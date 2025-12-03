@@ -60,6 +60,34 @@
         </el-col>
       </el-row>
 
+      <!-- 连接测试 -->
+      <el-row :gutter="24" class="connection-test" v-if="connectionStatus">
+        <el-col :span="24">
+          <el-card>
+            <template #header>
+              <span>后端连接测试</span>
+            </template>
+            <div class="test-content">
+              <el-alert
+                :title="connectionStatus.title"
+                :type="connectionStatus.type"
+                :description="connectionStatus.message"
+                :closable="false"
+                show-icon
+              />
+              <el-button 
+                type="primary" 
+                @click="testConnection" 
+                :loading="testing"
+                style="margin-top: 16px;"
+              >
+                重新测试连接
+              </el-button>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+
       <!-- 快速操作 -->
       <el-row :gutter="24" class="quick-actions">
         <el-col :span="24">
@@ -141,9 +169,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import type { Trip, Expense } from '@/types'
+import { communityApi } from '@/api'
 
 // 统计数据
 const stats = ref({
@@ -248,6 +278,61 @@ const getCategoryText = (category: string) => {
   }
   return texts[category] || category
 }
+
+// 连接测试
+const testing = ref(false)
+const connectionStatus = ref<{
+  title: string
+  type: 'success' | 'warning' | 'error' | 'info'
+  message: string
+} | null>(null)
+
+const testConnection = async () => {
+  testing.value = true
+  try {
+    // 测试一个不需要登录的API接口
+    const response = await communityApi.getFeed(1, 1)
+    connectionStatus.value = {
+      title: '连接成功！',
+      type: 'success',
+      message: `后端API响应正常。状态码: ${response.code || 'N/A'}`
+    }
+    ElMessage.success('后端连接测试成功！')
+  } catch (error: any) {
+    console.error('连接测试失败:', error)
+    if (error.response) {
+      // 有响应，说明连接成功，但可能是401或其他错误
+      connectionStatus.value = {
+        title: '连接成功，但需要认证',
+        type: 'warning',
+        message: `后端已连接，但返回状态码: ${error.response.status}。这可能是正常的（需要登录）。`
+      }
+      ElMessage.warning('后端已连接，但可能需要登录')
+    } else if (error.request) {
+      // 没有响应，说明连接失败
+      connectionStatus.value = {
+        title: '连接失败',
+        type: 'error',
+        message: '无法连接到后端服务器。请检查：1. 后端服务是否运行在8081端口 2. Vite代理配置是否正确'
+      }
+      ElMessage.error('无法连接到后端服务器')
+    } else {
+      connectionStatus.value = {
+        title: '测试出错',
+        type: 'error',
+        message: `错误信息: ${error.message || '未知错误'}`
+      }
+      ElMessage.error('连接测试出错')
+    }
+  } finally {
+    testing.value = false
+  }
+}
+
+// 页面加载时自动测试连接
+onMounted(() => {
+  testConnection()
+})
 </script>
 
 <style scoped>
@@ -312,6 +397,15 @@ const getCategoryText = (category: string) => {
 
 .quick-actions {
   margin-bottom: 24px;
+}
+
+.connection-test {
+  margin-bottom: 24px;
+}
+
+.test-content {
+  display: flex;
+  flex-direction: column;
 }
 
 .action-buttons {

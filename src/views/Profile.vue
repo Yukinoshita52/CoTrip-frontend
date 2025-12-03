@@ -307,12 +307,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '@/components/Layout.vue'
+import { useUserStore } from '@/stores/user'
+import { userApi } from '@/api'
 import type { Trip, CommunityPost } from '@/types'
 import dayjs from 'dayjs'
 
+const userStore = useUserStore()
 const activeTab = ref('trips')
 const showEditProfile = ref(false)
 const showShareDialog = ref(false)
@@ -321,13 +324,13 @@ const showLoginDevices = ref(false)
 
 // 用户信息
 const userInfo = ref({
-  id: 'user1',
-  username: '张三',
-  nickname: '旅行爱好者',
-  email: 'zhangsan@example.com',
+  id: '',
+  username: '',
+  nickname: '',
+  email: '',
   avatar: '',
-  bio: '热爱旅行，喜欢探索世界各地的美景和文化',
-  createdAt: '2024-01-01'
+  bio: '',
+  createdAt: ''
 })
 
 // 用户统计
@@ -493,12 +496,6 @@ const handleAvatarUpload = () => {
   ElMessage.info('头像上传功能待实现')
 }
 
-const saveProfile = () => {
-  Object.assign(userInfo.value, editForm)
-  showEditProfile.value = false
-  ElMessage.success('个人资料已更新')
-}
-
 const saveSettings = () => {
   Object.assign(userInfo.value, settingsForm)
   ElMessage.success('设置已保存')
@@ -508,24 +505,7 @@ const savePrivacySettings = () => {
   ElMessage.success('隐私设置已保存')
 }
 
-const changePassword = () => {
-  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-    ElMessage.error('两次输入的密码不一致')
-    return
-  }
-  
-  showChangePassword.value = false
-  ElMessage.success('密码修改成功')
-  
-  // 重置表单
-  Object.assign(passwordForm, {
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  })
-}
-
-const editShare = (share: CommunityPost) => {
+const editShare = (_share: CommunityPost) => {
   ElMessage.info('编辑分享功能待实现')
 }
 
@@ -555,6 +535,86 @@ const removeFavorite = (favorite: CommunityPost) => {
   if (index > -1) {
     favorites.value.splice(index, 1)
     ElMessage.success('已取消收藏')
+  }
+}
+
+// 加载用户信息
+onMounted(async () => {
+  if (userStore.user) {
+    userInfo.value = {
+      id: String(userStore.user.id || userStore.user.userId || ''),
+      username: userStore.user.username || '',
+      nickname: userStore.user.nickname || userStore.user.username || '',
+      email: userStore.user.email || '',
+      avatar: userStore.user.avatar || '',
+      bio: '',
+      createdAt: ''
+    }
+  } else {
+    // 尝试从后端获取
+    const user = await userStore.fetchCurrentUser()
+    if (user) {
+      userInfo.value = {
+        id: String(user.id || user.userId || ''),
+        username: user.username || '',
+        nickname: user.nickname || user.username || '',
+        email: user.email || '',
+        avatar: user.avatar || '',
+        bio: '',
+        createdAt: ''
+      }
+    }
+  }
+  
+  // 同步表单数据
+  editForm.username = userInfo.value.username
+  editForm.nickname = userInfo.value.nickname
+  editForm.email = userInfo.value.email
+  settingsForm.username = userInfo.value.username
+  settingsForm.nickname = userInfo.value.nickname
+  settingsForm.email = userInfo.value.email
+})
+
+// 保存资料
+const saveProfile = async () => {
+  try {
+    if (editForm.nickname !== userInfo.value.nickname) {
+      await userApi.updateNickname(editForm.nickname)
+    }
+    Object.assign(userInfo.value, editForm)
+    userStore.setUser({
+      ...userStore.user!,
+      nickname: editForm.nickname,
+      username: editForm.username,
+      email: editForm.email
+    })
+    showEditProfile.value = false
+    ElMessage.success('个人资料已更新')
+  } catch (error: any) {
+    ElMessage.error(error.message || '更新失败')
+  }
+}
+
+// 修改密码
+const changePassword = async () => {
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+    ElMessage.error('两次输入的密码不一致')
+    return
+  }
+  
+  try {
+    await userApi.updatePassword(passwordForm.currentPassword, passwordForm.newPassword)
+    showChangePassword.value = false
+    ElMessage.success('密码修改成功')
+    
+    // 重置表单
+    Object.assign(passwordForm, {
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    })
+  } catch (error: any) {
+    ElMessage.error(error.message || '密码修改失败')
   }
 }
 </script>

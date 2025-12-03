@@ -83,23 +83,45 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
-
-// 模拟用户数据
-const username = '用户名'
-const userAvatar = ''
+const router = useRouter()
+const userStore = useUserStore()
 
 const currentPageTitle = computed(() => {
   return route.meta?.title as string || '协同旅行'
 })
 
-const handleLogout = () => {
-  // 退出登录逻辑
-  console.log('退出登录')
+const username = computed(() => {
+  return userStore.user?.nickname || userStore.user?.username || '未登录'
+})
+
+const userAvatar = computed(() => {
+  return userStore.user?.avatar || ''
+})
+
+const handleLogout = async () => {
+  try {
+    await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+      type: 'warning'
+    })
+    userStore.logout()
+    router.push('/login')
+  } catch {
+    // 用户取消
+  }
 }
+
+onMounted(() => {
+  // 如果已登录但没有用户信息，尝试获取
+  if (localStorage.getItem('token') && !userStore.user) {
+    userStore.fetchCurrentUser()
+  }
+})
 </script>
 
 <style scoped>

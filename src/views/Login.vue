@@ -201,16 +201,18 @@ const handleRegister = async () => {
     console.log('注册响应:', res)
     
     if (res.code === 200 && res.data) {
-      localStorage.setItem('token', res.data.token)
-      
-      // 获取用户信息
-      if (res.data.userId) {
-        await userStore.fetchCurrentUser()
-      }
-      
-      ElMessage.success('注册成功')
+      ElMessage.success('注册成功，请登录')
       showRegister.value = false
-      router.push('/dashboard')
+      
+      // 将注册的用户名填入登录表单
+      loginForm.username = registerForm.username
+      
+      // 重置注册表单
+      Object.assign(registerForm, {
+        username: '',
+        password: '',
+        confirmPassword: ''
+      })
     } else {
       ElMessage.error(res.message || '注册失败')
     }

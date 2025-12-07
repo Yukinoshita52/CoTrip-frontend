@@ -122,7 +122,7 @@
               
               <div class="post-footer">
                 <div class="author-info">
-                  <el-avatar :size="24" :src="post.author.avatar">
+                  <el-avatar :size="24" :src="formatAvatarUrl(post.author.avatar)">
                     {{ post.author.username.charAt(0) }}
                   </el-avatar>
                   <span class="author-name">{{ post.author.username }}</span>
@@ -233,6 +233,7 @@ import { ElMessage } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import { communityApi, tripApi } from '@/api'
 import type { CommunityPost, Trip } from '@/types'
+import { formatAvatarUrl } from '@/utils/image'
 import dayjs from 'dayjs'
 
 // 筛选条件
@@ -263,14 +264,7 @@ const shareForm = reactive({
 })
 
 // 热门标签
-const popularTags = ref([
-  { name: '日本', count: 156 },
-  { name: '美食', count: 89 },
-  { name: '文化', count: 67 },
-  { name: '自然风光', count: 45 },
-  { name: '城市游', count: 34 },
-  { name: '亲子游', count: 28 }
-])
+const popularTags = ref<{ name: string; count: number }[]>([])
 
 // 我的行程（用于分享）
 const myTrips = ref<Trip[]>([])

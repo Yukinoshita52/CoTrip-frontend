@@ -227,6 +227,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import { expenseApi, tripApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 import type { Expense, Trip } from '@/types'
 import dayjs from 'dayjs'
 
@@ -246,6 +247,7 @@ const pagination = ref({
 })
 
 const loading = ref(false)
+const userStore = useUserStore()
 const accountBooks = ref<any[]>([])
 const trips = ref<Trip[]>([])
 const expenses = ref<Expense[]>([])
@@ -301,10 +303,19 @@ const stats = computed(() => {
   const totalAmount = expenseRecords.reduce((sum, expense) => sum + expense.amount, 0)
   const totalCount = expenses.value.length
   
+  // 计算我的支出和待结算金额（基于实际数据）
+  const myAmount = expenseRecords
+    .filter(e => e.paidBy === userStore.user?.userId || e.paidBy === userStore.user?.id)
+    .reduce((sum, expense) => sum + expense.amount, 0)
+  
+  const pendingAmount = expenseRecords
+    .filter(e => !isSettled(e))
+    .reduce((sum, expense) => sum + expense.amount, 0)
+  
   return { 
     totalAmount, 
-    myAmount: 0, // 需要从后端获取
-    pendingAmount: 0, // 需要从后端获取
+    myAmount,
+    pendingAmount,
     totalCount 
   }
 })
@@ -426,12 +437,15 @@ const getSplitTypeText = (splitType: string) => {
 }
 
 const getUserName = (userId: string) => {
-  const users: Record<string, string> = {
-    user1: '张三',
-    user2: '李四',
-    user3: '王五'
+  // 从行程成员中查找用户名
+  const selectedTrip = trips.value.find(trip => trip.id === filters.value.tripId)
+  if (selectedTrip) {
+    const member = selectedTrip.members.find(m => m.userId === userId)
+    if (member) {
+      return member.username
+    }
   }
-  return users[userId] || userId
+  return userId
 }
 
 const isSettled = (expense: Expense) => {

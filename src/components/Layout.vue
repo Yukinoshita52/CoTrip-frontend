@@ -35,6 +35,11 @@
           <span>旅行社区</span>
         </el-menu-item>
         
+        <el-menu-item index="/invitations">
+          <el-icon><Message /></el-icon>
+          <span>邀请信息</span>
+        </el-menu-item>
+        
         <el-menu-item index="/profile">
           <el-icon><User /></el-icon>
           <span>个人中心</span>
@@ -87,6 +92,7 @@ import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { formatAvatarUrl } from '@/utils/image'
 
 const route = useRoute()
 const router = useRouter()
@@ -101,7 +107,7 @@ const username = computed(() => {
 })
 
 const userAvatar = computed(() => {
-  return userStore.user?.avatar || ''
+  return formatAvatarUrl(userStore.user?.avatarUrl)
 })
 
 const handleLogout = async () => {

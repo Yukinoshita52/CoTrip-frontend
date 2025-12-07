@@ -142,14 +142,7 @@ const form = reactive({
   dateRange: [] as string[],
   description: '',
   coverImage: '',
-  members: [
-    {
-      userId: 'current-user',
-      username: '我',
-      role: 'owner' as const,
-      joinedAt: new Date().toISOString()
-    }
-  ] as TripMember[]
+  members: [] as TripMember[]
 })
 
 // 表单验证规则
@@ -192,17 +185,9 @@ const addMember = () => {
     return
   }
   
-  // 模拟邀请成员
-  const newMember: TripMember = {
-    userId: `user-${Date.now()}`,
-    username: newMemberEmail.value.split('@')[0],
-    role: 'member',
-    joinedAt: new Date().toISOString()
-  }
-  
-  form.members.push(newMember)
+  // 实际应该调用邀请API，这里暂时提示功能待实现
+  ElMessage.info('邀请功能待实现，请在行程创建后通过行程详情页面邀请成员')
   newMemberEmail.value = ''
-  ElMessage.success('成员邀请已发送')
 }
 
 const removeMember = (userId: string) => {

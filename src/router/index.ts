@@ -61,6 +61,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '行程分享详情', requiresAuth: false }
   },
   {
+    path: '/invitations',
+    name: 'Invitations',
+    component: () => import('@/views/Invitations.vue'),
+    meta: { title: '邀请信息', requiresAuth: true }
+  },
+  {
     path: '/profile',
     name: 'Profile',
     component: () => import('@/views/Profile.vue'),

@@ -197,10 +197,12 @@ import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElDialog } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import type { Trip, Expense } from '@/types'
-import { tripApi, expenseApi, announcementApi } from '@/api'
+import { tripApi, expenseApi, announcementApi, communityApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 import dayjs from 'dayjs'
 
 const loading = ref(false)
+const userStore = useUserStore()
 
 // 统计数据
 const stats = ref({
@@ -352,7 +354,20 @@ const loadData = async () => {
     stats.value.ongoingTrips = allTrips.value.filter(t => t.status === 'ongoing').length
     stats.value.totalExpenses = allExpenses.value
       .reduce((sum, e) => sum + e.amount, 0)
-    stats.value.sharedTrips = 0 // 需要从社区API获取
+    // 获取已分享的行程数量
+    try {
+      const communityRes = await communityApi.getFeed(1, 100).catch(() => ({ code: 200, data: { list: [] } }))
+      if (communityRes.code === 200 && communityRes.data) {
+        const myPosts = (communityRes.data.list || []).filter((post: any) => 
+          post.author?.userId === userStore.user?.userId || post.author?.userId === userStore.user?.id
+        )
+        stats.value.sharedTrips = myPosts.length
+      } else {
+        stats.value.sharedTrips = 0
+      }
+    } catch (error) {
+      stats.value.sharedTrips = 0
+    }
     
     // 处理公告数据
     if (announcementsRes.code === 200 && announcementsRes.data) {

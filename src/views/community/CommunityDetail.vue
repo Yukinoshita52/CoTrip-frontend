@@ -19,7 +19,7 @@
             <h1>{{ post.title }}</h1>
             <div class="post-meta">
               <div class="author-info">
-                <el-avatar :src="post.author.avatar">
+                <el-avatar :src="formatAvatarUrl(post.author.avatar)">
                   {{ post.author.username.charAt(0) }}
                 </el-avatar>
                 <div class="author-details">
@@ -230,6 +230,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import type { CommunityPost, ItineraryItem, Expense } from '@/types'
+import { formatAvatarUrl } from '@/utils/image'
 import dayjs from 'dayjs'
 import { communityApi, tripApi, expenseApi } from '@/api'
 

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { userApi } from '@/api'
+import type { UserVO } from '@/types/api'
 
 export interface User {
   id?: number
@@ -9,7 +10,7 @@ export interface User {
   nickname?: string
   email?: string
   phone?: string
-  avatar?: string
+  avatarUrl?: string
 }
 
 export const useUserStore = defineStore('user', () => {
@@ -37,9 +38,25 @@ export const useUserStore = defineStore('user', () => {
     loading.value = true
     try {
       const res = await userApi.getCurrentUser()
+      
       if (res.code === 200 && res.data) {
-        user.value = res.data
-        return res.data
+        // 处理头像URL，如果是相对路径则拼接完整地址
+        let avatarUrl = res.data.avatarUrl
+        if (avatarUrl && !avatarUrl.startsWith('http')) {
+          const cleanPath = avatarUrl.startsWith('/') ? avatarUrl.substring(1) : avatarUrl
+          avatarUrl = `http://121.40.23.40:9000/cotrip/${cleanPath}`
+        }
+        
+        // 将后端返回的UserVO转换为前端User类型
+        const userData: User = {
+          username: res.data.username,
+          nickname: res.data.nickname,
+          phone: res.data.phone,
+          avatarUrl: avatarUrl
+        }
+        
+        user.value = userData
+        return userData
       }
     } catch (error) {
       console.error('获取用户信息失败:', error)

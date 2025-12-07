@@ -175,6 +175,86 @@
           </div>
         </el-tab-pane>
 
+        <!-- 我的邀请 -->
+        <el-tab-pane label="我的邀请" name="sent-invitations">
+          <div class="invitations-section">
+            <div class="section-header">
+              <h3>我发出的邀请</h3>
+            </div>
+            
+            <div class="invitations-list">
+              <el-empty v-if="sentInvitations.length === 0" description="暂无发出的邀请" :image-size="80" />
+              <div v-for="invitation in sentInvitations" :key="invitation.invitationId" class="invitation-item">
+                <div class="invitation-info">
+                  <div class="invitation-trip">
+                    <el-icon><MapLocation /></el-icon>
+                    <span>行程ID: {{ invitation.tripId }}</span>
+                  </div>
+                  <div class="invitation-invitee">
+                    <el-icon><User /></el-icon>
+                    <span>被邀请人: {{ invitation.invitee }}</span>
+                  </div>
+                  <div class="invitation-status">
+                    <el-tag :type="getInvitationStatusType(invitation.status)" size="small">
+                      {{ getInvitationStatusText(invitation.status) }}
+                    </el-tag>
+                  </div>
+                  <div class="invitation-time">
+                    <el-icon><Clock /></el-icon>
+                    <span>{{ formatDate(invitation.sentTime) }}</span>
+                  </div>
+                </div>
+                <div class="invitation-actions" v-if="invitation.status === 0">
+                  <el-button text type="danger" @click="cancelInvitation(invitation.invitationId)">
+                    撤销邀请
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </el-tab-pane>
+
+        <!-- 收到的邀请 -->
+        <el-tab-pane label="收到的邀请" name="received-invitations">
+          <div class="invitations-section">
+            <div class="section-header">
+              <h3>我收到的邀请</h3>
+            </div>
+            
+            <div class="invitations-list">
+              <el-empty v-if="receivedInvitations.length === 0" description="暂无收到的邀请" :image-size="80" />
+              <div v-for="invitation in receivedInvitations" :key="invitation.invitationId" class="invitation-item">
+                <div class="invitation-info">
+                  <div class="invitation-inviter">
+                    <el-avatar :size="40" :src="invitation.inviterAvatarUrl">
+                      {{ invitation.inviterNickname?.charAt(0) || 'U' }}
+                    </el-avatar>
+                    <div class="inviter-details">
+                      <div class="inviter-name">{{ invitation.inviterNickname || invitation.inviterPhone }}</div>
+                      <div class="invitation-trip">
+                        <el-icon><MapLocation /></el-icon>
+                        <span>邀请加入行程ID: {{ invitation.tripId }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="invitation-time">
+                    <el-icon><Clock /></el-icon>
+                    <span>{{ formatDate(invitation.sentTime) }}</span>
+                  </div>
+                </div>
+                <div class="invitation-actions">
+                  <el-button type="success" @click="acceptInvitation(invitation.invitationId)">
+                    接受
+                  </el-button>
+                  <el-button @click="rejectInvitation(invitation.invitationId)">
+                    拒绝
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </el-tab-pane>
+
         <!-- 账户设置 -->
         <el-tab-pane label="账户设置" name="settings">
           <div class="settings-section">
@@ -311,7 +391,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import { useUserStore } from '@/stores/user'
-import { userApi } from '@/api'
+import { userApi, tripApi, communityApi, invitationApi } from '@/api'
 import type { Trip, CommunityPost } from '@/types'
 import dayjs from 'dayjs'
 
@@ -335,102 +415,22 @@ const userInfo = ref({
 
 // 用户统计
 const userStats = ref({
-  totalTrips: 12,
-  sharedTrips: 5,
-  totalLikes: 89
+  totalTrips: 0,
+  sharedTrips: 0,
+  totalLikes: 0
 })
 
 // 我的行程
-const myTrips = ref<Trip[]>([
-  {
-    id: '1',
-    title: '日本关西之旅',
-    destination: '大阪·京都·奈良',
-    startDate: '2024-03-15',
-    endDate: '2024-03-22',
-    status: 'ongoing',
-    description: '',
-    coverImage: '',
-    createdBy: 'user1',
-    members: [],
-    itinerary: [],
-    createdAt: '2024-03-01',
-    updatedAt: '2024-03-01'
-  },
-  {
-    id: '2',
-    title: '云南大理丽江',
-    destination: '大理·丽江',
-    startDate: '2024-04-10',
-    endDate: '2024-04-17',
-    status: 'planning',
-    description: '',
-    coverImage: '',
-    createdBy: 'user1',
-    members: [],
-    itinerary: [],
-    createdAt: '2024-02-20',
-    updatedAt: '2024-02-20'
-  }
-])
-
+const myTrips = ref<Trip[]>([])
 // 我的分享
-const myShares = ref<CommunityPost[]>([
-  {
-    id: '1',
-    title: '春日京都赏樱之旅',
-    description: '在樱花盛开的季节，漫步京都古街，感受千年古都的魅力',
-    tripId: '1',
-    authorId: 'user1',
-    author: userInfo.value,
-    trip: myTrips.value[0],
-    likes: 128,
-    views: 1520,
-    tags: ['日本', '樱花', '文化'],
-    isPublic: true,
-    createdAt: '2024-04-10',
-    updatedAt: '2024-04-10'
-  }
-])
+const myShares = ref<CommunityPost[]>([])
 
 // 收藏夹
-const favorites = ref<CommunityPost[]>([
-  {
-    id: '2',
-    title: '云南大理洱海环游',
-    description: '骑行洱海，住民宿，品白族美食',
-    tripId: '2',
-    authorId: 'user3',
-    author: {
-      id: 'user3',
-      username: '背包客小王',
-      email: 'user3@example.com',
-      nickname: '小王',
-      createdAt: '2024-01-01'
-    },
-    trip: {
-      id: '2',
-      title: '大理丽江5日游',
-      destination: '大理·丽江',
-      startDate: '2024-03-20',
-      endDate: '2024-03-24',
-      status: 'completed',
-      description: '',
-      coverImage: '',
-      createdBy: 'user3',
-      members: [],
-      itinerary: [],
-      createdAt: '2024-03-01',
-      updatedAt: '2024-03-01'
-    },
-    likes: 89,
-    views: 756,
-    tags: ['云南', '自然风光'],
-    isPublic: true,
-    createdAt: '2024-03-25',
-    updatedAt: '2024-03-25'
-  }
-])
+const favorites = ref<CommunityPost[]>([])
+
+// 邀请相关
+const sentInvitations = ref<any[]>([])
+const receivedInvitations = ref<any[]>([])
 
 // 表单数据
 const editForm = reactive({
@@ -538,8 +538,131 @@ const removeFavorite = (favorite: CommunityPost) => {
   }
 }
 
+// 加载我发出的邀请
+const loadSentInvitations = async () => {
+  try {
+    const res = await invitationApi.getSentInvitations()
+    if (res.code === 200 && res.data) {
+      sentInvitations.value = res.data.map((inv: any) => ({
+        invitationId: inv.invitationId || inv.id,
+        tripId: inv.tripId,
+        invitee: inv.invitee,
+        status: inv.status,
+        sentTime: inv.sentTime
+      }))
+    }
+  } catch (error: any) {
+    console.error('加载发出的邀请失败:', error)
+    ElMessage.error(error.message || '加载发出的邀请失败')
+  }
+}
+
+// 加载我收到的邀请
+const loadReceivedInvitations = async () => {
+  try {
+    const res = await invitationApi.getReceivedInvitations()
+    if (res.code === 200 && res.data) {
+      receivedInvitations.value = res.data.map((inv: any) => ({
+        invitationId: inv.invitationId || inv.id,
+        tripId: inv.tripId,
+        inviterId: inv.inviterId,
+        inviterNickname: inv.inviterNickname,
+        inviterAvatarUrl: inv.inviterAvatarUrl,
+        inviterPhone: inv.inviterPhone,
+        status: inv.status,
+        sentTime: inv.sentTime
+      }))
+    }
+  } catch (error: any) {
+    console.error('加载收到的邀请失败:', error)
+    ElMessage.error(error.message || '加载收到的邀请失败')
+  }
+}
+
+// 接受邀请
+const acceptInvitation = async (invitationId: number) => {
+  try {
+    const res = await invitationApi.acceptInvitation(invitationId)
+    if (res.code === 200) {
+      ElMessage.success('已接受邀请')
+      await loadReceivedInvitations()
+    } else {
+      ElMessage.error(res.message || '接受邀请失败')
+    }
+  } catch (error: any) {
+    console.error('接受邀请失败:', error)
+    ElMessage.error(error.message || '接受邀请失败')
+  }
+}
+
+// 拒绝邀请
+const rejectInvitation = async (invitationId: number) => {
+  try {
+    await ElMessageBox.confirm('确定要拒绝这个邀请吗？', '确认拒绝', {
+      type: 'warning'
+    })
+    
+    const res = await invitationApi.rejectInvitation(invitationId)
+    if (res.code === 200) {
+      ElMessage.success('已拒绝邀请')
+      await loadReceivedInvitations()
+    } else {
+      ElMessage.error(res.message || '拒绝邀请失败')
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('拒绝邀请失败:', error)
+      ElMessage.error(error.message || '拒绝邀请失败')
+    }
+  }
+}
+
+// 撤销邀请
+const cancelInvitation = async (invitationId: number) => {
+  try {
+    await ElMessageBox.confirm('确定要撤销这个邀请吗？', '确认撤销', {
+      type: 'warning'
+    })
+    
+    const res = await invitationApi.cancelInvitation(invitationId)
+    if (res.code === 200) {
+      ElMessage.success('已撤销邀请')
+      await loadSentInvitations()
+    } else {
+      ElMessage.error(res.message || '撤销邀请失败')
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('撤销邀请失败:', error)
+      ElMessage.error(error.message || '撤销邀请失败')
+    }
+  }
+}
+
+// 获取邀请状态类型
+const getInvitationStatusType = (status: number) => {
+  const types: Record<number, string> = {
+    0: 'warning', // 待接受
+    1: 'success', // 已接受
+    2: 'danger',  // 已拒绝
+    3: 'info'      // 已过期
+  }
+  return types[status] || 'info'
+}
+
+// 获取邀请状态文本
+const getInvitationStatusText = (status: number) => {
+  const texts: Record<number, string> = {
+    0: '待接受',
+    1: '已接受',
+    2: '已拒绝',
+    3: '已过期'
+  }
+  return texts[status] || '未知'
+}
+
 // 加载用户信息
-onMounted(async () => {
+const loadUserInfo = async () => {
   if (userStore.user) {
     userInfo.value = {
       id: String(userStore.user.id || userStore.user.userId || ''),
@@ -573,6 +696,94 @@ onMounted(async () => {
   settingsForm.username = userInfo.value.username
   settingsForm.nickname = userInfo.value.nickname
   settingsForm.email = userInfo.value.email
+}
+
+// 加载我的行程
+const loadMyTrips = async () => {
+  try {
+    const res = await tripApi.getTrips()
+    if (res.code === 200 && res.data) {
+      myTrips.value = res.data.map((trip: any) => ({
+        id: String(trip.tripId),
+        title: trip.name,
+        destination: trip.region,
+        startDate: dayjs(trip.startDate).format('YYYY-MM-DD'),
+        endDate: dayjs(trip.endDate).format('YYYY-MM-DD'),
+        status: 'completed',
+        description: trip.description || '',
+        coverImage: '',
+        createdBy: String(trip.createdBy || ''),
+        members: [],
+        itinerary: [],
+        createdAt: dayjs(trip.createdTime).format('YYYY-MM-DD'),
+        updatedAt: dayjs(trip.updatedTime).format('YYYY-MM-DD')
+      }))
+      userStats.value.totalTrips = myTrips.value.length
+    }
+  } catch (error: any) {
+    console.error('加载我的行程失败:', error)
+    ElMessage.error(error.message || '加载我的行程失败')
+  }
+}
+
+// 加载我的分享
+const loadMyShares = async () => {
+  if (!userInfo.value.id) return
+  try {
+    const res = await communityApi.getUserProfile(Number(userInfo.value.id))
+    if (res.code === 200 && res.data) {
+      const posts = res.data.posts || []
+      myShares.value = posts.map((post: any) => ({
+        id: String(post.postId || post.id || ''),
+        title: post.tripName || post.title || '',
+        description: post.description || '',
+        tripId: String(post.tripId || ''),
+        authorId: String(post.author?.userId || post.authorId || ''),
+        author: {
+          id: String(post.author?.userId || post.authorId || ''),
+          username: post.author?.username || '',
+          email: post.author?.email || '',
+          nickname: post.author?.nickname || post.author?.username || '',
+          avatar: post.author?.avatarUrl || post.author?.avatar || '',
+          createdAt: ''
+        },
+        trip: {
+          id: String(post.tripId || ''),
+          title: post.tripName || '',
+          destination: post.region || '',
+          startDate: post.startDate ? dayjs(post.startDate).format('YYYY-MM-DD') : '',
+          endDate: post.endDate ? dayjs(post.endDate).format('YYYY-MM-DD') : '',
+          status: 'completed',
+          description: post.description || '',
+          coverImage: post.coverImages?.[0] || '',
+          createdBy: String(post.author?.userId || ''),
+          members: [],
+          itinerary: [],
+          createdAt: post.createTime ? dayjs(post.createTime).format('YYYY-MM-DD') : '',
+          updatedAt: post.createTime ? dayjs(post.createTime).format('YYYY-MM-DD') : ''
+        },
+        likes: post.stats?.likeCount || post.likes || 0,
+        views: post.stats?.viewCount || post.views || 0,
+        tags: post.tags || [],
+        isPublic: true,
+        createdAt: post.createTime ? dayjs(post.createTime).format('YYYY-MM-DD') : '',
+        updatedAt: post.createTime ? dayjs(post.createTime).format('YYYY-MM-DD') : ''
+      }))
+      userStats.value.sharedTrips = myShares.value.length
+      userStats.value.totalLikes = myShares.value.reduce((sum, share) => sum + share.likes, 0)
+    }
+  } catch (error: any) {
+    console.error('加载我的分享失败:', error)
+    ElMessage.error(error.message || '加载我的分享失败')
+  }
+}
+
+onMounted(async () => {
+  await loadUserInfo()
+  await loadMyTrips()
+  await loadMyShares()
+  await loadSentInvitations()
+  await loadReceivedInvitations()
 })
 
 // 保存资料
@@ -870,5 +1081,78 @@ const changePassword = async () => {
 
 .settings-section .el-card:last-child {
   margin-bottom: 0;
+}
+
+.invitations-section {
+  padding: 24px;
+}
+
+.invitations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.invitation-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.invitation-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.invitation-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.invitation-inviter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.inviter-details {
+  flex: 1;
+}
+
+.inviter-name {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.invitation-trip,
+.invitation-invitee,
+.invitation-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  color: #666;
+}
+
+.invitation-trip .el-icon,
+.invitation-invitee .el-icon,
+.invitation-time .el-icon {
+  margin-right: 4px;
+}
+
+.invitation-status {
+  margin-top: 4px;
+}
+
+.invitation-actions {
+  display: flex;
+  gap: 8px;
 }
 </style>

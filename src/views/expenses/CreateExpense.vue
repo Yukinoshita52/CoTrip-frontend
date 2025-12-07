@@ -210,28 +210,49 @@ const router = useRouter()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
 
-// 模拟数据
-const trips = ref<Trip[]>([
-  {
-    id: '1',
-    title: '日本关西之旅',
-    destination: '大阪·京都·奈良',
-    startDate: '2024-03-15',
-    endDate: '2024-03-22',
-    status: 'ongoing',
-    description: '',
-    coverImage: '',
-    createdBy: 'user1',
-    members: [
-      { userId: 'user1', username: '张三', role: 'owner', joinedAt: '2024-03-01' },
-      { userId: 'user2', username: '李四', role: 'member', joinedAt: '2024-03-02' },
-      { userId: 'user3', username: '王五', role: 'member', joinedAt: '2024-03-03' }
-    ],
-    itinerary: [],
-    createdAt: '2024-03-01',
-    updatedAt: '2024-03-01'
+import { expenseApi, tripApi } from '@/api'
+
+const accountBooks = ref<any[]>([])
+const trips = ref<Trip[]>([])
+
+// 加载账本和行程列表
+const loadData = async () => {
+  try {
+    const [booksRes, tripsRes] = await Promise.all([
+      expenseApi.getAllAccountBooks().catch(() => ({ code: 200, data: [] })),
+      tripApi.getTrips().catch(() => ({ code: 200, data: [] }))
+    ])
+    
+    if (booksRes.code === 200 && booksRes.data) {
+      accountBooks.value = Array.isArray(booksRes.data) ? booksRes.data : []
+    }
+    
+    if (tripsRes.code === 200 && tripsRes.data) {
+      const tripsData = Array.isArray(tripsRes.data) ? tripsRes.data : []
+      trips.value = tripsData.map((trip: any) => ({
+        id: String(trip.tripId || trip.id || ''),
+        title: trip.name || trip.title || '',
+        destination: trip.region || trip.destination || '',
+        startDate: trip.startDate ? dayjs(trip.startDate).format('YYYY-MM-DD') : '',
+        endDate: trip.endDate ? dayjs(trip.endDate).format('YYYY-MM-DD') : '',
+        status: trip.status || 'planning',
+        description: trip.description || '',
+        coverImage: trip.coverImage || '',
+        createdBy: String(trip.createdBy || ''),
+        members: trip.members || [],
+        itinerary: trip.itinerary || [],
+        createdAt: trip.createdTime ? dayjs(trip.createdTime).format('YYYY-MM-DD') : '',
+        updatedAt: trip.updatedTime ? dayjs(trip.updatedTime).format('YYYY-MM-DD') : ''
+      }))
+    }
+  } catch (error: any) {
+    console.error('加载数据失败:', error)
   }
-])
+}
+
+onMounted(() => {
+  loadData()
+})
 
 const tripMembers = computed(() => {
   const selectedTrip = trips.value.find(trip => trip.id === form.tripId)
@@ -240,10 +261,12 @@ const tripMembers = computed(() => {
 
 // 表单数据
 const form = reactive({
+  bookId: null as number | null,
   tripId: '',
   title: '',
   amount: 0,
   category: '',
+  categoryId: null as number | null,
   date: '',
   paidBy: '',
   description: '',
@@ -251,6 +274,35 @@ const form = reactive({
   participants: [] as string[],
   splitType: 'equal' as 'equal' | 'custom' | 'percentage',
   splits: [] as ExpenseSplit[]
+})
+
+// 监听tripId变化，自动选择或创建账本
+watch(() => form.tripId, async (tripId) => {
+  if (tripId) {
+    const tripIdNum = Number(tripId)
+    // 查找该行程对应的账本
+    const book = accountBooks.value.find(b => b.tripId === tripIdNum)
+    if (book) {
+      form.bookId = book.bookId || book.id
+    } else {
+      // 如果没有账本，自动创建一个
+      try {
+        const selectedTrip = trips.value.find(t => t.id === tripId)
+        const bookName = selectedTrip?.title || '默认账本'
+        const res = await expenseApi.createAccountBook({
+          tripId: tripIdNum,
+          name: bookName
+        })
+        if (res.code === 200 && res.data) {
+          form.bookId = res.data.bookId || res.data.id
+          await loadData() // 重新加载账本列表
+        }
+      } catch (error: any) {
+        console.error('创建账本失败:', error)
+        ElMessage.error('创建账本失败，请稍后再试')
+      }
+    }
+  }
 })
 
 // 表单验证规则
@@ -386,6 +438,11 @@ const handleSubmit = async () => {
   try {
     await formRef.value.validate()
     
+    if (!form.bookId) {
+      ElMessage.error('请先选择行程，系统会自动创建账本')
+      return
+    }
+    
     // 验证分摊金额
     if (form.splitType !== 'equal' && Math.abs(remainingAmount.value) > 0.01) {
       ElMessage.error('分摊金额与账单金额不匹配')
@@ -394,28 +451,28 @@ const handleSubmit = async () => {
     
     loading.value = true
     
-    // 构建提交数据
-    const expenseData = {
-      tripId: form.tripId,
-      title: form.title,
+    // 构建提交数据（匹配后端RecordDTO格式）
+    const recordData = {
+      bookId: form.bookId,
+      type: 2, // 2表示支出，1表示收入
       amount: form.amount,
-      category: form.category,
-      date: form.date,
-      paidBy: form.paidBy,
-      description: form.description,
-      receipt: form.receipt,
-      participants: form.participants,
-      splitType: form.splitType,
-      splits: form.splits
+      categoryId: form.categoryId || null,
+      categoryName: form.category || '',
+      note: form.description || form.title,
+      recordTime: form.date ? new Date(form.date) : new Date()
     }
     
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    const res = await expenseApi.createRecord(recordData)
     
-    ElMessage.success('账单添加成功!')
-    router.push('/expenses')
-  } catch (error) {
+    if (res.code === 200) {
+      ElMessage.success('账单添加成功!')
+      router.push('/expenses')
+    } else {
+      ElMessage.error(res.message || '添加失败')
+    }
+  } catch (error: any) {
     console.error('保存失败:', error)
+    ElMessage.error(error.message || '保存失败，请稍后再试')
   } finally {
     loading.value = false
   }

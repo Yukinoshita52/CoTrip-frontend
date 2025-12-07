@@ -60,34 +60,6 @@
         </el-col>
       </el-row>
 
-      <!-- 连接测试 -->
-      <el-row :gutter="24" class="connection-test" v-if="connectionStatus">
-        <el-col :span="24">
-          <el-card>
-            <template #header>
-              <span>后端连接测试</span>
-            </template>
-            <div class="test-content">
-              <el-alert
-                :title="connectionStatus.title"
-                :type="connectionStatus.type"
-                :description="connectionStatus.message"
-                :closable="false"
-                show-icon
-              />
-              <el-button 
-                type="primary" 
-                @click="testConnection" 
-                :loading="testing"
-                style="margin-top: 16px;"
-              >
-                重新测试连接
-              </el-button>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
-
       <!-- 快速操作 -->
       <el-row :gutter="24" class="quick-actions">
         <el-col :span="24">
@@ -113,8 +85,32 @@
         </el-col>
       </el-row>
 
+      <!-- 公告 -->
+      <el-row :gutter="24" class="announcements-row" v-if="announcements.length > 0">
+        <el-col :span="24">
+          <el-card>
+            <template #header>
+              <div class="card-header">
+                <span>最新公告</span>
+                <el-button text @click="showAllAnnouncements = true">查看全部</el-button>
+              </div>
+            </template>
+            <div class="announcements-list">
+              <div v-for="announcement in announcements.slice(0, 3)" :key="announcement.id" class="announcement-item">
+                <el-icon class="announcement-icon"><Bell /></el-icon>
+                <div class="announcement-content">
+                  <div class="announcement-title">{{ announcement.title }}</div>
+                  <div class="announcement-time">{{ formatDate(announcement.publishTime) }}</div>
+                </div>
+                <el-button text @click="viewAnnouncement(announcement.id)">查看详情</el-button>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+
       <!-- 最近行程和账单 -->
-      <el-row :gutter="24">
+      <el-row :gutter="24" v-loading="loading">
         <el-col :span="12">
           <el-card>
             <template #header>
@@ -124,7 +120,8 @@
               </div>
             </template>
             <div class="recent-trips">
-              <div v-for="trip in recentTrips" :key="trip.id" class="trip-item">
+              <el-empty v-if="!loading && recentTrips.length === 0" description="暂无行程" :image-size="80" />
+              <div v-for="trip in recentTrips" :key="trip.id" class="trip-item" v-else>
                 <div class="trip-info">
                   <div class="trip-title">{{ trip.title }}</div>
                   <div class="trip-meta">
@@ -151,7 +148,8 @@
               </div>
             </template>
             <div class="recent-expenses">
-              <div v-for="expense in recentExpenses" :key="expense.id" class="expense-item">
+              <el-empty v-if="!loading && recentExpenses.length === 0" description="暂无账单" :image-size="80" />
+              <div v-for="expense in recentExpenses" :key="expense.id" class="expense-item" v-else>
                 <div class="expense-info">
                   <div class="expense-title">{{ expense.title }}</div>
                   <div class="expense-amount">¥{{ expense.amount }}</div>
@@ -165,89 +163,213 @@
         </el-col>
       </el-row>
     </div>
+
+    <!-- 公告详情对话框 -->
+    <el-dialog v-model="showAnnouncementDialog" title="公告详情" width="600px" v-if="currentAnnouncement">
+      <div class="announcement-detail">
+        <h3>{{ currentAnnouncement.title }}</h3>
+        <div class="announcement-meta">
+          <span>发布时间：{{ formatDate(currentAnnouncement.publishTime) }}</span>
+        </div>
+        <div class="announcement-content-text" v-html="currentAnnouncement.content"></div>
+      </div>
+    </el-dialog>
+
+    <!-- 全部公告对话框 -->
+    <el-dialog v-model="showAllAnnouncements" title="全部公告" width="800px">
+      <div class="all-announcements">
+        <div v-for="announcement in announcements" :key="announcement.id" class="announcement-item-full">
+          <div class="announcement-header">
+            <h4>{{ announcement.title }}</h4>
+            <span class="announcement-time">{{ formatDate(announcement.publishTime) }}</span>
+          </div>
+          <div class="announcement-content-preview">{{ announcement.content }}</div>
+          <el-button text @click="viewAnnouncement(announcement.id)">查看详情</el-button>
+        </div>
+        <el-empty v-if="announcements.length === 0" description="暂无公告" />
+      </div>
+    </el-dialog>
   </Layout>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, onMounted, computed } from 'vue'
+import { ElMessage, ElDialog } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import type { Trip, Expense } from '@/types'
-import { communityApi } from '@/api'
+import { tripApi, expenseApi, announcementApi } from '@/api'
+import dayjs from 'dayjs'
+
+const loading = ref(false)
 
 // 统计数据
 const stats = ref({
-  totalTrips: 12,
-  totalExpenses: 25680,
-  ongoingTrips: 2,
-  sharedTrips: 5
+  totalTrips: 0,
+  totalExpenses: 0,
+  ongoingTrips: 0,
+  sharedTrips: 0
 })
 
-// 最近行程
-const recentTrips = ref<Trip[]>([
-  {
-    id: '1',
-    title: '日本关西之旅',
-    destination: '大阪·京都·奈良',
-    status: 'ongoing',
-    startDate: '2024-03-15',
-    endDate: '2024-03-22',
-    description: '',
-    coverImage: '',
-    createdBy: 'user1',
-    members: [],
-    itinerary: [],
-    createdAt: '2024-03-01',
-    updatedAt: '2024-03-01'
-  },
-  {
-    id: '2',
-    title: '云南大理丽江',
-    destination: '大理·丽江',
-    status: 'planning',
-    startDate: '2024-04-10',
-    endDate: '2024-04-17',
-    description: '',
-    coverImage: '',
-    createdBy: 'user1',
-    members: [],
-    itinerary: [],
-    createdAt: '2024-02-20',
-    updatedAt: '2024-02-20'
-  }
-])
+// 所有行程
+const allTrips = ref<Trip[]>([])
+// 所有账本
+const accountBooks = ref<any[]>([])
+// 所有账单
+const allExpenses = ref<Expense[]>([])
 
-// 最近账单
-const recentExpenses = ref<Expense[]>([
-  {
-    id: '1',
-    tripId: '1',
-    title: '大阪城门票',
-    amount: 600,
-    currency: 'CNY',
-    category: 'activity',
-    paidBy: 'user1',
-    participants: ['user1', 'user2'],
-    splitType: 'equal',
-    splits: [],
-    date: '2024-03-16',
-    createdAt: '2024-03-16'
-  },
-  {
-    id: '2',
-    tripId: '1',
-    title: '京都怀石料理',
-    amount: 1200,
-    currency: 'CNY',
-    category: 'food',
-    paidBy: 'user2',
-    participants: ['user1', 'user2'],
-    splitType: 'equal',
-    splits: [],
-    date: '2024-03-17',
-    createdAt: '2024-03-17'
+// 公告
+const announcements = ref<any[]>([])
+const showAllAnnouncements = ref(false)
+const currentAnnouncement = ref<any>(null)
+const showAnnouncementDialog = ref(false)
+
+// 最近行程（取前5个）
+const recentTrips = computed(() => {
+  return allTrips.value
+    .sort((a, b) => {
+      const dateA = dayjs(a.createdAt || a.updatedAt)
+      const dateB = dayjs(b.createdAt || b.updatedAt)
+      return dateB.diff(dateA)
+    })
+    .slice(0, 5)
+})
+
+// 最近账单（取前5个）
+const recentExpenses = computed(() => {
+  return allExpenses.value
+    .sort((a, b) => {
+      const dateA = dayjs(a.date || a.createdAt)
+      const dateB = dayjs(b.date || b.createdAt)
+      return dateB.diff(dateA)
+    })
+    .slice(0, 5)
+})
+
+// 加载数据
+const loadData = async () => {
+  loading.value = true
+  try {
+    // 并行加载所有数据
+    const [tripsRes, booksRes, announcementsRes] = await Promise.all([
+      tripApi.getTrips().catch(() => ({ code: 200, data: [] })),
+      expenseApi.getAllAccountBooks().catch(() => ({ code: 200, data: [] })),
+      announcementApi.getLatestAnnouncements(5).catch(() => ({ code: 200, data: [] }))
+    ])
+    
+    // 处理行程数据
+    if (tripsRes.code === 200 && tripsRes.data) {
+      const tripsData = Array.isArray(tripsRes.data) ? tripsRes.data : []
+      allTrips.value = tripsData.map((trip: any) => {
+        const startDate = trip.startDate || trip.start_date
+        const endDate = trip.endDate || trip.end_date
+        const now = dayjs()
+        const start = dayjs(startDate)
+        const end = dayjs(endDate)
+        
+        let status = 'planning'
+        if (startDate && endDate) {
+          if (now.isAfter(end)) {
+            status = 'completed'
+          } else if (now.isAfter(start) && now.isBefore(end)) {
+            status = 'ongoing'
+          }
+        }
+        
+        return {
+          id: String(trip.tripId || trip.id || ''),
+          title: trip.name || trip.title || '',
+          description: trip.description || '',
+          destination: trip.region || trip.destination || '',
+          startDate: startDate ? dayjs(startDate).format('YYYY-MM-DD') : '',
+          endDate: endDate ? dayjs(endDate).format('YYYY-MM-DD') : '',
+          status: trip.status || status,
+          coverImage: trip.coverImage || trip.coverImageUrl || '',
+          createdBy: String(trip.createdBy || trip.userId || ''),
+          members: trip.members || trip.participants || [],
+          itinerary: trip.itinerary || trip.places || [],
+          createdAt: trip.createdTime ? dayjs(trip.createdTime).format('YYYY-MM-DD') : '',
+          updatedAt: trip.updatedTime ? dayjs(trip.updatedTime).format('YYYY-MM-DD') : ''
+        }
+      })
+    }
+    
+    // 处理账本数据
+    if (booksRes.code === 200 && booksRes.data) {
+      accountBooks.value = Array.isArray(booksRes.data) ? booksRes.data : []
+      
+      // 加载每个账本的账单
+      const expensePromises = accountBooks.value.map((book: any) =>
+        expenseApi.getRecords(book.id || book.bookId, 1, 100).catch(() => ({ code: 200, data: { items: [] } }))
+      )
+      
+      const expenseResults = await Promise.all(expensePromises)
+      
+      // 合并所有账单
+      allExpenses.value = []
+      expenseResults.forEach((res: any) => {
+        if (res.code === 200 && res.data) {
+          const items = res.data.items || res.data.list || []
+          items.forEach((record: any) => {
+            // 只处理支出类型（type === 2），收入类型（type === 1）不计入支出统计
+            if (record.type === 2) {
+              // 根据 categoryName 映射到前端类别，如果没有则使用 'other'
+              let category: 'transport' | 'accommodation' | 'food' | 'activity' | 'shopping' | 'other' = 'other'
+              const categoryName = (record.categoryName || '').toLowerCase()
+              if (categoryName.includes('交通') || categoryName.includes('transport')) {
+                category = 'transport'
+              } else if (categoryName.includes('住宿') || categoryName.includes('accommodation') || categoryName.includes('酒店')) {
+                category = 'accommodation'
+              } else if (categoryName.includes('餐饮') || categoryName.includes('food') || categoryName.includes('美食')) {
+                category = 'food'
+              } else if (categoryName.includes('活动') || categoryName.includes('activity')) {
+                category = 'activity'
+              } else if (categoryName.includes('购物') || categoryName.includes('shopping')) {
+                category = 'shopping'
+              }
+              
+              allExpenses.value.push({
+                id: String(record.recordId || record.id || ''),
+                tripId: String(record.bookId || record.tripId || ''),
+                title: record.categoryName || record.note || '未命名',
+                amount: Number(record.amount || 0),
+                currency: 'CNY',
+                category: category,
+                paidBy: record.user?.userId ? String(record.user.userId) : '',
+                participants: [],
+                splitType: 'equal',
+                splits: [],
+                date: record.recordTime ? dayjs(record.recordTime).format('YYYY-MM-DD') : '',
+                createdAt: record.recordTime ? dayjs(record.recordTime).format('YYYY-MM-DD') : ''
+              })
+            }
+          })
+        }
+      })
+    }
+    
+    // 计算统计数据
+    stats.value.totalTrips = allTrips.value.length
+    stats.value.ongoingTrips = allTrips.value.filter(t => t.status === 'ongoing').length
+    stats.value.totalExpenses = allExpenses.value
+      .reduce((sum, e) => sum + e.amount, 0)
+    stats.value.sharedTrips = 0 // 需要从社区API获取
+    
+    // 处理公告数据
+    if (announcementsRes.code === 200 && announcementsRes.data) {
+      announcements.value = Array.isArray(announcementsRes.data) ? announcementsRes.data : []
+    }
+    
+  } catch (error: any) {
+    console.error('加载数据失败:', error)
+    ElMessage.error(error.message || '加载数据失败')
+  } finally {
+    loading.value = false
   }
-])
+}
+
+onMounted(() => {
+  loadData()
+})
 
 const getTripStatusType = (status: string) => {
   const types: Record<string, string> = {
@@ -279,60 +401,27 @@ const getCategoryText = (category: string) => {
   return texts[category] || category
 }
 
-// 连接测试
-const testing = ref(false)
-const connectionStatus = ref<{
-  title: string
-  type: 'success' | 'warning' | 'error' | 'info'
-  message: string
-} | null>(null)
-
-const testConnection = async () => {
-  testing.value = true
-  try {
-    // 测试一个不需要登录的API接口
-    const response = await communityApi.getFeed(1, 1)
-    connectionStatus.value = {
-      title: '连接成功！',
-      type: 'success',
-      message: `后端API响应正常。状态码: ${response.code || 'N/A'}`
-    }
-    ElMessage.success('后端连接测试成功！')
-  } catch (error: any) {
-    console.error('连接测试失败:', error)
-    if (error.response) {
-      // 有响应，说明连接成功，但可能是401或其他错误
-      connectionStatus.value = {
-        title: '连接成功，但需要认证',
-        type: 'warning',
-        message: `后端已连接，但返回状态码: ${error.response.status}。这可能是正常的（需要登录）。`
-      }
-      ElMessage.warning('后端已连接，但可能需要登录')
-    } else if (error.request) {
-      // 没有响应，说明连接失败
-      connectionStatus.value = {
-        title: '连接失败',
-        type: 'error',
-        message: '无法连接到后端服务器。请检查：1. 后端服务是否运行在8081端口 2. Vite代理配置是否正确'
-      }
-      ElMessage.error('无法连接到后端服务器')
-    } else {
-      connectionStatus.value = {
-        title: '测试出错',
-        type: 'error',
-        message: `错误信息: ${error.message || '未知错误'}`
-      }
-      ElMessage.error('连接测试出错')
-    }
-  } finally {
-    testing.value = false
-  }
+// 格式化日期
+const formatDate = (date: string | Date) => {
+  if (!date) return ''
+  return dayjs(date).format('YYYY-MM-DD HH:mm')
 }
 
-// 页面加载时自动测试连接
-onMounted(() => {
-  testConnection()
-})
+// 查看公告详情
+const viewAnnouncement = async (id: number) => {
+  try {
+    const res = await announcementApi.getAnnouncementById(id)
+    if (res.code === 200 && res.data) {
+      currentAnnouncement.value = res.data
+      showAnnouncementDialog.value = true
+    } else {
+      ElMessage.error(res.message || '加载公告失败')
+    }
+  } catch (error: any) {
+    console.error('加载公告详情失败:', error)
+    ElMessage.error(error.message || '加载公告详情失败')
+  }
+}
 </script>
 
 <style scoped>
@@ -399,15 +488,6 @@ onMounted(() => {
   margin-bottom: 24px;
 }
 
-.connection-test {
-  margin-bottom: 24px;
-}
-
-.test-content {
-  display: flex;
-  flex-direction: column;
-}
-
 .action-buttons {
   display: flex;
   gap: 16px;
@@ -458,5 +538,103 @@ onMounted(() => {
 .expense-meta {
   display: flex;
   align-items: center;
+}
+
+.announcements-row {
+  margin-bottom: 24px;
+}
+
+.announcements-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.announcement-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.announcement-item:hover {
+  background: #f8f9fa;
+}
+
+.announcement-icon {
+  font-size: 20px;
+  color: #409eff;
+}
+
+.announcement-content {
+  flex: 1;
+}
+
+.announcement-title {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.announcement-time {
+  font-size: 12px;
+  color: #999;
+}
+
+.announcement-detail h3 {
+  margin: 0 0 12px 0;
+  color: #333;
+}
+
+.announcement-meta {
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #666;
+}
+
+.announcement-content-text {
+  line-height: 1.6;
+  color: #666;
+}
+
+.all-announcements {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.announcement-item-full {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 16px;
+}
+
+.announcement-item-full:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.announcement-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.announcement-header h4 {
+  margin: 0;
+  color: #333;
+}
+
+.announcement-content-preview {
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 </style>

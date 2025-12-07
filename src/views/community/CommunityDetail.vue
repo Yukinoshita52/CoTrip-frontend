@@ -1,6 +1,9 @@
 <template>
   <Layout>
-    <div class="community-detail" v-if="post">
+    <div v-if="loading" class="loading-container">
+      <el-skeleton :rows="10" animated />
+    </div>
+    <div class="community-detail" v-else-if="post">
       <!-- 返回按钮 -->
       <div class="back-button">
         <el-button @click="$router.back()">
@@ -223,162 +226,226 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import type { CommunityPost, ItineraryItem, Expense } from '@/types'
 import dayjs from 'dayjs'
+import { communityApi, tripApi, expenseApi } from '@/api'
 
 const route = useRoute()
+const router = useRouter()
 const isLiked = ref(false)
+const loading = ref(false)
 
-// 模拟数据
-const post = ref<CommunityPost>({
-  id: '1',
-  title: '春日京都赏樱之旅 - 7天深度体验古都文化',
-  description: '在樱花盛开的季节，我们深入京都的大街小巷，从清水寺到金阁寺，从祇园到岚山，感受千年古都的独特魅力。这次旅行不仅欣赏了美丽的樱花，还体验了传统的茶道、品尝了地道的怀石料理，是一次难忘的文化之旅。',
-  tripId: '1',
-  authorId: 'user2',
-  author: {
-    id: 'user2',
-    username: '旅行达人小李',
-    email: 'user2@example.com',
-    nickname: '小李',
-    avatar: '',
-    createdAt: '2024-01-01'
-  },
-  trip: {
-    id: '1',
-    title: '京都赏樱7日游',
-    destination: '京都·大阪',
-    startDate: '2024-04-01',
-    endDate: '2024-04-07',
-    status: 'completed',
-    description: '',
-    coverImage: '',
-    createdBy: 'user2',
-    members: [
-      { userId: 'user2', username: '小李', role: 'owner', joinedAt: '2024-03-01' },
-      { userId: 'user4', username: '小张', role: 'member', joinedAt: '2024-03-02' }
-    ],
-    itinerary: [
-      {
-        id: '1',
-        tripId: '1',
-        title: '抵达关西机场',
-        description: '从上海浦东机场出发，抵达大阪关西机场',
-        location: '关西国际机场',
-        startTime: '2024-04-01T14:00:00',
-        endTime: '2024-04-01T15:00:00',
-        type: 'transport',
-        cost: 0,
-        createdBy: 'user2',
-        createdAt: '2024-03-01'
-      },
-      {
-        id: '2',
-        tripId: '1',
-        title: '清水寺赏樱',
-        description: '参观著名的清水寺，欣赏樱花美景',
-        location: '清水寺',
-        startTime: '2024-04-02T09:00:00',
-        endTime: '2024-04-02T12:00:00',
-        type: 'activity',
-        cost: 400,
-        createdBy: 'user2',
-        createdAt: '2024-03-01'
+// 帖子数据
+const post = ref<CommunityPost | null>(null)
+const relatedExpenses = ref<Expense[]>([])
+const relatedPosts = ref<CommunityPost[]>([])
+
+// 加载帖子详情
+const loadPostDetail = async () => {
+  const postId = Number(route.params.id)
+  if (!postId) {
+    ElMessage.error('帖子ID无效')
+    router.push('/community')
+    return
+  }
+
+  loading.value = true
+  try {
+    const res = await communityApi.getPostDetail(postId)
+    if (res.code === 200 && res.data) {
+      const data = res.data
+      post.value = {
+        id: String(data.postId || data.id || postId),
+        title: data.tripName || data.title || '',
+        description: data.description || '',
+        tripId: String(data.tripId || ''),
+        authorId: String(data.author?.userId || data.authorId || ''),
+        author: {
+          id: String(data.author?.userId || data.authorId || ''),
+          username: data.author?.username || '',
+          email: data.author?.email || '',
+          nickname: data.author?.nickname || data.author?.username || '',
+          avatar: data.author?.avatarUrl || data.author?.avatar || '',
+          createdAt: ''
+        },
+        trip: {
+          id: String(data.tripId || ''),
+          title: data.tripName || '',
+          destination: data.region || '',
+          startDate: data.startDate ? dayjs(data.startDate).format('YYYY-MM-DD') : '',
+          endDate: data.endDate ? dayjs(data.endDate).format('YYYY-MM-DD') : '',
+          status: 'completed',
+          description: data.description || '',
+          coverImage: data.coverImages?.[0] || '',
+          createdBy: String(data.author?.userId || ''),
+          members: [],
+          itinerary: [],
+          createdAt: data.createTime ? dayjs(data.createTime).format('YYYY-MM-DD') : '',
+          updatedAt: data.createTime ? dayjs(data.createTime).format('YYYY-MM-DD') : ''
+        },
+        likes: data.stats?.likeCount || data.likes || 0,
+        views: data.stats?.viewCount || data.views || 0,
+        tags: data.tags || [],
+        isPublic: true,
+        createdAt: data.createTime ? dayjs(data.createTime).format('YYYY-MM-DD') : '',
+        updatedAt: data.createTime ? dayjs(data.createTime).format('YYYY-MM-DD') : ''
       }
-    ],
-    createdAt: '2024-03-01',
-    updatedAt: '2024-03-01'
-  },
-  likes: 128,
-  views: 1520,
-  tags: ['日本', '樱花', '文化', '美食', '京都'],
-  isPublic: true,
-  createdAt: '2024-04-10',
-  updatedAt: '2024-04-10'
-})
 
-const relatedExpenses = ref<Expense[]>([
-  {
-    id: '1',
-    tripId: '1',
-    title: '往返机票',
-    amount: 2800,
-    currency: 'CNY',
-    category: 'transport',
-    paidBy: 'user2',
-    participants: ['user2', 'user4'],
-    splitType: 'equal',
-    splits: [],
-    date: '2024-04-01',
-    createdAt: '2024-04-01'
-  },
-  {
-    id: '2',
-    tripId: '1',
-    title: '京都酒店住宿',
-    amount: 1600,
-    currency: 'CNY',
-    category: 'accommodation',
-    paidBy: 'user2',
-    participants: ['user2', 'user4'],
-    splitType: 'equal',
-    splits: [],
-    date: '2024-04-01',
-    createdAt: '2024-04-01'
-  }
-])
+      // 加载行程详情以获取 itinerary
+      if (data.tripId) {
+        await loadTripDetail(data.tripId)
+      }
 
-const relatedPosts = ref<CommunityPost[]>([
-  {
-    id: '2',
-    title: '大阪美食探索之旅',
-    description: '品尝大阪地道美食',
-    tripId: '2',
-    authorId: 'user3',
-    author: {
-      id: 'user3',
-      username: '美食家小王',
-      email: 'user3@example.com',
-      nickname: '小王',
-      createdAt: '2024-01-01'
-    },
-    trip: {
-      id: '2',
-      title: '大阪美食3日游',
-      destination: '大阪',
-      startDate: '2024-03-15',
-      endDate: '2024-03-17',
-      status: 'completed',
-      description: '',
-      coverImage: '',
-      createdBy: 'user3',
-      members: [],
-      itinerary: [],
-      createdAt: '2024-03-01',
-      updatedAt: '2024-03-01'
-    },
-    likes: 89,
-    views: 756,
-    tags: ['日本', '美食', '大阪'],
-    isPublic: true,
-    createdAt: '2024-03-20',
-    updatedAt: '2024-03-20'
+      // 加载相关费用
+      await loadRelatedExpenses(data.tripId)
+    } else {
+      ElMessage.error(res.message || '加载帖子详情失败')
+      router.push('/community')
+    }
+  } catch (error: any) {
+    console.error('加载帖子详情失败:', error)
+    ElMessage.error(error.message || '加载帖子详情失败')
+    router.push('/community')
+  } finally {
+    loading.value = false
   }
-])
+}
+
+// 加载行程详情
+const loadTripDetail = async (tripId: number) => {
+  try {
+    const res = await tripApi.getTripById(tripId)
+    if (res.code === 200 && res.data && post.value) {
+      const tripData = res.data
+      post.value.trip.itinerary = tripData.places?.flatMap((day: any) => 
+        day.places.map((place: any) => ({
+          id: String(place.id || place.placeId || ''),
+          tripId: String(tripId),
+          title: place.name || '',
+          description: place.description || '',
+          location: place.address || '',
+          startTime: day.date ? dayjs(day.date).format('YYYY-MM-DD') + 'T09:00:00' : '',
+          endTime: day.date ? dayjs(day.date).format('YYYY-MM-DD') + 'T17:00:00' : '',
+          type: 'activity',
+          cost: 0,
+          createdBy: '',
+          createdAt: ''
+        })) || []
+      ) || []
+      post.value.trip.members = tripData.members?.map((m: any) => ({
+        userId: String(m.userId || m.id || ''),
+        username: m.username || '',
+        role: m.role === 0 ? 'owner' : 'member',
+        joinedAt: m.joinedAt || ''
+      })) || []
+    }
+  } catch (error: any) {
+    console.error('加载行程详情失败:', error)
+  }
+}
+
+// 加载相关费用
+const loadRelatedExpenses = async (tripId: number) => {
+  try {
+    const booksRes = await expenseApi.getAllAccountBooks()
+    if (booksRes.code === 200 && booksRes.data) {
+      const books = Array.isArray(booksRes.data) ? booksRes.data : []
+      const book = books.find((b: any) => String(b.tripId) === String(tripId))
+
+      if (book) {
+        const recordsRes = await expenseApi.getRecords(book.bookId, 1, 50)
+        if (recordsRes.code === 200 && recordsRes.data) {
+          const items = recordsRes.data.items || recordsRes.data.list || []
+          relatedExpenses.value = items.map((record: any) => ({
+            id: String(record.recordId || record.id || ''),
+            tripId: String(tripId),
+            title: record.categoryName || record.note || '未命名',
+            amount: Number(record.amount || 0),
+            currency: 'CNY',
+            category: record.type === 1 ? 'income' : (record.type === 2 ? 'expense' : 'other'),
+            paidBy: record.user?.userId ? String(record.user.userId) : '',
+            participants: [],
+            splitType: 'equal',
+            splits: [],
+            receipt: '',
+            date: record.recordTime ? dayjs(record.recordTime).format('YYYY-MM-DD') : '',
+            createdAt: record.recordTime ? dayjs(record.recordTime).format('YYYY-MM-DD') : ''
+          }))
+        }
+      }
+    }
+  } catch (error: any) {
+    console.error('加载相关费用失败:', error)
+  }
+}
+
+// 加载相关推荐
+const loadRelatedPosts = async () => {
+  try {
+    const res = await communityApi.getFeed(1, 5)
+    if (res.code === 200 && res.data) {
+      const list = res.data.list || res.data.items || []
+      const currentPostId = Number(route.params.id)
+      relatedPosts.value = list
+        .filter((item: any) => item.postId !== currentPostId)
+        .slice(0, 3)
+        .map((item: any) => ({
+          id: String(item.postId || item.id || ''),
+          title: item.tripName || item.title || '',
+          description: item.description || '',
+          tripId: String(item.tripId || ''),
+          authorId: String(item.author?.userId || item.authorId || ''),
+          author: {
+            id: String(item.author?.userId || item.authorId || ''),
+            username: item.author?.username || '',
+            email: item.author?.email || '',
+            nickname: item.author?.nickname || item.author?.username || '',
+            avatar: item.author?.avatarUrl || item.author?.avatar || '',
+            createdAt: ''
+          },
+          trip: {
+            id: String(item.tripId || ''),
+            title: item.tripName || '',
+            destination: item.region || '',
+            startDate: item.startDate ? dayjs(item.startDate).format('YYYY-MM-DD') : '',
+            endDate: item.endDate ? dayjs(item.endDate).format('YYYY-MM-DD') : '',
+            status: 'completed',
+            description: item.description || '',
+            coverImage: item.coverImages?.[0] || '',
+            createdBy: String(item.author?.userId || ''),
+            members: [],
+            itinerary: [],
+            createdAt: item.createTime ? dayjs(item.createTime).format('YYYY-MM-DD') : '',
+            updatedAt: item.createTime ? dayjs(item.createTime).format('YYYY-MM-DD') : ''
+          },
+          likes: item.stats?.likeCount || item.likes || 0,
+          views: item.stats?.viewCount || item.views || 0,
+          tags: item.tags || [],
+          isPublic: true,
+          createdAt: item.createTime ? dayjs(item.createTime).format('YYYY-MM-DD') : '',
+          updatedAt: item.createTime ? dayjs(item.createTime).format('YYYY-MM-DD') : ''
+        }))
+    }
+  } catch (error: any) {
+    console.error('加载相关推荐失败:', error)
+  }
+}
 
 // 计算属性
 const groupedItinerary = computed(() => {
   const groups: Record<string, ItineraryItem[]> = {}
-  post.value?.trip.itinerary.forEach(item => {
-    const date = dayjs(item.startTime).format('YYYY-MM-DD')
-    if (!groups[date]) {
-      groups[date] = []
-    }
-    groups[date].push(item)
-  })
+  if (post.value?.trip.itinerary) {
+    post.value.trip.itinerary.forEach(item => {
+      const date = dayjs(item.startTime).format('YYYY-MM-DD')
+      if (!groups[date]) {
+        groups[date] = []
+      }
+      groups[date].push(item)
+    })
+  }
   return groups
 })
 
@@ -397,12 +464,8 @@ const expenseSummary = computed(() => {
 })
 
 onMounted(() => {
-  const postId = route.params.id
-  console.log('加载社区详情:', postId)
-  // 增加浏览量
-  if (post.value) {
-    post.value.views++
-  }
+  loadPostDetail()
+  loadRelatedPosts()
 })
 
 // 工具函数
@@ -465,16 +528,24 @@ const getCategoryText = (category: string) => {
 }
 
 // 事件处理
-const toggleLike = () => {
+const toggleLike = async () => {
   if (!post.value) return
   
-  isLiked.value = !isLiked.value
-  if (isLiked.value) {
-    post.value.likes++
-    ElMessage.success('点赞成功')
-  } else {
-    post.value.likes--
-    ElMessage.success('已取消点赞')
+  try {
+    if (isLiked.value) {
+      await communityApi.unlikePost(Number(post.value.id))
+      post.value.likes--
+      isLiked.value = false
+      ElMessage.success('已取消点赞')
+    } else {
+      await communityApi.likePost(Number(post.value.id))
+      post.value.likes++
+      isLiked.value = true
+      ElMessage.success('点赞成功')
+    }
+  } catch (error: any) {
+    console.error('点赞操作失败:', error)
+    ElMessage.error(error.message || '操作失败')
   }
 }
 
@@ -486,8 +557,27 @@ const handleCollect = () => {
   ElMessage.success('已收藏到我的行程')
 }
 
-const handleCopyTrip = () => {
-  ElMessage.success('行程已复制到你的账户，可以在"我的行程"中查看和编辑')
+const handleCopyTrip = async () => {
+  if (!post.value) return
+  try {
+    const tripData = {
+      name: post.value.trip.title,
+      region: post.value.trip.destination,
+      startDate: post.value.trip.startDate,
+      endDate: post.value.trip.endDate,
+      description: post.value.trip.description
+    }
+    const res = await tripApi.createTrip(tripData)
+    if (res.code === 200) {
+      ElMessage.success('行程已复制到你的账户，可以在"我的行程"中查看和编辑')
+      router.push('/trips')
+    } else {
+      ElMessage.error(res.message || '复制失败')
+    }
+  } catch (error: any) {
+    console.error('复制行程失败:', error)
+    ElMessage.error(error.message || '复制失败')
+  }
 }
 
 const handleContact = () => {
@@ -496,6 +586,11 @@ const handleContact = () => {
 </script>
 
 <style scoped>
+.loading-container {
+  max-width: 1000px;
+  padding: 24px;
+}
+
 .community-detail {
   max-width: 1000px;
 }

@@ -261,3 +261,58 @@ export const userApi = {
   }
 }
 
+// 邀请相关API
+export const invitationApi = {
+  // 获取我发出的邀请
+  getSentInvitations() {
+    return request.get('/invitations/sent')
+  },
+  
+  // 获取我收到的邀请
+  getReceivedInvitations() {
+    return request.get('/invitations/received')
+  },
+  
+  // 接受邀请
+  acceptInvitation(invitationId: number) {
+    return request.post(`/invitations/${invitationId}/accept`)
+  },
+  
+  // 拒绝邀请
+  rejectInvitation(invitationId: number) {
+    return request.post(`/invitations/${invitationId}/reject`)
+  },
+  
+  // 撤销邀请
+  cancelInvitation(invitationId: number) {
+    return request.delete(`/invitations/${invitationId}`)
+  }
+}
+
+// 公告相关API
+export const announcementApi = {
+  // 获取公告列表
+  getAnnouncements() {
+    return request.get('/announcement')
+  },
+  
+  // 获取公告详情
+  getAnnouncementById(id: number) {
+    return request.get(`/announcement/${id}`)
+  },
+  
+  // 获取最新公告
+  getLatestAnnouncements(count: number = 5) {
+    return request.get('/announcement/latest', {
+      params: { count }
+    })
+  },
+  
+  // 搜索公告
+  searchAnnouncements(keyword: string) {
+    return request.get('/announcement/search', {
+      params: { keyword }
+    })
+  }
+}
+

@@ -39,6 +39,19 @@
         </el-col>
       </el-row>
 
+      <!-- 账本选择 -->
+      <el-card class="book-selector" v-if="accountBooks.length > 0" style="margin-bottom: 16px;">
+        <el-radio-group v-model="selectedBookId" @change="handleBookChange">
+          <el-radio-button
+            v-for="book in accountBooks"
+            :key="book.bookId || book.id"
+            :label="book.bookId || book.id"
+          >
+            {{ book.name }}
+          </el-radio-button>
+        </el-radio-group>
+      </el-card>
+
       <!-- 筛选器 -->
       <el-card class="filter-card">
         <el-row :gutter="16">
@@ -94,8 +107,9 @@
       </el-card>
 
       <!-- 账单列表 -->
-      <el-card>
-        <el-table :data="expenses" style="width: 100%">
+      <el-card v-loading="loading">
+        <el-empty v-if="!loading && expenses.length === 0" description="暂无账单数据" />
+        <el-table :data="expenses" style="width: 100%" v-else>
           <el-table-column prop="title" label="账单标题" min-width="150">
             <template #default="{ row }">
               <div class="expense-title">
@@ -212,6 +226,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '@/components/Layout.vue'
+import { expenseApi, tripApi } from '@/api'
 import type { Expense, Trip } from '@/types'
 import dayjs from 'dayjs'
 
@@ -230,88 +245,113 @@ const pagination = ref({
   total: 0
 })
 
-// 模拟数据
-const trips = ref<Trip[]>([
-  {
-    id: '1',
-    title: '日本关西之旅',
-    destination: '大阪·京都·奈良',
-    startDate: '2024-03-15',
-    endDate: '2024-03-22',
-    status: 'ongoing',
-    description: '',
-    coverImage: '',
-    createdBy: 'user1',
-    members: [],
-    itinerary: [],
-    createdAt: '2024-03-01',
-    updatedAt: '2024-03-01'
-  }
-])
+const loading = ref(false)
+const accountBooks = ref<any[]>([])
+const trips = ref<Trip[]>([])
+const expenses = ref<Expense[]>([])
+const selectedBookId = ref<number | null>(null)
 
-const expenses = ref<Expense[]>([
-  {
-    id: '1',
-    tripId: '1',
-    title: '大阪城门票',
-    amount: 600,
-    currency: 'CNY',
-    category: 'activity',
-    description: '大阪城公园门票费用',
-    paidBy: 'user1',
-    participants: ['user1', 'user2'],
-    splitType: 'equal',
-    splits: [
-      { userId: 'user1', amount: 300, settled: true },
-      { userId: 'user2', amount: 300, settled: false }
-    ],
-    receipt: 'receipt1.jpg',
-    date: '2024-03-16',
-    createdAt: '2024-03-16'
-  },
-  {
-    id: '2',
-    tripId: '1',
-    title: '京都怀石料理',
-    amount: 1200,
-    currency: 'CNY',
-    category: 'food',
-    description: '京都传统怀石料理晚餐',
-    paidBy: 'user2',
-    participants: ['user1', 'user2'],
-    splitType: 'equal',
-    splits: [
-      { userId: 'user1', amount: 600, settled: false },
-      { userId: 'user2', amount: 600, settled: true }
-    ],
-    date: '2024-03-17',
-    createdAt: '2024-03-17'
+// 加载账本列表
+const loadAccountBooks = async () => {
+  try {
+    const res = await expenseApi.getAllAccountBooks()
+    if (res.code === 200 && res.data) {
+      accountBooks.value = Array.isArray(res.data) ? res.data : []
+      // 如果有账本，默认选择第一个
+      if (accountBooks.value.length > 0 && !selectedBookId.value) {
+        selectedBookId.value = accountBooks.value[0].bookId || accountBooks.value[0].id
+        loadExpenses()
+      }
+    }
+  } catch (error: any) {
+    console.error('加载账本列表失败:', error)
   }
-])
+}
+
+// 加载行程列表（用于筛选）
+const loadTrips = async () => {
+  try {
+    const res = await tripApi.getTrips()
+    if (res.code === 200 && res.data) {
+      const tripsData = Array.isArray(res.data) ? res.data : []
+      trips.value = tripsData.map((trip: any) => ({
+        id: String(trip.tripId || trip.id || ''),
+        title: trip.name || trip.title || '',
+        destination: trip.region || trip.destination || '',
+        startDate: trip.startDate ? dayjs(trip.startDate).format('YYYY-MM-DD') : '',
+        endDate: trip.endDate ? dayjs(trip.endDate).format('YYYY-MM-DD') : '',
+        status: trip.status || 'planning',
+        description: trip.description || '',
+        coverImage: trip.coverImage || '',
+        createdBy: String(trip.createdBy || ''),
+        members: trip.members || [],
+        itinerary: trip.itinerary || [],
+        createdAt: trip.createdTime ? dayjs(trip.createdTime).format('YYYY-MM-DD') : '',
+        updatedAt: trip.updatedTime ? dayjs(trip.updatedTime).format('YYYY-MM-DD') : ''
+      }))
+    }
+  } catch (error: any) {
+    console.error('加载行程列表失败:', error)
+  }
+}
 
 // 统计数据
 const stats = computed(() => {
-  const totalAmount = expenses.value.reduce((sum, expense) => sum + expense.amount, 0)
-  const myAmount = expenses.value
-    .filter(expense => expense.paidBy === 'user1')
-    .reduce((sum, expense) => sum + expense.amount, 0)
-  const pendingAmount = expenses.value
-    .reduce((sum, expense) => {
-      const pendingSplits = expense.splits.filter(split => !split.settled)
-      return sum + pendingSplits.reduce((splitSum, split) => splitSum + split.amount, 0)
-    }, 0)
+  const expenseRecords = expenses.value.filter(e => e.category !== 'income')
+  const totalAmount = expenseRecords.reduce((sum, expense) => sum + expense.amount, 0)
   const totalCount = expenses.value.length
   
-  return { totalAmount, myAmount, pendingAmount, totalCount }
+  return { 
+    totalAmount, 
+    myAmount: 0, // 需要从后端获取
+    pendingAmount: 0, // 需要从后端获取
+    totalCount 
+  }
 })
 
 onMounted(() => {
-  loadExpenses()
+  loadAccountBooks()
+  loadTrips()
 })
 
-const loadExpenses = () => {
-  // 加载账单列表
-  pagination.value.total = expenses.value.length
+const loadExpenses = async () => {
+  if (!selectedBookId.value) {
+    expenses.value = []
+    return
+  }
+  
+  loading.value = true
+  try {
+    const res = await expenseApi.getRecords(selectedBookId.value, pagination.value.page, pagination.value.pageSize)
+    if (res.code === 200 && res.data) {
+      const data = res.data
+      const items = data.items || data.list || []
+      
+      expenses.value = items.map((record: any) => ({
+        id: String(record.recordId || record.id || ''),
+        tripId: String(record.bookId || ''),
+        title: record.categoryName || record.note || '未命名',
+        amount: Number(record.amount || 0),
+        currency: 'CNY',
+        category: record.type === 1 ? 'income' : (record.type === 2 ? 'expense' : 'other'),
+        description: record.note || '',
+        paidBy: record.user?.userId ? String(record.user.userId) : '',
+        participants: [],
+        splitType: 'equal',
+        splits: [],
+        receipt: record.receipt || '',
+        date: record.recordTime ? dayjs(record.recordTime).format('YYYY-MM-DD') : '',
+        createdAt: record.recordTime ? dayjs(record.recordTime).format('YYYY-MM-DD') : ''
+      }))
+      
+      pagination.value.total = data.total || items.length
+    }
+  } catch (error: any) {
+    console.error('加载账单列表失败:', error)
+    ElMessage.error(error.message || '加载账单列表失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 const handleSearch = () => {
@@ -331,11 +371,19 @@ const resetFilters = () => {
 
 const handleSizeChange = (size: number) => {
   pagination.value.pageSize = size
+  pagination.value.page = 1
   loadExpenses()
 }
 
 const handleCurrentChange = (page: number) => {
   pagination.value.page = page
+  loadExpenses()
+}
+
+// 账本选择变化
+const handleBookChange = (bookId: number) => {
+  selectedBookId.value = bookId
+  pagination.value.page = 1
   loadExpenses()
 }
 

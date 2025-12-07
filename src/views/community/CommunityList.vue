@@ -231,6 +231,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import Layout from '@/components/Layout.vue'
+import { communityApi, tripApi } from '@/api'
 import type { CommunityPost, Trip } from '@/types'
 import dayjs from 'dayjs'
 
@@ -272,110 +273,153 @@ const popularTags = ref([
 ])
 
 // 我的行程（用于分享）
-const myTrips = ref<Trip[]>([
-  {
-    id: '1',
-    title: '日本关西之旅',
-    destination: '大阪·京都·奈良',
-    startDate: '2024-03-15',
-    endDate: '2024-03-22',
-    status: 'completed',
-    description: '',
-    coverImage: '',
-    createdBy: 'user1',
-    members: [],
-    itinerary: [],
-    createdAt: '2024-03-01',
-    updatedAt: '2024-03-01'
+const myTrips = ref<Trip[]>([])
+
+// 加载我的行程
+const loadMyTrips = async () => {
+  try {
+    const res = await tripApi.getTrips()
+    if (res.code === 200 && res.data) {
+      const tripsData = Array.isArray(res.data) ? res.data : []
+      myTrips.value = tripsData.map((trip: any) => {
+        const startDate = trip.startDate || trip.start_date
+        const endDate = trip.endDate || trip.end_date
+        const now = dayjs()
+        const start = dayjs(startDate)
+        const end = dayjs(endDate)
+        
+        let status = 'planning'
+        if (startDate && endDate) {
+          if (now.isAfter(end)) {
+            status = 'completed'
+          } else if (now.isAfter(start) && now.isBefore(end)) {
+            status = 'ongoing'
+          }
+        }
+        
+        return {
+          id: String(trip.tripId || trip.id || ''),
+          title: trip.name || trip.title || '',
+          description: trip.description || '',
+          destination: trip.region || trip.destination || '',
+          startDate: startDate ? dayjs(startDate).format('YYYY-MM-DD') : '',
+          endDate: endDate ? dayjs(endDate).format('YYYY-MM-DD') : '',
+          status: trip.status || status,
+          coverImage: trip.coverImage || trip.coverImageUrl || '',
+          createdBy: String(trip.createdBy || trip.userId || ''),
+          members: trip.members || trip.participants || [],
+          itinerary: trip.itinerary || trip.places || [],
+          createdAt: trip.createdTime ? dayjs(trip.createdTime).format('YYYY-MM-DD') : '',
+          updatedAt: trip.updatedTime ? dayjs(trip.updatedTime).format('YYYY-MM-DD') : ''
+        }
+      })
+    }
+  } catch (error: any) {
+    console.error('加载我的行程失败:', error)
   }
-])
+}
 
 // 社区动态
-const posts = ref<CommunityPost[]>([
-  {
-    id: '1',
-    title: '春日京都赏樱之旅',
-    description: '在樱花盛开的季节，漫步京都古街，感受千年古都的魅力',
-    tripId: '1',
-    authorId: 'user2',
-    author: {
-      id: 'user2',
-      username: '旅行达人小李',
-      email: 'user2@example.com',
-      nickname: '小李',
-      createdAt: '2024-01-01'
-    },
-    trip: {
-      id: '1',
-      title: '京都赏樱7日游',
-      destination: '京都·大阪',
-      startDate: '2024-04-01',
-      endDate: '2024-04-07',
-      status: 'completed',
-      description: '',
-      coverImage: '',
-      createdBy: 'user2',
-      members: [],
-      itinerary: [],
-      createdAt: '2024-03-01',
-      updatedAt: '2024-03-01'
-    },
-    likes: 128,
-    views: 1520,
-    tags: ['日本', '樱花', '文化', '美食'],
-    isPublic: true,
-    createdAt: '2024-04-10',
-    updatedAt: '2024-04-10'
-  },
-  {
-    id: '2',
-    title: '云南大理洱海环游',
-    description: '骑行洱海，住民宿，品白族美食，体验慢生活',
-    tripId: '2',
-    authorId: 'user3',
-    author: {
-      id: 'user3',
-      username: '背包客小王',
-      email: 'user3@example.com',
-      nickname: '小王',
-      createdAt: '2024-01-01'
-    },
-    trip: {
-      id: '2',
-      title: '大理丽江5日游',
-      destination: '大理·丽江',
-      startDate: '2024-03-20',
-      endDate: '2024-03-24',
-      status: 'completed',
-      description: '',
-      coverImage: '',
-      createdBy: 'user3',
-      members: [],
-      itinerary: [],
-      createdAt: '2024-03-01',
-      updatedAt: '2024-03-01'
-    },
-    likes: 89,
-    views: 756,
-    tags: ['云南', '自然风光', '骑行', '民宿'],
-    isPublic: true,
-    createdAt: '2024-03-25',
-    updatedAt: '2024-03-25'
-  }
-])
+const posts = ref<CommunityPost[]>([])
+const loading = ref(false)
+const likedPosts = ref<Set<number>>(new Set())
 
 onMounted(() => {
   loadPosts()
+  loadMyTrips()
 })
 
-const loadPosts = () => {
-  // 加载社区动态
-  pagination.value.total = posts.value.length
+const loadPosts = async () => {
+  loading.value = true
+  try {
+    const res = await communityApi.getFeed(pagination.value.page, pagination.value.pageSize)
+    if (res.code === 200 && res.data) {
+      const feedData = res.data
+      const list = feedData.list || feedData.items || []
+      
+      // 转换后端数据格式到前端格式
+      posts.value = list.map((item: any) => {
+        const author = item.author || {}
+        const stats = item.stats || {}
+        
+        return {
+          id: String(item.postId || item.id || ''),
+          title: item.tripName || item.title || '',
+          description: item.description || '',
+          tripId: String(item.tripId || ''),
+          authorId: String(author.userId || author.id || ''),
+          author: {
+            id: String(author.userId || author.id || ''),
+            username: author.username || '',
+            email: author.email || '',
+            nickname: author.nickname || author.username || '',
+            avatar: author.avatar || author.avatarUrl || '',
+            createdAt: author.createdAt || ''
+          },
+          trip: {
+            id: String(item.tripId || ''),
+            title: item.tripName || '',
+            destination: item.region || '',
+            startDate: item.startDate ? dayjs(item.startDate).format('YYYY-MM-DD') : '',
+            endDate: item.endDate ? dayjs(item.endDate).format('YYYY-MM-DD') : '',
+            status: 'completed',
+            description: item.description || '',
+            coverImage: item.coverImages?.[0] || '',
+            createdBy: String(author.userId || ''),
+            members: [],
+            itinerary: [],
+            createdAt: item.createTime ? dayjs(item.createTime).format('YYYY-MM-DD') : '',
+            updatedAt: item.createTime ? dayjs(item.createTime).format('YYYY-MM-DD') : ''
+          },
+          likes: stats.likeCount || stats.likes || 0,
+          views: stats.viewCount || stats.views || 0,
+          tags: item.tags || [],
+          isPublic: true,
+          createdAt: item.createTime ? dayjs(item.createTime).format('YYYY-MM-DD') : '',
+          updatedAt: item.createTime ? dayjs(item.createTime).format('YYYY-MM-DD') : ''
+        }
+      })
+      
+      pagination.value.total = feedData.total || list.length
+    }
+  } catch (error: any) {
+    console.error('加载社区动态失败:', error)
+    ElMessage.error(error.message || '加载社区动态失败')
+  } finally {
+    loading.value = false
+  }
 }
 
-const handleSearch = () => {
-  // 搜索逻辑
-  loadPosts()
+const handleSearch = async () => {
+  if (filters.value.keyword) {
+    try {
+      const res = await communityApi.searchPosts(filters.value.keyword)
+      if (res.code === 200 && res.data) {
+        const searchData = res.data
+        const list = searchData.list || searchData.items || []
+        posts.value = list.map((item: any) => ({
+          id: String(item.postId || item.id || ''),
+          title: item.tripName || item.title || '',
+          description: item.description || '',
+          tripId: String(item.tripId || ''),
+          authorId: String(item.authorId || ''),
+          author: item.author || {},
+          trip: item.trip || {},
+          likes: item.likes || 0,
+          views: item.views || 0,
+          tags: item.tags || [],
+          isPublic: true,
+          createdAt: item.createdAt || '',
+          updatedAt: item.updatedAt || ''
+        }))
+      }
+    } catch (error: any) {
+      console.error('搜索失败:', error)
+      ElMessage.error(error.message || '搜索失败')
+    }
+  } else {
+    loadPosts()
+  }
 }
 
 const resetFilters = () => {
@@ -390,6 +434,7 @@ const resetFilters = () => {
 
 const handleSizeChange = (size: number) => {
   pagination.value.pageSize = size
+  pagination.value.page = 1
   loadPosts()
 }
 
@@ -421,18 +466,29 @@ const getTripDuration = (trip: Trip) => {
 }
 
 const isLiked = (post: CommunityPost) => {
-  // 模拟点赞状态
-  return false
+  return likedPosts.value.has(Number(post.id))
 }
 
-const toggleLike = (post: CommunityPost) => {
-  // 切换点赞状态
-  if (isLiked(post)) {
-    post.likes--
-  } else {
-    post.likes++
+const toggleLike = async (post: CommunityPost) => {
+  const postId = Number(post.id)
+  if (isNaN(postId)) return
+  
+  try {
+    if (isLiked(post)) {
+      await communityApi.unlikePost(postId)
+      likedPosts.value.delete(postId)
+      post.likes--
+      ElMessage.success('已取消点赞')
+    } else {
+      await communityApi.likePost(postId)
+      likedPosts.value.add(postId)
+      post.likes++
+      ElMessage.success('点赞成功')
+    }
+  } catch (error: any) {
+    console.error('点赞操作失败:', error)
+    ElMessage.error(error.message || '操作失败')
   }
-  ElMessage.success(isLiked(post) ? '已取消点赞' : '点赞成功')
 }
 
 const sharePost = (post: CommunityPost) => {
@@ -456,23 +512,28 @@ const handleShare = async () => {
   shareLoading.value = true
   
   try {
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    ElMessage.success('行程分享成功!')
-    showShareDialog.value = false
-    
-    // 重置表单
-    Object.assign(shareForm, {
-      tripId: '',
-      title: '',
-      description: '',
-      tagsInput: '',
-      isPublic: true
+    const res = await communityApi.createPost({
+      tripId: Number(shareForm.tripId),
+      name: shareForm.title,
+      description: shareForm.description || ''
     })
     
-    // 刷新列表
-    loadPosts()
+    if (res.code === 200) {
+      ElMessage.success('行程分享成功!')
+      showShareDialog.value = false
+      
+      // 重置表单
+      Object.assign(shareForm, {
+        tripId: '',
+        title: '',
+        description: '',
+        tagsInput: '',
+        isPublic: true
+      })
+      
+      // 刷新列表
+      loadPosts()
+    }
   } catch (error) {
     console.error('分享失败:', error)
   } finally {

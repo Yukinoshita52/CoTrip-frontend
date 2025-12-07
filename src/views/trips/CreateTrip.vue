@@ -127,6 +127,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import Layout from '@/components/Layout.vue'
+import { tripApi } from '@/api'
 import type { TripMember } from '@/types'
 
 const router = useRouter()
@@ -228,24 +229,26 @@ const handleSubmit = async () => {
     await formRef.value.validate()
     loading.value = true
     
-    // 构建提交数据
+    // 构建提交数据（匹配后端DTO格式）
     const tripData = {
-      title: form.title,
-      destination: form.destination,
+      name: form.title,
+      region: form.destination,
       startDate: form.dateRange[0],
       endDate: form.dateRange[1],
-      description: form.description,
-      coverImage: form.coverImage,
-      members: form.members
+      description: form.description || ''
     }
     
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    const res = await tripApi.createTrip(tripData)
     
-    ElMessage.success('行程创建成功!')
-    router.push('/trips')
-  } catch (error) {
+    if (res.code === 200) {
+      ElMessage.success('行程创建成功!')
+      router.push('/trips')
+    } else {
+      ElMessage.error(res.message || '创建失败')
+    }
+  } catch (error: any) {
     console.error('创建失败:', error)
+    ElMessage.error(error.message || '创建失败，请稍后再试')
   } finally {
     loading.value = false
   }

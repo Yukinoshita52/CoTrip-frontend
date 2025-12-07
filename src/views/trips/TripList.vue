@@ -44,8 +44,9 @@
       </el-card>
 
       <!-- 行程列表 -->
-      <div class="trip-grid">
-        <el-row :gutter="24">
+      <div class="trip-grid" v-loading="loading">
+        <el-empty v-if="!loading && trips.length === 0" description="暂无行程数据" />
+        <el-row :gutter="24" v-else>
           <el-col :span="8" v-for="trip in trips" :key="trip.id">
             <el-card class="trip-card" @click="$router.push(`/trips/${trip.id}`)">
               <div class="trip-cover">
@@ -130,8 +131,11 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '@/components/Layout.vue'
+import { tripApi } from '@/api'
 import type { Trip } from '@/types'
 import dayjs from 'dayjs'
+
+const loading = ref(false)
 
 // 筛选条件
 const filters = ref({
@@ -147,60 +151,83 @@ const pagination = ref({
 })
 
 // 行程列表
-const trips = ref<Trip[]>([
-  {
-    id: '1',
-    title: '日本关西之旅',
-    description: '探索古都京都的文化魅力',
-    destination: '大阪·京都·奈良',
-    startDate: '2024-03-15',
-    endDate: '2024-03-22',
-    status: 'ongoing',
-    coverImage: '',
-    createdBy: 'user1',
-    members: [
-      { userId: 'user1', username: '张三', role: 'owner', joinedAt: '2024-03-01' },
-      { userId: 'user2', username: '李四', role: 'member', joinedAt: '2024-03-02' }
-    ],
-    itinerary: [],
-    createdAt: '2024-03-01',
-    updatedAt: '2024-03-01'
-  },
-  {
-    id: '2',
-    title: '云南大理丽江',
-    description: '感受彩云之南的自然风光',
-    destination: '大理·丽江',
-    startDate: '2024-04-10',
-    endDate: '2024-04-17',
-    status: 'planning',
-    coverImage: '',
-    createdBy: 'user1',
-    members: [
-      { userId: 'user1', username: '张三', role: 'owner', joinedAt: '2024-02-20' }
-    ],
-    itinerary: [],
-    createdAt: '2024-02-20',
-    updatedAt: '2024-02-20'
-  }
-])
+const trips = ref<Trip[]>([])
 
 onMounted(() => {
   loadTrips()
 })
 
-const loadTrips = () => {
-  // 加载行程列表
-  pagination.value.total = trips.value.length
+const loadTrips = async () => {
+  loading.value = true
+  try {
+    const res = await tripApi.getTrips()
+    if (res.code === 200 && res.data) {
+      // 转换后端数据格式到前端格式
+      trips.value = (Array.isArray(res.data) ? res.data : []).map((trip: any) => {
+        const startDate = trip.startDate || trip.start_date
+        const endDate = trip.endDate || trip.end_date
+        const now = dayjs()
+        const start = dayjs(startDate)
+        const end = dayjs(endDate)
+        
+        // 根据日期判断状态
+        let status = 'planning'
+        if (now.isAfter(end)) {
+          status = 'completed'
+        } else if (now.isAfter(start) && now.isBefore(end)) {
+          status = 'ongoing'
+        }
+        
+        return {
+          id: String(trip.tripId || trip.id || ''),
+          title: trip.name || trip.title || '',
+          description: trip.description || '',
+          destination: trip.region || trip.destination || '',
+          startDate: startDate ? dayjs(startDate).format('YYYY-MM-DD') : '',
+          endDate: endDate ? dayjs(endDate).format('YYYY-MM-DD') : '',
+          status: trip.status || status,
+          coverImage: trip.coverImage || trip.coverImageUrl || '',
+          createdBy: String(trip.createdBy || trip.userId || ''),
+          members: trip.members || trip.participants || [],
+          itinerary: trip.itinerary || trip.places || [],
+          createdAt: trip.createdTime ? dayjs(trip.createdTime).format('YYYY-MM-DD') : '',
+          updatedAt: trip.updatedTime ? dayjs(trip.updatedTime).format('YYYY-MM-DD') : ''
+        }
+      })
+      
+      // 应用筛选
+      let filteredTrips = [...trips.value]
+      
+      if (filters.value.status) {
+        filteredTrips = filteredTrips.filter(t => t.status === filters.value.status)
+      }
+      
+      if (filters.value.keyword) {
+        const keyword = filters.value.keyword.toLowerCase()
+        filteredTrips = filteredTrips.filter(t => 
+          t.title.toLowerCase().includes(keyword) || 
+          t.destination.toLowerCase().includes(keyword)
+        )
+      }
+      
+      trips.value = filteredTrips
+      pagination.value.total = filteredTrips.length
+    }
+  } catch (error: any) {
+    console.error('加载行程列表失败:', error)
+    ElMessage.error(error.message || '加载行程列表失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 const handleSearch = () => {
-  // 搜索逻辑
   loadTrips()
 }
 
 const handleSizeChange = (size: number) => {
   pagination.value.pageSize = size
+  pagination.value.page = 1
   loadTrips()
 }
 
@@ -253,10 +280,23 @@ const handleDelete = async (trip: Trip) => {
     await ElMessageBox.confirm('确定要删除这个行程吗？', '确认删除', {
       type: 'warning'
     })
-    // 删除逻辑
-    ElMessage.success('行程已删除')
-  } catch {
-    // 用户取消
+    
+    const tripId = Number(trip.id)
+    if (isNaN(tripId)) {
+      ElMessage.error('行程ID无效')
+      return
+    }
+    
+    const res = await tripApi.deleteTrip(tripId)
+    if (res.code === 200) {
+      ElMessage.success('行程已删除')
+      loadTrips() // 重新加载列表
+    }
+  } catch (error: any) {
+    if (error.message !== 'cancel') {
+      console.error('删除行程失败:', error)
+      ElMessage.error(error.message || '删除失败')
+    }
   }
 }
 </script>

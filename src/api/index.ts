@@ -72,9 +72,31 @@ export const tripApi = {
     return request.delete(`/trips/${tripId}/places/${placeId}`)
   },
 
+  // 更新地点信息
+  updatePlace(tripId: number, placeId: number, data: { day: number; typeId?: number }) {
+    return request.put(`/trips/${tripId}/places/${placeId}`, data)
+  },
+
   // 更新地点顺序
   updatePlaceOrder(tripId: number, placeIds: number[]) {
     return request.put(`/trips/${tripId}/places/order`, placeIds)
+  },
+
+  // 获取地点建议
+  getPlaceSuggestions(tripId: number, query: string) {
+    return request.get(`/trips/${tripId}/places/suggestion`, {
+      params: { query }
+    })
+  },
+
+  // 添加地点到行程
+  addPlaceToTrip(tripId: number, data: { uid: string; day: number; typeId?: number }) {
+    return request.post(`/trips/${tripId}/places/add`, data)
+  },
+
+  // 获取地点详情
+  getPlaceDetail(tripId: number, placeId: number) {
+    return request.get(`/trips/${tripId}/places/${placeId}`)
   },
 
   // 创建邀请
@@ -232,6 +254,53 @@ export const communityApi = {
   }
 }
 
+// 图片上传相关API
+export const imageApi = {
+  // 上传图片
+  uploadImage(file: File, itemType: number = 4, itemId: number = 0) {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('itemType', itemType.toString())
+    formData.append('itemId', itemId.toString())
+    return request.post<ImageUrlVO>('/images/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+
+  // 获取图片URL
+  getImageUrl(imageId: number) {
+    return request.get<ImageUrlVO>(`/images/${imageId}`)
+  },
+
+  // 删除图片
+  deleteImage(imageId: number) {
+    return request.delete<void>(`/images/${imageId}`)
+  },
+
+  // 上传行程封面图片
+  uploadTripCover(file: File, tripId: number) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return request.post<ImageUrlVO>(`/images/trip/${tripId}/cover`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+
+  // 获取行程封面图片
+  getTripCover(tripId: number) {
+    return request.get<ImageUrlVO>(`/images/trip/${tripId}/cover`)
+  },
+
+  // 删除行程封面图片
+  deleteTripCover(tripId: number) {
+    return request.delete<void>(`/images/trip/${tripId}/cover`)
+  }
+}
+
 // 用户相关API
 export const userApi = {
   // 获取当前用户信息
@@ -271,6 +340,8 @@ export const userApi = {
   }
 }
 
+
+
 // 邀请相关API
 export const invitationApi = {
   // 获取我发出的邀请
@@ -296,6 +367,21 @@ export const invitationApi = {
   // 撤销邀请
   cancelInvitation(invitationId: number) {
     return request.delete<void>(`/invitations/${invitationId}`)
+  }
+}
+
+// 地点类型相关API
+export const placeTypeApi = {
+  // 获取所有地点类型
+  getAllPlaceTypes() {
+    return request.get('/place-types')
+  },
+
+  // 分页获取地点类型
+  getPlaceTypes(page: number = 1, size: number = 10) {
+    return request.get('/place-types/page', {
+      params: { page, size }
+    })
   }
 }
 

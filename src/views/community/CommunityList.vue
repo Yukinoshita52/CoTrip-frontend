@@ -74,7 +74,7 @@
           <el-col :span="8" v-for="post in posts" :key="post.id">
             <el-card class="post-card" @click="$router.push(`/community/${post.id}`)">
               <div class="post-cover">
-                <img v-if="post.trip.coverImage" :src="post.trip.coverImage" alt="行程封面" />
+                <img v-if="post.trip.coverImage" :src="formatImageUrl(post.trip.coverImage)" alt="行程封面" />
                 <div v-else class="default-cover">
                   <el-icon><Picture /></el-icon>
                 </div>
@@ -233,7 +233,7 @@ import { ElMessage } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import { communityApi, tripApi } from '@/api'
 import type { CommunityPost, Trip } from '@/types'
-import { formatAvatarUrl } from '@/utils/image'
+import { formatAvatarUrl, formatImageUrl } from '@/utils/image'
 import dayjs from 'dayjs'
 
 // 筛选条件

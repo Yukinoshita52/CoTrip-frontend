@@ -204,7 +204,7 @@
         <div class="related-list">
           <div v-for="relatedPost in relatedPosts" :key="relatedPost.id" class="related-item">
             <div class="related-cover">
-              <img v-if="relatedPost.trip.coverImage" :src="relatedPost.trip.coverImage" alt="封面" />
+              <img v-if="relatedPost.trip.coverImage" :src="formatImageUrl(relatedPost.trip.coverImage)" alt="封面" />
               <div v-else class="default-cover">
                 <el-icon><Picture /></el-icon>
               </div>
@@ -230,7 +230,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import type { CommunityPost, ItineraryItem, Expense } from '@/types'
-import { formatAvatarUrl } from '@/utils/image'
+import { formatAvatarUrl, formatImageUrl } from '@/utils/image'
 import dayjs from 'dayjs'
 import { communityApi, tripApi, expenseApi } from '@/api'
 

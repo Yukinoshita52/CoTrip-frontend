@@ -1,9 +1,9 @@
 <template>
   <Layout>
-    <div class="create-trip">
+    <div class="edit-trip" v-loading="loading">
       <div class="page-header">
-        <h2>创建新行程</h2>
-        <p>开始规划你的下一次旅行</p>
+        <h2>编辑行程</h2>
+        <p>修改你的旅行计划</p>
       </div>
 
       <el-form
@@ -12,6 +12,7 @@
         :rules="rules"
         label-width="100px"
         class="trip-form"
+        v-if="!loading"
       >
         <el-card>
           <template #header>
@@ -28,30 +29,11 @@
           </el-form-item>
           
           <el-form-item label="目的地" prop="destination">
-            <el-select
+            <el-input
               v-model="form.destination"
-              placeholder="请选择目的地"
-              filterable
-              allow-create
-              style="width: 100%"
-            >
-              <el-option-group label="热门城市">
-                <el-option
-                  v-for="city in popularCities"
-                  :key="city"
-                  :label="city"
-                  :value="city"
-                />
-              </el-option-group>
-              <el-option-group label="省份/地区">
-                <el-option
-                  v-for="region in regions"
-                  :key="region"
-                  :label="region"
-                  :value="region"
-                />
-              </el-option-group>
-            </el-select>
+              placeholder="如：北京·上海·杭州"
+              maxlength="100"
+            />
           </el-form-item>
           
           <el-form-item label="行程时间" prop="dateRange">
@@ -97,45 +79,10 @@
           </el-form-item>
         </el-card>
 
-        <el-card style="margin-top: 24px;">
-          <template #header>
-            <span>成员管理</span>
-          </template>
-          
-          <div class="member-section">
-            <div class="add-member">
-              <el-input
-                v-model="newMemberEmail"
-                placeholder="输入邮箱邀请成员"
-                style="width: 300px; margin-right: 12px;"
-              />
-              <el-button @click="addMember">邀请成员</el-button>
-            </div>
-            
-            <div class="member-list" v-if="form.members.length > 0">
-              <div v-for="member in form.members" :key="member.userId" class="member-item">
-                <el-avatar size="small">{{ member.username.charAt(0) }}</el-avatar>
-                <span class="member-name">{{ member.username }}</span>
-                <el-tag size="small" :type="member.role === 'owner' ? 'success' : ''">
-                  {{ getRoleText(member.role) }}
-                </el-tag>
-                <el-button
-                  v-if="member.role !== 'owner'"
-                  text
-                  type="danger"
-                  @click="removeMember(member.userId)"
-                >
-                  移除
-                </el-button>
-              </div>
-            </div>
-          </div>
-        </el-card>
-
         <div class="form-actions">
           <el-button @click="$router.back()">取消</el-button>
-          <el-button type="primary" @click="handleSubmit" :loading="loading">
-            创建行程
+          <el-button type="primary" @click="handleSubmit" :loading="submitting">
+            保存修改
           </el-button>
         </div>
       </el-form>
@@ -144,19 +91,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import { tripApi, imageApi } from '@/api'
 import { formatImageUrl } from '@/utils/image'
-import type { TripMember } from '@/types'
+import dayjs from 'dayjs'
 
 const router = useRouter()
+const route = useRoute()
 const formRef = ref<FormInstance>()
-const loading = ref(false)
-const newMemberEmail = ref('')
+const loading = ref(true)
+const submitting = ref(false)
+
+const tripId = route.params.id as string
 
 // 表单数据
 const form = reactive({
@@ -164,27 +114,8 @@ const form = reactive({
   destination: '',
   dateRange: [] as string[],
   description: '',
-  coverImage: '',
-  members: [] as TripMember[]
+  coverImage: ''
 })
-
-// 热门城市列表
-const popularCities = [
-  '北京', '上海', '广州', '深圳', '杭州', '南京', '苏州', '成都', 
-  '重庆', '西安', '武汉', '天津', '青岛', '大连', '厦门', '三亚',
-  '丽江', '桂林', '张家界', '黄山', '九寨沟', '稻城亚丁'
-]
-
-// 省份/地区列表
-const regions = [
-  '北京市', '天津市', '上海市', '重庆市',
-  '河北省', '山西省', '辽宁省', '吉林省', '黑龙江省',
-  '江苏省', '浙江省', '安徽省', '福建省', '江西省', '山东省',
-  '河南省', '湖北省', '湖南省', '广东省', '海南省',
-  '四川省', '贵州省', '云南省', '陕西省', '甘肃省', '青海省',
-  '台湾省', '内蒙古自治区', '广西壮族自治区', '西藏自治区',
-  '宁夏回族自治区', '新疆维吾尔自治区', '香港特别行政区', '澳门特别行政区'
-]
 
 // 表单验证规则
 const rules: FormRules = {
@@ -198,6 +129,39 @@ const rules: FormRules = {
   dateRange: [
     { required: true, message: '请选择行程时间', trigger: 'change' }
   ]
+}
+
+// 加载行程数据
+const loadTripData = async () => {
+  try {
+    loading.value = true
+    const res = await tripApi.getTripById(Number(tripId))
+    
+    if (res.code === 200 && res.data) {
+      const trip = res.data
+      form.title = trip.name || ''
+      form.destination = trip.region || ''
+      form.description = trip.description || ''
+      form.coverImage = trip.coverImageUrl || ''
+      
+      // 设置日期范围
+      if (trip.startDate && trip.endDate) {
+        form.dateRange = [
+          dayjs(trip.startDate).format('YYYY-MM-DD'),
+          dayjs(trip.endDate).format('YYYY-MM-DD')
+        ]
+      }
+    } else {
+      ElMessage.error(res.message || '加载行程数据失败')
+      router.back()
+    }
+  } catch (error: any) {
+    console.error('加载行程数据失败:', error)
+    ElMessage.error(error.message || '加载行程数据失败')
+    router.back()
+  } finally {
+    loading.value = false
+  }
 }
 
 const beforeUpload = (file: File) => {
@@ -225,7 +189,7 @@ const handleUpload = async (options: any) => {
     const res = await imageApi.uploadImage(file, 2, 0)
     
     if (res.code === 200 && res.data?.url) {
-      // 保存图片URL，稍后在创建行程时会关联到具体的行程ID
+      // 保存图片URL
       form.coverImage = res.data.url
       ElMessage.success('封面上传成功')
     } else {
@@ -242,70 +206,46 @@ const removeCover = () => {
   ElMessage.success('封面已移除')
 }
 
-const addMember = () => {
-  if (!newMemberEmail.value) {
-    ElMessage.warning('请输入邮箱地址')
-    return
-  }
-  
-  // 实际应该调用邀请API，这里暂时提示功能待实现
-  ElMessage.info('邀请功能待实现，请在行程创建后通过行程详情页面邀请成员')
-  newMemberEmail.value = ''
-}
-
-const removeMember = (userId: string) => {
-  const index = form.members.findIndex(m => m.userId === userId)
-  if (index > -1) {
-    form.members.splice(index, 1)
-    ElMessage.success('成员已移除')
-  }
-}
-
-const getRoleText = (role: string) => {
-  const texts: Record<string, string> = {
-    owner: '创建者',
-    admin: '管理员',
-    member: '成员'
-  }
-  return texts[role] || role
-}
-
 const handleSubmit = async () => {
   if (!formRef.value) return
   
   try {
     await formRef.value.validate()
-    loading.value = true
+    submitting.value = true
     
-    // 构建提交数据（匹配后端DTO格式）
-    const tripData = {
+    // 构建更新数据
+    const updateData = {
       name: form.title,
       region: form.destination,
       startDate: form.dateRange[0],
       endDate: form.dateRange[1],
       description: form.description || '',
-      coverImageUrl: form.coverImage || '' // 使用上传的图片URL
+      coverImageUrl: form.coverImage || ''
     }
     
-    const res = await tripApi.createTrip(tripData)
+    const res = await tripApi.updateTrip(Number(tripId), updateData)
     
     if (res.code === 200) {
-      ElMessage.success('行程创建成功!')
+      ElMessage.success('行程修改成功!')
       router.push('/trips')
     } else {
-      ElMessage.error(res.message || '创建失败')
+      ElMessage.error(res.message || '修改失败')
     }
   } catch (error: any) {
-    console.error('创建失败:', error)
-    ElMessage.error(error.message || '创建失败，请稍后再试')
+    console.error('修改失败:', error)
+    ElMessage.error(error.message || '修改失败，请稍后再试')
   } finally {
-    loading.value = false
+    submitting.value = false
   }
 }
+
+onMounted(() => {
+  loadTripData()
+})
 </script>
 
 <style scoped>
-.create-trip {
+.edit-trip {
   max-width: 800px;
 }
 
@@ -365,39 +305,6 @@ const handleSubmit = async () => {
 
 .upload-actions {
   margin-top: 8px;
-}
-
-.member-section {
-  margin-top: 16px;
-}
-
-.add-member {
-  display: flex;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.member-list {
-  border: 1px solid #ebeef5;
-  border-radius: 4px;
-  padding: 16px;
-}
-
-.member-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.member-item:last-child {
-  border-bottom: none;
-}
-
-.member-name {
-  flex: 1;
-  font-size: 14px;
 }
 
 .form-actions {

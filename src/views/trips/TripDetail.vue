@@ -81,7 +81,7 @@
                       <el-button text @click="editItineraryItem(item)">
                         <el-icon><Edit /></el-icon>
                       </el-button>
-                      <el-button text type="danger" @click="deleteItineraryItem(item.id)">
+                      <el-button text type="danger" @click="deleteItineraryItem(item)">
                         <el-icon><Delete /></el-icon>
                       </el-button>
                     </div>
@@ -182,8 +182,100 @@
 
     <!-- 添加行程安排对话框 -->
     <el-dialog v-model="showAddItinerary" title="添加行程安排" width="600px">
-      <!-- 这里可以添加表单内容 -->
-      <p>添加行程安排表单（待实现）</p>
+      <el-form :model="itineraryForm" :rules="itineraryRules" ref="itineraryFormRef" label-width="80px">
+        <el-form-item label="选择天数" prop="day">
+          <el-select v-model="itineraryForm.day" placeholder="请选择第几天" style="width: 100%">
+            <el-option 
+              v-for="day in availableDays" 
+              :key="day" 
+              :label="`第${day}天 (${formatDayDate(day)})`" 
+              :value="day"
+            />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="搜索地点" prop="placeName">
+          <el-autocomplete
+            v-model="itineraryForm.placeName"
+            :fetch-suggestions="fetchPlaceSuggestions"
+            placeholder="输入地点名称搜索"
+            style="width: 100%"
+            @select="handlePlaceSelect"
+            clearable
+          >
+            <template #default="{ item }">
+              <div class="suggestion-item">
+                <span class="suggestion-name">{{ item.name }}</span>
+              </div>
+            </template>
+          </el-autocomplete>
+        </el-form-item>
+        
+        <el-form-item label="地点类型" prop="placeType" v-if="selectedPlace">
+          <el-select v-model="itineraryForm.placeType" placeholder="请选择地点类型" style="width: 100%">
+            <el-option
+              v-for="type in placeTypes"
+              :key="type.id"
+              :label="type.name"
+              :value="type.id"
+            />
+          </el-select>
+        </el-form-item>
+        
+        <div v-if="selectedPlace" class="selected-place">
+          <h4>已选择地点：</h4>
+          <div class="place-info">
+            <p><strong>名称：</strong>{{ selectedPlace.name }}</p>
+            <p><strong>类型：</strong>{{ getSelectedTypeName() }}</p>
+            <p v-if="selectedPlace.address"><strong>地址：</strong>{{ selectedPlace.address }}</p>
+          </div>
+        </div>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="showAddItinerary = false">取消</el-button>
+        <el-button type="primary" @click="handleAddItinerary" :loading="addingItinerary">
+          添加到行程
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 编辑行程安排对话框 -->
+    <el-dialog v-model="showEditItinerary" title="编辑行程安排" width="500px">
+      <el-form :model="editItineraryForm" :rules="editItineraryRules" ref="editItineraryFormRef" label-width="80px">
+        <el-form-item label="地点名称">
+          <el-input :value="currentEditItem?.title" disabled />
+        </el-form-item>
+        
+        <el-form-item label="选择天数" prop="day">
+          <el-select v-model="editItineraryForm.day" placeholder="请选择第几天" style="width: 100%">
+            <el-option 
+              v-for="day in availableDays" 
+              :key="day" 
+              :label="`第${day}天 (${formatDayDate(day)})`" 
+              :value="day"
+            />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="地点类型" prop="placeType">
+          <el-select v-model="editItineraryForm.placeType" placeholder="请选择地点类型" style="width: 100%">
+            <el-option
+              v-for="type in placeTypes"
+              :key="type.id"
+              :label="type.name"
+              :value="type.id"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="showEditItinerary = false">取消</el-button>
+        <el-button type="primary" @click="handleEditItinerary" :loading="editingItinerary">
+          保存修改
+        </el-button>
+      </template>
     </el-dialog>
 
     <!-- 邀请成员对话框 -->
@@ -211,10 +303,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import Layout from '@/components/Layout.vue'
-import { tripApi, expenseApi } from '@/api'
+import { tripApi, expenseApi, placeTypeApi } from '@/api'
 import type { Trip, ItineraryItem, Expense, TripMember } from '@/types'
 import dayjs from 'dayjs'
 
@@ -222,11 +314,33 @@ const route = useRoute()
 const router = useRouter()
 const activeTab = ref('itinerary')
 const showAddItinerary = ref(false)
+const showEditItinerary = ref(false)
 const showInviteMember = ref(false)
 
 const loading = ref(false)
 const trip = ref<Trip | null>(null)
 const relatedExpenses = ref<Expense[]>([])
+
+// 添加行程安排表单
+const itineraryFormRef = ref<FormInstance>()
+const addingItinerary = ref(false)
+const selectedPlace = ref<any>(null)
+const placeTypes = ref<any[]>([])
+const itineraryForm = ref({
+  day: 1,
+  placeName: '',
+  placeUid: '',
+  placeType: null as number | null
+})
+
+// 编辑行程安排表单
+const editItineraryFormRef = ref<FormInstance>()
+const editingItinerary = ref(false)
+const currentEditItem = ref<any>(null)
+const editItineraryForm = ref({
+  day: 1,
+  placeType: null as number | null
+})
 
 // 邀请成员表单
 const inviteFormRef = ref<FormInstance>()
@@ -234,6 +348,29 @@ const inviteLoading = ref(false)
 const inviteForm = ref({
   invitee: ''
 })
+
+// 行程安排表单验证规则
+const itineraryRules: FormRules = {
+  day: [
+    { required: true, message: '请选择天数', trigger: 'change' }
+  ],
+  placeName: [
+    { required: true, message: '请选择地点', trigger: 'blur' }
+  ],
+  placeType: [
+    { required: true, message: '请选择地点类型', trigger: 'change' }
+  ]
+}
+
+// 编辑行程安排表单验证规则
+const editItineraryRules: FormRules = {
+  day: [
+    { required: true, message: '请选择天数', trigger: 'change' }
+  ],
+  placeType: [
+    { required: true, message: '请选择地点类型', trigger: 'change' }
+  ]
+}
 
 // 邀请表单验证规则
 const inviteRules: FormRules = {
@@ -265,15 +402,19 @@ const loadTripDetail = async () => {
         const day = dayPlaces.day || 1
         const placesList = dayPlaces.places || []
         placesList.forEach((place: any, index: number) => {
+          const placeId = place.placeId || place.id
           itinerary.push({
-            id: String(place.placeId || place.id || `${day}-${index}`),
+            id: String(placeId || `${day}-${index}`),
+            placeId: placeId, // 添加真实的placeId
+            day: day, // 添加天数信息
             tripId: String(data.tripId || tripId),
             title: place.name || '',
             description: place.address || '',
             location: place.name || '',
             startTime: `${data.startDate}T09:00:00`,
             endTime: `${data.startDate}T18:00:00`,
-            type: 'activity',
+            type: place.type || 'activity',
+            typeId: place.typeId, // 添加类型ID
             cost: 0,
             createdBy: String(data.createdBy || ''),
             createdAt: data.createdTime || ''
@@ -378,7 +519,29 @@ const loadRelatedExpenses = async (tripId: number) => {
   }
 }
 
+// 加载地点类型
+const loadPlaceTypes = async () => {
+  try {
+    const res = await placeTypeApi.getAllPlaceTypes()
+    if (res.code === 200 && res.data) {
+      placeTypes.value = res.data
+    }
+  } catch (error: any) {
+    console.error('加载地点类型失败:', error)
+  }
+}
+
 // 计算属性
+const availableDays = computed(() => {
+  if (!trip.value?.startDate || !trip.value?.endDate) return [1]
+  
+  const start = dayjs(trip.value.startDate)
+  const end = dayjs(trip.value.endDate)
+  const days = end.diff(start, 'day') + 1
+  
+  return Array.from({ length: days }, (_, i) => i + 1)
+})
+
 const groupedItinerary = computed(() => {
   const groups: Record<string, ItineraryItem[]> = {}
   trip.value?.itinerary.forEach(item => {
@@ -402,21 +565,28 @@ const expenseSummary = computed(() => {
 
 onMounted(() => {
   loadTripDetail()
+  loadPlaceTypes()
 })
 
 // 工具函数
-const formatDate = (date: string) => {
-  return dayjs(date).format('MM月DD日')
+const formatDate = (date: string | Date) => {
+  if (!date) return ''
+  const d = dayjs(date)
+  return d.isValid() ? d.format('MM月DD日') : ''
 }
 
-const formatTime = (time: string) => {
-  return dayjs(time).format('HH:mm')
+const formatTime = (time: string | Date) => {
+  if (!time) return ''
+  const t = dayjs(time)
+  return t.isValid() ? t.format('HH:mm') : ''
 }
 
-const formatDateRange = (startDate: string, endDate: string) => {
-  const start = dayjs(startDate).format('MM-DD')
-  const end = dayjs(endDate).format('MM-DD')
-  return `${start} ~ ${end}`
+const formatDateRange = (startDate: string | Date, endDate: string | Date) => {
+  if (!startDate || !endDate) return ''
+  const start = dayjs(startDate)
+  const end = dayjs(endDate)
+  if (!start.isValid() || !end.isValid()) return ''
+  return `${start.format('MM-DD')} ~ ${end.format('MM-DD')}`
 }
 
 const getTripStatusType = (status: string) => {
@@ -482,19 +652,157 @@ const getCategoryText = (category: string) => {
 
 // 事件处理
 const handleEdit = () => {
-  ElMessage.info('编辑功能待实现')
+  // 跳转到编辑页面
+  router.push(`/trips/${route.params.id}/edit`)
 }
 
 const handleShare = () => {
   ElMessage.success('分享链接已复制到剪贴板')
 }
 
-const editItineraryItem = (item: ItineraryItem) => {
-  console.log('编辑行程项:', item.id)
+// 格式化天数对应的日期
+const formatDayDate = (day: number) => {
+  if (!trip.value?.startDate) return ''
+  const startDate = dayjs(trip.value.startDate)
+  if (!startDate.isValid()) return ''
+  const date = startDate.add(day - 1, 'day')
+  return date.format('MM-DD')
 }
 
-const deleteItineraryItem = (itemId: string) => {
-  console.log('删除行程项:', itemId)
+// 获取地点建议
+const fetchPlaceSuggestions = async (queryString: string, cb: (suggestions: any[]) => void) => {
+  if (!queryString.trim()) {
+    cb([])
+    return
+  }
+  
+  try {
+    const tripId = Number(route.params.id)
+    const res = await tripApi.getPlaceSuggestions(tripId, queryString.trim())
+    
+    if (res.code === 200 && res.data) {
+      const suggestions = res.data.map((item: any) => ({
+        value: item.name,
+        name: item.name,
+        uid: item.uid
+      }))
+      cb(suggestions)
+    } else {
+      cb([])
+    }
+  } catch (error) {
+    console.error('获取地点建议失败:', error)
+    cb([])
+  }
+}
+
+// 选择地点
+const handlePlaceSelect = (item: any) => {
+  itineraryForm.value.placeUid = item.uid
+  // 设置默认地点类型（如果有的话）
+  if (placeTypes.value.length > 0) {
+    itineraryForm.value.placeType = placeTypes.value[0].id
+  }
+  selectedPlace.value = {
+    name: item.name,
+    uid: item.uid,
+    type: '地点',
+    address: ''
+  }
+}
+
+// 获取选中的地点类型名称
+const getSelectedTypeName = () => {
+  if (!itineraryForm.value.placeType) return '未选择'
+  const type = placeTypes.value.find(t => t.id === itineraryForm.value.placeType)
+  return type ? type.name : '未知类型'
+}
+
+// 添加行程安排
+const handleAddItinerary = async () => {
+  if (!itineraryFormRef.value) return
+  
+  try {
+    await itineraryFormRef.value.validate()
+    
+    if (!itineraryForm.value.placeUid) {
+      ElMessage.error('请选择一个地点')
+      return
+    }
+    
+    addingItinerary.value = true
+    const tripId = Number(route.params.id)
+    
+    const res = await tripApi.addPlaceToTrip(tripId, {
+      uid: itineraryForm.value.placeUid,
+      day: itineraryForm.value.day,
+      typeId: itineraryForm.value.placeType
+    })
+    
+    if (res.code === 200) {
+      ElMessage.success('行程安排添加成功')
+      showAddItinerary.value = false
+      
+      // 重置表单
+      itineraryForm.value = {
+        day: 1,
+        placeName: '',
+        placeUid: '',
+        placeType: null
+      }
+      selectedPlace.value = null
+      
+      // 重新加载行程详情
+      await loadTripDetail()
+    } else {
+      ElMessage.error(res.message || '添加失败')
+    }
+  } catch (error: any) {
+    console.error('添加行程安排失败:', error)
+    ElMessage.error(error.message || '添加失败，请稍后再试')
+  } finally {
+    addingItinerary.value = false
+  }
+}
+
+const editItineraryItem = (item: any) => {
+  currentEditItem.value = item
+  editItineraryForm.value = {
+    day: item.day || 1,
+    placeType: item.typeId || null
+  }
+  showEditItinerary.value = true
+}
+
+const deleteItineraryItem = async (item: any) => {
+  try {
+    await ElMessageBox.confirm('确定要删除这个行程安排吗？', '确认删除', {
+      type: 'warning'
+    })
+    
+    const tripId = Number(route.params.id)
+    const placeId = item.placeId || item.id
+    
+    if (!placeId) {
+      ElMessage.error('无法获取地点ID')
+      return
+    }
+    
+    const res = await tripApi.deletePlace(tripId, Number(placeId))
+    
+    if (res.code === 200) {
+      ElMessage.success('行程安排已删除')
+      // 重新加载行程详情
+      await loadTripDetail()
+    } else {
+      ElMessage.error(res.message || '删除失败')
+    }
+  } catch (error: any) {
+    if (error.message !== 'cancel') {
+      console.error('删除行程安排失败:', error)
+      ElMessage.error(error.message || '删除失败，请稍后再试')
+    }
+  }
 }
 
 const changeRole = (member: TripMember) => {
@@ -503,6 +811,51 @@ const changeRole = (member: TripMember) => {
 
 const removeMember = (member: TripMember) => {
   console.log('移除成员:', member.userId)
+}
+
+// 处理编辑行程安排
+const handleEditItinerary = async () => {
+  if (!editItineraryFormRef.value || !currentEditItem.value) return
+  
+  try {
+    await editItineraryFormRef.value.validate()
+    
+    editingItinerary.value = true
+    const tripId = Number(route.params.id)
+    const placeId = currentEditItem.value.placeId || currentEditItem.value.id
+    
+    if (!placeId) {
+      ElMessage.error('无法获取地点ID')
+      return
+    }
+    
+    const res = await tripApi.updatePlace(tripId, Number(placeId), {
+      day: editItineraryForm.value.day,
+      typeId: editItineraryForm.value.placeType
+    })
+    
+    if (res.code === 200) {
+      ElMessage.success('行程安排已更新')
+      showEditItinerary.value = false
+      
+      // 重置表单
+      editItineraryForm.value = {
+        day: 1,
+        placeType: null
+      }
+      currentEditItem.value = null
+      
+      // 重新加载行程详情
+      await loadTripDetail()
+    } else {
+      ElMessage.error(res.message || '更新失败')
+    }
+  } catch (error: any) {
+    console.error('更新行程安排失败:', error)
+    ElMessage.error(error.message || '更新失败，请稍后再试')
+  } finally {
+    editingItinerary.value = false
+  }
 }
 
 // 邀请成员
@@ -760,5 +1113,41 @@ const handleInviteMember = async () => {
 .expense-amount {
   font-weight: bold;
   color: #f56c6c;
+}
+
+/* 添加行程安排对话框样式 */
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.suggestion-name {
+  font-weight: 500;
+  color: #333;
+}
+
+.selected-place {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.selected-place h4 {
+  margin: 0 0 12px 0;
+  color: #333;
+  font-size: 14px;
+}
+
+.place-info p {
+  margin: 4px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.place-info strong {
+  color: #333;
 }
 </style>

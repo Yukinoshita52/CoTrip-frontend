@@ -50,7 +50,7 @@
           <el-col :span="8" v-for="trip in trips" :key="trip.id">
             <el-card class="trip-card" @click="$router.push(`/trips/${trip.id}`)">
               <div class="trip-cover">
-                <img v-if="trip.coverImage" :src="trip.coverImage" alt="行程封面" />
+                <img v-if="trip.coverImage" :src="formatImageUrl(trip.coverImage)" alt="行程封面" />
                 <div v-else class="default-cover">
                   <el-icon><Picture /></el-icon>
                 </div>
@@ -129,12 +129,15 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import { tripApi } from '@/api'
+import { formatImageUrl } from '@/utils/image'
 import type { Trip } from '@/types'
 import dayjs from 'dayjs'
 
+const router = useRouter()
 const loading = ref(false)
 
 // 筛选条件
@@ -261,8 +264,8 @@ const formatDateRange = (startDate: string, endDate: string) => {
 }
 
 const handleEdit = (trip: Trip) => {
-  // 编辑行程
-  console.log('编辑行程:', trip.id)
+  // 跳转到编辑页面
+  router.push(`/trips/${trip.id}/edit`)
 }
 
 const handleShare = (trip: Trip) => {

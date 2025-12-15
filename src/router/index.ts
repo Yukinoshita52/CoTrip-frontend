@@ -37,6 +37,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '行程详情', requiresAuth: true }
   },
   {
+    path: '/trips/:id/edit',
+    name: 'EditTrip',
+    component: () => import('@/views/trips/EditTrip.vue'),
+    meta: { title: '编辑行程', requiresAuth: true }
+  },
+  {
     path: '/expenses',
     name: 'Expenses',
     component: () => import('@/views/expenses/ExpenseList.vue'),

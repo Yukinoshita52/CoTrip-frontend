@@ -37,6 +37,8 @@ export interface TripMember {
 // 行程安排项
 export interface ItineraryItem {
   id: string
+  placeId?: number // 真实的地点ID
+  day?: number // 天数
   tripId: string
   title: string
   description?: string
@@ -44,6 +46,7 @@ export interface ItineraryItem {
   startTime: string
   endTime: string
   type: 'transport' | 'accommodation' | 'activity' | 'dining' | 'other'
+  typeId?: number // 地点类型ID
   cost?: number
   notes?: string
   createdBy: string

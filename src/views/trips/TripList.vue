@@ -73,11 +73,15 @@
                 </p>
                 <div class="trip-members">
                   <el-avatar-group :max="3" size="small">
-                    <el-avatar v-for="member in trip.members" :key="member.userId">
+                    <el-avatar 
+                      v-for="member in trip.members" 
+                      :key="member.userId"
+                      :src="formatAvatarUrl(member.avatar)"
+                    >
                       {{ member.username.charAt(0) }}
                     </el-avatar>
                   </el-avatar-group>
-                  <span class="member-count">{{ trip.members.length }} 人</span>
+                  <span class="member-count">{{ trip.members.length || 1 }} 人</span>
                 </div>
               </div>
               
@@ -133,7 +137,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import { tripApi } from '@/api'
-import { formatImageUrl } from '@/utils/image'
+import { formatImageUrl, formatAvatarUrl } from '@/utils/image'
 import type { Trip } from '@/types'
 import dayjs from 'dayjs'
 
@@ -191,7 +195,15 @@ const loadTrips = async () => {
           status: trip.status || status,
           coverImage: trip.coverImage || trip.coverImageUrl || '',
           createdBy: String(trip.createdBy || trip.userId || ''),
-          members: trip.members || trip.participants || [],
+          members: (trip.members && Array.isArray(trip.members) && trip.members.length > 0) 
+            ? trip.members.map((m: any) => ({
+                userId: String(m.userId || m.id || ''),
+                username: m.nickname || m.username || '',
+                avatar: m.avatarUrl || undefined,
+                role: m.role === 0 ? 'owner' : (m.role === 1 ? 'admin' : 'member'),
+                joinedAt: m.joinedAt || m.createTime || ''
+              }))
+            : [],
           itinerary: trip.itinerary || trip.places || [],
           createdAt: trip.createdTime ? dayjs(trip.createdTime).format('YYYY-MM-DD') : '',
           updatedAt: trip.updatedTime ? dayjs(trip.updatedTime).format('YYYY-MM-DD') : ''

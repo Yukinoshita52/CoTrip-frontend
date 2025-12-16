@@ -364,9 +364,14 @@ export const invitationApi = {
     return request.post<void>(`/invitations/${invitationId}/reject`)
   },
 
-  // 撤销邀请
+  // 撤销邀请（发出的邀请）
   cancelInvitation(invitationId: number) {
     return request.delete<void>(`/invitations/${invitationId}`)
+  },
+
+  // 删除收到的邀请
+  deleteReceivedInvitation(invitationId: number) {
+    return request.delete<void>(`/invitations/received/${invitationId}`)
   }
 }
 

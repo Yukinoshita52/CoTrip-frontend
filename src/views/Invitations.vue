@@ -14,7 +14,7 @@
               <div class="card-header">
                 <el-icon><Download /></el-icon>
                 <span>收到的邀请</span>
-                <el-badge :value="receivedInvitations.length" :hidden="receivedInvitations.length === 0" />
+                <el-badge :value="pendingReceivedCount" :hidden="pendingReceivedCount === 0" />
               </div>
             </template>
             
@@ -42,18 +42,24 @@
                 <div class="invitation-content">
                   <div class="trip-info">
                     <el-icon><MapLocation /></el-icon>
-                    <span>邀请你加入行程 ID: {{ invitation.tripId }}</span>
+                    <span>邀请你加入行程: {{ invitation.tripName || `ID: ${invitation.tripId}` }}</span>
                   </div>
                 </div>
                 
-                <div class="invitation-actions" v-if="invitation.status === 0">
-                  <el-button type="success" @click="acceptInvitation(invitation.invitationId)">
-                    <el-icon><Check /></el-icon>
-                    接受邀请
-                  </el-button>
-                  <el-button @click="rejectInvitation(invitation.invitationId)">
-                    <el-icon><Close /></el-icon>
-                    拒绝邀请
+                <div class="invitation-actions">
+                  <template v-if="invitation.status === 0">
+                    <el-button type="success" @click="acceptInvitation(invitation.invitationId)">
+                      <el-icon><Check /></el-icon>
+                      接受邀请
+                    </el-button>
+                    <el-button @click="rejectInvitation(invitation.invitationId)">
+                      <el-icon><Close /></el-icon>
+                      拒绝邀请
+                    </el-button>
+                  </template>
+                  <el-button text type="danger" @click="deleteReceivedInvitation(invitation.invitationId)">
+                    <el-icon><Delete /></el-icon>
+                    删除
                   </el-button>
                 </div>
               </div>
@@ -68,7 +74,6 @@
               <div class="card-header">
                 <el-icon><Upload /></el-icon>
                 <span>发出的邀请</span>
-                <el-badge :value="sentInvitations.length" :hidden="sentInvitations.length === 0" />
               </div>
             </template>
             
@@ -77,11 +82,11 @@
               <div v-for="invitation in sentInvitations" :key="invitation.invitationId" class="invitation-item">
                 <div class="invitation-header">
                   <div class="invitee-info">
-                    <el-avatar :size="40">
-                      {{ invitation.invitee?.charAt(0) || 'U' }}
+                    <el-avatar :size="40" :src="formatAvatarUrl(invitation.inviteeAvatarUrl)">
+                      {{ invitation.inviteeNickname?.charAt(0) || invitation.invitee?.charAt(0) || 'U' }}
                     </el-avatar>
                     <div class="invitee-details">
-                      <div class="invitee-name">{{ invitation.invitee }}</div>
+                      <div class="invitee-name">{{ invitation.inviteeNickname || invitation.invitee }}</div>
                       <div class="invitation-time">
                         <el-icon><Clock /></el-icon>
                         <span>{{ formatDate(invitation.sentTime) }}</span>
@@ -96,14 +101,14 @@
                 <div class="invitation-content">
                   <div class="trip-info">
                     <el-icon><MapLocation /></el-icon>
-                    <span>邀请加入行程 ID: {{ invitation.tripId }}</span>
+                    <span>邀请加入行程: {{ invitation.tripName || `ID: ${invitation.tripId}` }}</span>
                   </div>
                 </div>
                 
-                <div class="invitation-actions" v-if="invitation.status === 0">
-                  <el-button type="danger" plain @click="cancelInvitation(invitation.invitationId)">
+                <div class="invitation-actions">
+                  <el-button text type="danger" @click="cancelInvitation(invitation.invitationId)">
                     <el-icon><Delete /></el-icon>
-                    撤销邀请
+                    删除
                   </el-button>
                 </div>
               </div>
@@ -145,7 +150,7 @@
               <el-col :span="6">
                 <div class="stat-item">
                   <div class="stat-number">{{ acceptedCount }}</div>
-                  <div class="stat-label">已接受</div>
+                  <div class="stat-label">已同意</div>
                 </div>
               </el-col>
             </el-row>
@@ -198,7 +203,7 @@ const getInvitationStatusType = (status: number) => {
 const getInvitationStatusText = (status: number) => {
   const texts: Record<number, string> = {
     0: '待处理',
-    1: '已接受',
+    1: '已同意',
     2: '已拒绝',
     3: '已过期'
   }
@@ -269,24 +274,46 @@ const rejectInvitation = async (invitationId: number) => {
   }
 }
 
-// 撤销邀请
+// 撤销邀请（发出的邀请）
 const cancelInvitation = async (invitationId: number) => {
   try {
-    await ElMessageBox.confirm('确定要撤销这个邀请吗？', '确认撤销', {
+    await ElMessageBox.confirm('确定要删除这个邀请吗？删除后将无法恢复。', '确认删除', {
       type: 'warning'
     })
     
     const res = await invitationApi.cancelInvitation(invitationId)
     if (res.code === 200) {
-      ElMessage.success('已撤销邀请')
+      ElMessage.success('已删除邀请')
       await loadSentInvitations()
     } else {
-      ElMessage.error(res.message || '撤销邀请失败')
+      ElMessage.error(res.message || '删除邀请失败')
     }
   } catch (error: any) {
     if (error !== 'cancel') {
-      console.error('撤销邀请失败:', error)
-      ElMessage.error(error.message || '撤销邀请失败')
+      console.error('删除邀请失败:', error)
+      ElMessage.error(error.message || '删除邀请失败')
+    }
+  }
+}
+
+// 删除收到的邀请
+const deleteReceivedInvitation = async (invitationId: number) => {
+  try {
+    await ElMessageBox.confirm('确定要删除这个邀请吗？删除后将无法恢复。', '确认删除', {
+      type: 'warning'
+    })
+    
+    const res = await invitationApi.deleteReceivedInvitation(invitationId)
+    if (res.code === 200) {
+      ElMessage.success('已删除邀请')
+      await loadReceivedInvitations()
+    } else {
+      ElMessage.error(res.message || '删除邀请失败')
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('删除邀请失败:', error)
+      ElMessage.error(error.message || '删除邀请失败')
     }
   }
 }

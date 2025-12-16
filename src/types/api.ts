@@ -39,8 +39,11 @@ export interface InvitationVO {
   inviterAvatarUrl: string
   inviterPhone: string
   invitee: string
+  inviteeNickname?: string // 被邀请人昵称
+  inviteeAvatarUrl?: string // 被邀请人头像URL
   status: number // 0-待接受，1-已接受，2-已拒绝，3-已过期
   sentTime: string
+  tripName?: string 
 }
 
 // 社区相关类型

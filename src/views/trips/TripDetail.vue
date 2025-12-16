@@ -104,8 +104,11 @@
             </div>
             
             <div class="members-grid">
+              <!-- 正式成员 -->
               <div v-for="member in trip.members" :key="member.userId" class="member-card">
-                <el-avatar :size="60">{{ member.username.charAt(0) }}</el-avatar>
+                <el-avatar :size="60" :src="formatAvatarUrl(member.avatar)">
+                  {{ member.username.charAt(0) }}
+                </el-avatar>
                 <div class="member-info">
                   <div class="member-name">{{ member.username }}</div>
                   <el-tag size="small" :type="member.role === 'owner' ? 'success' : ''">
@@ -131,6 +134,24 @@
                       </el-dropdown-menu>
                     </template>
                   </el-dropdown>
+                </div>
+              </div>
+              
+              <!-- 待接受邀请的成员 -->
+              <div v-for="invitation in pendingInvitations" :key="invitation.invitationId" class="member-card pending-invitation">
+                <el-avatar :size="60">{{ invitation.invitee?.charAt(0) || 'U' }}</el-avatar>
+                <div class="member-info">
+                  <div class="member-name">{{ invitation.invitee }}</div>
+                  <el-tag size="small" type="warning">待接受邀请</el-tag>
+                  <div class="member-joined">
+                    邀请时间：{{ formatDate(invitation.sentTime) }}
+                  </div>
+                </div>
+                <div class="member-actions">
+                  <el-button text type="danger" @click="cancelInvitation(invitation.invitationId)">
+                    <el-icon><Delete /></el-icon>
+                    撤销
+                  </el-button>
                 </div>
               </div>
             </div>
@@ -306,8 +327,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import Layout from '@/components/Layout.vue'
-import { tripApi, expenseApi, placeTypeApi } from '@/api'
+import { tripApi, expenseApi, placeTypeApi, invitationApi } from '@/api'
 import type { Trip, ItineraryItem, Expense, TripMember } from '@/types'
+import { formatAvatarUrl } from '@/utils/image'
 import dayjs from 'dayjs'
 
 const route = useRoute()
@@ -320,6 +342,7 @@ const showInviteMember = ref(false)
 const loading = ref(false)
 const trip = ref<Trip | null>(null)
 const relatedExpenses = ref<Expense[]>([])
+const pendingInvitations = ref<any[]>([])
 
 // 添加行程安排表单
 const itineraryFormRef = ref<FormInstance>()
@@ -428,7 +451,8 @@ const loadTripDetail = async () => {
         data.members.forEach((m: any) => {
           members.push({
             userId: String(m.userId || m.id || ''),
-            username: m.username || m.nickname || '',
+            username: m.nickname || m.username || '',
+            avatar: m.avatarUrl || undefined,
             role: m.role === 0 ? 'owner' : (m.role === 1 ? 'admin' : 'member'),
             joinedAt: m.joinedAt || m.createTime || ''
           })
@@ -453,6 +477,9 @@ const loadTripDetail = async () => {
       
       // 加载相关账单
       await loadRelatedExpenses(Number(tripId))
+      
+      // 加载待接受邀请的成员
+      await loadPendingInvitations(Number(tripId))
     } else {
       ElMessage.error(res.message || '加载行程详情失败')
       router.push('/trips')
@@ -528,6 +555,19 @@ const loadPlaceTypes = async () => {
     }
   } catch (error: any) {
     console.error('加载地点类型失败:', error)
+  }
+}
+
+// 加载待接受邀请的成员
+const loadPendingInvitations = async (tripId: number) => {
+  try {
+    const res = await tripApi.getTripInvitations(tripId)
+    if (res.code === 200 && res.data) {
+      // 只显示待接受邀请（status === 0）的成员
+      pendingInvitations.value = res.data.filter((inv: any) => inv.status === 0)
+    }
+  } catch (error: any) {
+    console.error('加载待接受邀请失败:', error)
   }
 }
 
@@ -736,7 +776,7 @@ const handleAddItinerary = async () => {
     const res = await tripApi.addPlaceToTrip(tripId, {
       uid: itineraryForm.value.placeUid,
       day: itineraryForm.value.day,
-      typeId: itineraryForm.value.placeType
+      typeId: itineraryForm.value.placeType ?? undefined
     })
     
     if (res.code === 200) {
@@ -831,7 +871,7 @@ const handleEditItinerary = async () => {
     
     const res = await tripApi.updatePlace(tripId, Number(placeId), {
       day: editItineraryForm.value.day,
-      typeId: editItineraryForm.value.placeType
+      typeId: editItineraryForm.value.placeType ?? undefined
     })
     
     if (res.code === 200) {
@@ -884,6 +924,8 @@ const handleInviteMember = async () => {
       inviteForm.value.invitee = ''
       // 刷新行程详情以更新成员列表
       await loadTripDetail()
+      // 重新加载待接受邀请
+      await loadPendingInvitations(Number(trip.value.id))
     } else {
       ElMessage.error(res.message || '发送邀请失败')
     }
@@ -893,6 +935,31 @@ const handleInviteMember = async () => {
     ElMessage.error(errorMessage)
   } finally {
     inviteLoading.value = false
+  }
+}
+
+// 撤销邀请
+const cancelInvitation = async (invitationId: number) => {
+  try {
+    await ElMessageBox.confirm('确定要撤销这个邀请吗？', '确认撤销', {
+      type: 'warning'
+    })
+    
+    const res = await invitationApi.cancelInvitation(invitationId)
+    if (res.code === 200) {
+      ElMessage.success('已撤销邀请')
+      // 重新加载待接受邀请
+      if (trip.value) {
+        await loadPendingInvitations(Number(trip.value.id))
+      }
+    } else {
+      ElMessage.error(res.message || '撤销邀请失败')
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('撤销邀请失败:', error)
+      ElMessage.error(error.message || '撤销邀请失败')
+    }
   }
 }
 </script>
@@ -1071,6 +1138,11 @@ const handleInviteMember = async () => {
   font-size: 12px;
   color: #999;
   margin-top: 4px;
+}
+
+.pending-invitation {
+  opacity: 0.8;
+  border-color: #e6a23c;
 }
 
 .form-tip {

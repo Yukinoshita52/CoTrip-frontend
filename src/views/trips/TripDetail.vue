@@ -421,29 +421,36 @@ const loadTripDetail = async () => {
       
       // 转换地点数据为itinerary格式
       const itinerary: any[] = []
-      places.forEach((dayPlaces: any) => {
-        const day = dayPlaces.day || 1
-        const placesList = dayPlaces.places || []
-        placesList.forEach((place: any, index: number) => {
-          const placeId = place.placeId || place.id
-          itinerary.push({
-            id: String(placeId || `${day}-${index}`),
-            placeId: placeId, // 添加真实的placeId
-            day: day, // 添加天数信息
-            tripId: String(data.tripId || tripId),
-            title: place.name || '',
-            description: place.address || '',
-            location: place.name || '',
-            startTime: `${data.startDate}T09:00:00`,
-            endTime: `${data.startDate}T18:00:00`,
-            type: place.type || 'activity',
-            typeId: place.typeId, // 添加类型ID
-            cost: 0,
-            createdBy: String(data.createdBy || ''),
-            createdAt: data.createdTime || ''
-          })
+      if (Array.isArray(places)) {
+        places.forEach((dayPlaces: any) => {
+          const day = dayPlaces.day || 1
+          const placesList = dayPlaces.places || []
+          
+          if (Array.isArray(placesList)) {
+            placesList.forEach((place: any, index: number) => {
+              // 后端返回的是 id 字段，不是 placeId
+              const placeId = place.id
+              
+              itinerary.push({
+                id: String(placeId || `${day}-${index}`),
+                placeId: placeId, // 添加真实的placeId
+                day: day, // 添加天数信息
+                tripId: String(data.tripId || tripId),
+                title: place.name || '',
+                description: place.address || '',
+                location: place.name || '',
+                startTime: `${data.startDate}T09:00:00`,
+                endTime: `${data.startDate}T18:00:00`,
+                type: place.type || 'activity',
+                typeId: place.typeId, // 添加类型ID
+                cost: 0,
+                createdBy: String(data.createdBy || ''),
+                createdAt: data.createdTime || ''
+              })
+            })
+          }
         })
-      })
+      }
       
       // 处理成员数据
       const members: TripMember[] = []
@@ -584,13 +591,17 @@ const availableDays = computed(() => {
 
 const groupedItinerary = computed(() => {
   const groups: Record<string, ItineraryItem[]> = {}
-  trip.value?.itinerary.forEach(item => {
-    const date = dayjs(item.startTime).format('YYYY-MM-DD')
-    if (!groups[date]) {
-      groups[date] = []
-    }
-    groups[date].push(item)
-  })
+  
+  if (trip.value?.itinerary) {
+    trip.value.itinerary.forEach(item => {
+      const date = dayjs(item.startTime).format('YYYY-MM-DD')
+      if (!groups[date]) {
+        groups[date] = []
+      }
+      groups[date].push(item)
+    })
+  }
+  
   return groups
 })
 
@@ -821,7 +832,7 @@ const deleteItineraryItem = async (item: any) => {
     })
     
     const tripId = Number(route.params.id)
-    const placeId = item.placeId || item.id
+    const placeId = item.placeId
     
     if (!placeId) {
       ElMessage.error('无法获取地点ID')
@@ -838,7 +849,7 @@ const deleteItineraryItem = async (item: any) => {
       ElMessage.error(res.message || '删除失败')
     }
   } catch (error: any) {
-    if (error.message !== 'cancel') {
+    if (error !== 'cancel' && error.message !== 'cancel') {
       console.error('删除行程安排失败:', error)
       ElMessage.error(error.message || '删除失败，请稍后再试')
     }
@@ -862,7 +873,7 @@ const handleEditItinerary = async () => {
     
     editingItinerary.value = true
     const tripId = Number(route.params.id)
-    const placeId = currentEditItem.value.placeId || currentEditItem.value.id
+    const placeId = currentEditItem.value.placeId
     
     if (!placeId) {
       ElMessage.error('无法获取地点ID')

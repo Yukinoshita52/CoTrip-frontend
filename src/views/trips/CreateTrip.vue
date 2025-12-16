@@ -149,7 +149,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import Layout from '@/components/Layout.vue'
-import { tripApi, imageApi } from '@/api'
+import { tripApi, imageApi, expenseApi } from '@/api'
 import { formatImageUrl } from '@/utils/image'
 import type { TripMember } from '@/types'
 
@@ -291,6 +291,29 @@ const handleSubmit = async () => {
     
     if (res.code === 200) {
       ElMessage.success('行程创建成功!')
+      
+      // 自动为行程创建账本
+      try {
+        const tripId = res.data?.tripId || res.data?.id
+        if (tripId) {
+          const bookName = `${form.title}账本`
+          const bookRes = await expenseApi.createAccountBook({
+            tripId: Number(tripId),
+            name: bookName
+          })
+          
+          if (bookRes.code === 200) {
+            ElMessage.success('账本已自动创建')
+          } else {
+            console.warn('账本创建失败:', bookRes.message)
+            // 不阻止用户操作，只是记录警告
+          }
+        }
+      } catch (error: any) {
+        console.warn('自动创建账本失败:', error)
+        // 不阻止用户操作，账本可以后续手动创建
+      }
+      
       router.push('/trips')
     } else {
       ElMessage.error(res.message || '创建失败')

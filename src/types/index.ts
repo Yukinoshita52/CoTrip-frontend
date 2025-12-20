@@ -43,6 +43,8 @@ export interface ItineraryItem {
   title: string
   description?: string
   location: string
+  lat?: number // 纬度
+  lng?: number // 经度
   startTime: string
   endTime: string
   type: 'transport' | 'accommodation' | 'activity' | 'dining' | 'other'

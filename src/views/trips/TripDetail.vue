@@ -49,45 +49,139 @@
               </el-button>
             </div>
             
+            <!-- 日期按钮列表 -->
+            <div class="date-buttons">
+              <el-button 
+                :type="selectedDay === null ? 'primary' : ''" 
+                size="small"
+                @click="handleSelectDay(null)"
+              >
+                总览
+              </el-button>
+              <el-button 
+                v-for="day in availableDays" 
+                :key="day"
+                :type="selectedDay === day ? 'primary' : ''" 
+                size="small"
+                @click="handleSelectDay(day)"
+              >
+                {{ getDayDate(day) }}
+              </el-button>
+            </div>
+            
+            <!-- 地图显示区域（只在选择具体天数时显示，放在日期按钮下面） -->
+            <div v-if="shouldShowMap" class="route-map-container">
+              <div class="map-header">
+                <h4>路线规划</h4>
+                <el-button size="small" @click="refreshRoute" :loading="routeLoading">
+                  刷新路线
+                </el-button>
+              </div>
+              <div id="baidu-map" class="baidu-map"></div>
+              <div v-if="routeInfo" class="route-info">
+                <el-row :gutter="16">
+                  <el-col :span="8">
+                    <span>总距离：{{ formatDistance(routeInfo.distance) }}</span>
+                  </el-col>
+                  <el-col :span="8">
+                    <span>预计时间：{{ formatDuration(routeInfo.duration) }}</span>
+                  </el-col>
+                  <el-col :span="8">
+                    <span>过路费：¥{{ routeInfo.toll || 0 }}</span>
+                  </el-col>
+                </el-row>
+              </div>
+            </div>
+            
+            <!-- 行程列表 -->
             <div class="itinerary-timeline">
-              <div v-for="(dayItems, date) in groupedItinerary" :key="date" class="day-group">
-                <div class="day-header">
-                  <h4>{{ formatDate(date) }}</h4>
-                  <span class="day-count">{{ dayItems.length }} 项安排</span>
-                </div>
-                
-                <div class="day-items">
-                  <div v-for="item in dayItems" :key="item.id" class="itinerary-item">
-                    <div class="item-time">{{ formatTime(item.startTime) }}</div>
-                    <div class="item-content">
-                      <div class="item-header">
-                        <span class="item-title">{{ item.title }}</span>
-                        <el-tag size="small" :type="getItemTypeColor(item.type)">
-                          {{ getItemTypeText(item.type) }}
-                        </el-tag>
+              <!-- 总览模式：显示所有天数 -->
+              <template v-if="selectedDay === null">
+                <div v-for="(dayItems, day) in groupedItineraryByDay" :key="day" class="day-group">
+                  <div class="day-header">
+                    <h4>第{{ day }}天</h4>
+                    <span class="day-date">{{ getDayDate(Number(day)) }}</span>
+                    <span class="day-count">{{ dayItems.length }} 项安排</span>
+                  </div>
+                  
+                  <div class="day-items">
+                    <div v-for="item in dayItems" :key="item.id" class="itinerary-item">
+                      <div class="item-time">{{ formatTime(item.startTime) }}</div>
+                      <div class="item-content">
+                        <div class="item-header">
+                          <span class="item-title">{{ item.title }}</span>
+                          <el-tag size="small" :type="getItemTypeColor(item.type)">
+                            {{ getItemTypeText(item.type) }}
+                          </el-tag>
+                        </div>
+                        <div class="item-location">
+                          <el-icon><Location /></el-icon>
+                          {{ item.location }}
+                        </div>
+                        <div v-if="item.description" class="item-description">
+                          {{ item.description }}
+                        </div>
+                        <div v-if="item.cost" class="item-cost">
+                          预算：¥{{ item.cost }}
+                        </div>
                       </div>
-                      <div class="item-location">
-                        <el-icon><Location /></el-icon>
-                        {{ item.location }}
+                      <div class="item-actions">
+                        <el-button text @click="editItineraryItem(item)">
+                          <el-icon><Edit /></el-icon>
+                        </el-button>
+                        <el-button text type="danger" @click="deleteItineraryItem(item)">
+                          <el-icon><Delete /></el-icon>
+                        </el-button>
                       </div>
-                      <div v-if="item.description" class="item-description">
-                        {{ item.description }}
-                      </div>
-                      <div v-if="item.cost" class="item-cost">
-                        预算：¥{{ item.cost }}
-                      </div>
-                    </div>
-                    <div class="item-actions">
-                      <el-button text @click="editItineraryItem(item)">
-                        <el-icon><Edit /></el-icon>
-                      </el-button>
-                      <el-button text type="danger" @click="deleteItineraryItem(item)">
-                        <el-icon><Delete /></el-icon>
-                      </el-button>
                     </div>
                   </div>
                 </div>
-              </div>
+                <el-empty v-if="Object.keys(groupedItineraryByDay).length === 0" description="暂无行程安排" />
+              </template>
+              
+              <!-- 选择具体天数：只显示该天的行程 -->
+              <template v-else>
+                <div v-if="selectedDayItems.length > 0" class="day-group">
+                  <div class="day-header">
+                    <h4>第{{ selectedDay }}天</h4>
+                    <span class="day-date">{{ getDayDate(selectedDay) }}</span>
+                    <span class="day-count">{{ selectedDayItems.length }} 项安排</span>
+                  </div>
+                  
+                  <div class="day-items">
+                    <div v-for="item in selectedDayItems" :key="item.id" class="itinerary-item">
+                      <div class="item-time">{{ formatTime(item.startTime) }}</div>
+                      <div class="item-content">
+                        <div class="item-header">
+                          <span class="item-title">{{ item.title }}</span>
+                          <el-tag size="small" :type="getItemTypeColor(item.type)">
+                            {{ getItemTypeText(item.type) }}
+                          </el-tag>
+                        </div>
+                        <div class="item-location">
+                          <el-icon><Location /></el-icon>
+                          {{ item.location }}
+                        </div>
+                        <div v-if="item.description" class="item-description">
+                          {{ item.description }}
+                        </div>
+                        <div v-if="item.cost" class="item-cost">
+                          预算：¥{{ item.cost }}
+                        </div>
+                      </div>
+                      <div class="item-actions">
+                        <el-button text @click="editItineraryItem(item)">
+                          <el-icon><Edit /></el-icon>
+                        </el-button>
+                        <el-button text type="danger" @click="deleteItineraryItem(item)">
+                          <el-icon><Delete /></el-icon>
+                        </el-button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <el-empty v-else description="该天暂无行程安排" />
+              </template>
             </div>
           </div>
         </el-tab-pane>
@@ -322,7 +416,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -338,6 +432,15 @@ const activeTab = ref('itinerary')
 const showAddItinerary = ref(false)
 const showEditItinerary = ref(false)
 const showInviteMember = ref(false)
+
+// 选择的天数（null表示总览，显示所有天数）
+const selectedDay = ref<number | null>(null)
+
+// 地图相关状态
+const mapInstance = ref<any>(null)
+const routeInfo = ref<any>(null)
+const mapLoaded = ref(false)
+const routeLoading = ref(false)
 
 const loading = ref(false)
 const trip = ref<Trip | null>(null)
@@ -421,9 +524,12 @@ const loadTripDetail = async () => {
       
       // 转换地点数据为itinerary格式
       const itinerary: any[] = []
+      const startDate = dayjs(data.startDate)
       places.forEach((dayPlaces: any) => {
         const day = dayPlaces.day || 1
         const placesList = dayPlaces.places || []
+        // 根据天数计算正确的日期
+        const itemDate = startDate.add(day - 1, 'day').format('YYYY-MM-DD')
         placesList.forEach((place: any, index: number) => {
           const placeId = place.placeId || place.id
           itinerary.push({
@@ -434,8 +540,10 @@ const loadTripDetail = async () => {
             title: place.name || '',
             description: place.address || '',
             location: place.name || '',
-            startTime: `${data.startDate}T09:00:00`,
-            endTime: `${data.startDate}T18:00:00`,
+            lat: place.lat, // 添加纬度
+            lng: place.lng, // 添加经度
+            startTime: `${itemDate}T09:00:00`,
+            endTime: `${itemDate}T18:00:00`,
             type: place.type || 'activity',
             typeId: place.typeId, // 添加类型ID
             cost: 0,
@@ -582,16 +690,49 @@ const availableDays = computed(() => {
   return Array.from({ length: days }, (_, i) => i + 1)
 })
 
-const groupedItinerary = computed(() => {
-  const groups: Record<string, ItineraryItem[]> = {}
+// 按天数分组（总览模式）
+const groupedItineraryByDay = computed(() => {
+  const groups: Record<number, ItineraryItem[]> = {}
   trip.value?.itinerary.forEach(item => {
-    const date = dayjs(item.startTime).format('YYYY-MM-DD')
-    if (!groups[date]) {
-      groups[date] = []
+    const day = item.day || 1
+    if (!groups[day]) {
+      groups[day] = []
     }
-    groups[date].push(item)
+    groups[day].push(item)
   })
-  return groups
+  // 按天数排序
+  const sortedGroups: Record<number, ItineraryItem[]> = {}
+  Object.keys(groups)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .forEach(day => {
+      sortedGroups[day] = groups[day]
+    })
+  return sortedGroups
+})
+
+// 根据选择的天数筛选行程项
+const selectedDayItems = computed(() => {
+  if (selectedDay.value === null || !trip.value) return []
+  return trip.value.itinerary.filter(item => item.day === selectedDay.value)
+})
+
+// 是否显示地图（只在选择具体天数时显示，且至少2个地点）
+const shouldShowMap = computed(() => {
+  return selectedDay.value !== null && selectedDayItems.value.length >= 2
+})
+
+// 获取当前选择天数的地点坐标
+const getCurrentDayPlaces = computed(() => {
+  if (selectedDay.value === null) return []
+  return selectedDayItems.value
+    .filter((item: any) => item.lat && item.lng)
+    .map((item: any) => ({
+      name: item.title,
+      lat: item.lat,
+      lng: item.lng,
+      id: item.id
+    }))
 })
 
 const expenseSummary = computed(() => {
@@ -607,6 +748,19 @@ onMounted(() => {
   loadTripDetail()
   loadPlaceTypes()
 })
+
+// 监听选择的天数变化，自动加载地图和路线
+watch([selectedDay, mapLoaded], ([day, loaded]) => {
+  if (day !== null && loaded) {
+    nextTick(() => {
+      refreshRoute()
+    })
+  } else if (day !== null && !loaded && getCurrentDayPlaces.value.length >= 2) {
+    initMap().then(() => {
+      getRoute()
+    })
+  }
+}, { immediate: false })
 
 // 工具函数
 const formatDate = (date: string | Date) => {
@@ -707,6 +861,262 @@ const formatDayDate = (day: number) => {
   if (!startDate.isValid()) return ''
   const date = startDate.add(day - 1, 'day')
   return date.format('MM-DD')
+}
+
+// 根据天数获取日期字符串
+const getDayDate = (day: number) => {
+  if (!trip.value?.startDate) return ''
+  const startDate = dayjs(trip.value.startDate)
+  if (!startDate.isValid()) return ''
+  const date = startDate.add(day - 1, 'day')
+  return date.format('MM月DD日')
+}
+
+// 处理天数选择
+const handleSelectDay = (day: number | null) => {
+  selectedDay.value = day
+}
+
+// 加载百度地图
+const loadBaiduMap = () => {
+  return new Promise((resolve, reject) => {
+    if ((window as any).BMap) {
+      resolve((window as any).BMap)
+      return
+    }
+    
+    const baiduAk = (import.meta as any).env?.VITE_BAIDU_MAP_AK || ''
+    if (!baiduAk) {
+      ElMessage.error('请配置百度地图AK环境变量：VITE_BAIDU_MAP_AK')
+      reject(new Error('百度地图AK未配置'))
+      return
+    }
+    
+    const script = document.createElement('script')
+    script.src = `https://api.map.baidu.com/api?v=3.0&ak=${baiduAk}&callback=initBaiduMap`
+    script.onerror = reject
+    
+    ;(window as any).initBaiduMap = () => {
+      resolve((window as any).BMap)
+    }
+    
+    document.head.appendChild(script)
+  })
+}
+
+// 初始化地图
+const initMap = async () => {
+  try {
+    await loadBaiduMap()
+    await nextTick()
+    
+    const mapContainer = document.getElementById('baidu-map')
+    if (!mapContainer) return
+    
+    mapInstance.value = new (window as any).BMap.Map('baidu-map')
+    
+    if (getCurrentDayPlaces.value.length > 0) {
+      const firstPlace = getCurrentDayPlaces.value[0]
+      const point = new (window as any).BMap.Point(firstPlace.lng, firstPlace.lat)
+      mapInstance.value.centerAndZoom(point, 13)
+    }
+    
+    mapLoaded.value = true
+  } catch (error) {
+    console.error('加载百度地图失败:', error)
+    ElMessage.error('地图加载失败，请检查百度地图AK配置')
+  }
+}
+
+// 调用百度路线规划API（使用JS API）
+const getRoute = async () => {
+  const places = getCurrentDayPlaces.value
+  if (places.length < 2) {
+    ElMessage.warning('至少需要2个地点才能规划路线')
+    return
+  }
+  
+  if (!mapInstance.value) {
+    ElMessage.warning('地图未初始化')
+    return
+  }
+  
+  routeLoading.value = true
+  
+  try {
+    const places = getCurrentDayPlaces.value
+    console.log('开始路线规划，地点数量:', places.length)
+    
+    // 清除之前的覆盖物（包括路线和标记）
+    mapInstance.value.clearOverlays()
+    
+    // 先添加地点标记
+    places.forEach((place, index) => {
+      const point = new (window as any).BMap.Point(place.lng, place.lat)
+      const marker = new (window as any).BMap.Marker(point)
+      const infoWindow = new (window as any).BMap.InfoWindow(place.name, {
+        width: 200,
+        height: 50
+      })
+      
+      marker.addEventListener('click', () => {
+        mapInstance.value.openInfoWindow(infoWindow, point)
+      })
+      
+      const label = new (window as any).BMap.Label(
+        index === 0 ? '起点' : (index === places.length - 1 ? '终点' : `${index + 1}`),
+        { offset: new (window as any).BMap.Size(20, -10) }
+      )
+      marker.setLabel(label)
+      mapInstance.value.addOverlay(marker)
+    })
+    
+    console.log('地点标记已添加')
+    
+    // 使用百度地图JS API的路线规划（让百度地图自动绘制路线）
+    const driving = new (window as any).BMap.DrivingRoute(mapInstance.value, {
+      renderOptions: {
+        map: mapInstance.value, // 自动绘制到地图
+        autoViewport: true, // 自动调整视野
+        panel: null // 不显示路线面板
+      },
+      onSearchComplete: (result: any) => {
+        routeLoading.value = false
+        const status = driving.getStatus()
+        
+        console.log('路线规划完成，状态码:', status)
+        
+        // 使用数字比较，0 表示成功
+        if (status === 0) {
+          const plan = result.getPlan(0) // 获取第一条路线
+          
+          console.log('获取到的路线规划:', plan)
+          
+          if (plan) {
+            // 获取路线信息
+            const distance = plan.getDistance(false) // 总距离（米）
+            const duration = plan.getDuration(false) // 总时间（秒）
+            
+            console.log('路线距离:', distance, '米，时间:', duration, '秒')
+            
+            routeInfo.value = {
+              distance: distance,
+              duration: duration,
+              toll: 0 // JS API不提供过路费信息
+            }
+            
+            // 百度地图会自动绘制路线，我们只需要调整视野和添加标记
+            // 确保标记在地图最上层
+            setTimeout(() => {
+              adjustMapViewport(plan, places)
+            }, 100) // 稍微延迟确保路线已绘制
+          } else {
+            console.error('未找到路线规划结果')
+            ElMessage.error('未找到路线规划结果')
+          }
+        } else {
+          let errorMsg = '路线规划失败'
+          // 使用数字比较状态码
+          if (status === 1) {
+            errorMsg = '未找到路线，请检查起点和终点'
+          } else if (status === 2) {
+            errorMsg = '路线规划请求无效'
+          }
+          console.error('路线规划失败:', errorMsg, '状态码:', status)
+          ElMessage.error(errorMsg)
+        }
+      }
+    })
+    
+    // 设置起点和终点
+    const startPoint = new (window as any).BMap.Point(places[0].lng, places[0].lat)
+    const endPoint = new (window as any).BMap.Point(places[places.length - 1].lng, places[places.length - 1].lat)
+    
+    // 如果有途径点
+    if (places.length > 2) {
+      const waypoints: any[] = []
+      for (let i = 1; i < places.length - 1; i++) {
+        waypoints.push(new (window as any).BMap.Point(places[i].lng, places[i].lat))
+      }
+      // 搜索路线（百度地图会自动绘制）
+      driving.search(startPoint, endPoint, { waypoints: waypoints })
+    } else {
+      // 搜索路线（百度地图会自动绘制）
+      driving.search(startPoint, endPoint)
+    }
+    
+  } catch (error) {
+    console.error('获取路线失败:', error)
+    ElMessage.error('获取路线失败')
+    routeLoading.value = false
+  }
+}
+
+
+// 调整地图视野以包含所有地点和路线
+const adjustMapViewport = (plan: any, places: any[]) => {
+  if (!mapInstance.value) {
+    console.error('地图实例不存在')
+    return
+  }
+  
+  try {
+    // 收集所有地点坐标
+    const allPoints: any[] = []
+    places.forEach(place => {
+      allPoints.push(new (window as any).BMap.Point(place.lng, place.lat))
+    })
+    
+    // 尝试从路线规划结果中获取路线点来调整视野
+    try {
+      const route = plan.getRoute(0)
+      if (route) {
+        // 获取路线的起点和终点来扩展视野
+        const startPoint = route.getStartPoint()
+        const endPoint = route.getEndPoint()
+        if (startPoint) allPoints.push(startPoint)
+        if (endPoint) allPoints.push(endPoint)
+      }
+    } catch (e) {
+      console.warn('无法获取路线点:', e)
+    }
+    
+    if (allPoints.length > 0) {
+      mapInstance.value.setViewport(allPoints)
+      console.log('地图视野已调整')
+    }
+  } catch (error) {
+    console.error('调整地图视野时出错:', error)
+  }
+}
+
+// 刷新路线
+const refreshRoute = () => {
+  if (mapLoaded.value) {
+    getRoute()
+  } else {
+    initMap().then(() => {
+      getRoute()
+    })
+  }
+}
+
+// 格式化距离
+const formatDistance = (meters: number) => {
+  if (meters < 1000) {
+    return `${meters}米`
+  }
+  return `${(meters / 1000).toFixed(1)}公里`
+}
+
+// 格式化时间
+const formatDuration = (seconds: number) => {
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  if (hours > 0) {
+    return `${hours}小时${minutes}分钟`
+  }
+  return `${minutes}分钟`
 }
 
 // 获取地点建议
@@ -1033,6 +1443,16 @@ const cancelInvitation = async (invitationId: number) => {
   color: #333;
 }
 
+.date-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
 .day-group {
   margin-bottom: 32px;
 }
@@ -1055,6 +1475,12 @@ const cancelInvitation = async (invitationId: number) => {
 .day-count {
   font-size: 12px;
   color: #999;
+}
+
+.day-date {
+  font-size: 14px;
+  color: #666;
+  margin-left: 8px;
 }
 
 .itinerary-item {
@@ -1221,5 +1647,44 @@ const cancelInvitation = async (invitationId: number) => {
 
 .place-info strong {
   color: #333;
+}
+
+/* 地图相关样式 */
+.route-map-container {
+  margin-top: 24px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.map-header h4 {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.baidu-map {
+  width: 100%;
+  height: 500px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+}
+
+.route-info {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #666;
 }
 </style>

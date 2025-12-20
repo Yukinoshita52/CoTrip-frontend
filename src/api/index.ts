@@ -57,6 +57,11 @@ export const tripApi = {
     return request.delete(`/trips/${tripId}`)
   },
 
+  // 退出行程
+  leaveTrip(tripId: number) {
+    return request.post(`/trips/${tripId}/leave`)
+  },
+
   // 一键规划行程路线
   autoPlanRoute(tripId: number) {
     return request.get(`/trips/${tripId}/auto-plan`)

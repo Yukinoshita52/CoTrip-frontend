@@ -24,13 +24,21 @@
             <p class="trip-description">{{ trip.description }}</p>
           </div>
           <div class="trip-actions">
-            <el-button @click="handleEdit">
+            <el-button @click="handleEdit" v-if="isOwner">
               <el-icon><Edit /></el-icon>
               编辑行程
             </el-button>
             <el-button @click="handleShare">
               <el-icon><Share /></el-icon>
               分享
+            </el-button>
+            <el-button type="danger" @click="handleDeleteTrip" v-if="isOwner">
+              <el-icon><Delete /></el-icon>
+              删除行程
+            </el-button>
+            <el-button type="danger" @click="handleLeaveTrip" v-if="isParticipant">
+              <el-icon><CircleClose /></el-icon>
+              退出行程
             </el-button>
           </div>
         </div>
@@ -43,7 +51,7 @@
           <div class="itinerary-section">
             <div class="section-header">
               <h3>行程安排</h3>
-              <el-button @click="showAddItinerary = true">
+              <el-button @click="showAddItinerary = true" v-if="isOwner">
                 <el-icon><Plus /></el-icon>
                 添加安排
               </el-button>
@@ -125,7 +133,7 @@
                           预算：¥{{ item.cost }}
                         </div>
                       </div>
-                      <div class="item-actions">
+                      <div class="item-actions" v-if="isOwner">
                         <el-button text @click="editItineraryItem(item)">
                           <el-icon><Edit /></el-icon>
                         </el-button>
@@ -169,7 +177,7 @@
                           预算：¥{{ item.cost }}
                         </div>
                       </div>
-                      <div class="item-actions">
+                      <div class="item-actions" v-if="isOwner">
                         <el-button text @click="editItineraryItem(item)">
                           <el-icon><Edit /></el-icon>
                         </el-button>
@@ -191,7 +199,7 @@
           <div class="members-section">
             <div class="section-header">
               <h3>成员管理</h3>
-              <el-button @click="showInviteMember = true">
+              <el-button @click="showInviteMember = true" v-if="isOwner">
                 <el-icon><UserFilled /></el-icon>
                 邀请成员
               </el-button>
@@ -421,7 +429,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import Layout from '@/components/Layout.vue'
-import { tripApi, expenseApi, placeTypeApi, invitationApi } from '@/api'
+import { tripApi, expenseApi, placeTypeApi, invitationApi, userApi } from '@/api'
 import type { Trip, ItineraryItem, Expense, TripMember } from '@/types'
 import { formatAvatarUrl } from '@/utils/image'
 import dayjs from 'dayjs'
@@ -446,6 +454,7 @@ const loading = ref(false)
 const trip = ref<Trip | null>(null)
 const relatedExpenses = ref<Expense[]>([])
 const pendingInvitations = ref<any[]>([])
+const currentUser = ref<any>(null)
 
 // 添加行程安排表单
 const itineraryFormRef = ref<FormInstance>()
@@ -561,7 +570,7 @@ const loadTripDetail = async () => {
             userId: String(m.userId || m.id || ''),
             username: m.nickname || m.username || '',
             avatar: m.avatarUrl || undefined,
-            role: m.role === 0 ? 'owner' : (m.role === 1 ? 'admin' : 'member'),
+            role: m.role === 0 ? 'owner' : 'member',
             joinedAt: m.joinedAt || m.createTime || ''
           })
         })
@@ -744,7 +753,41 @@ const expenseSummary = computed(() => {
   return { total, count, average }
 })
 
-onMounted(() => {
+// 判断用户在行程中的角色
+const getUserRoleInTrip = () => {
+  if (!currentUser.value || !trip.value) return null
+  
+  const member = trip.value.members.find(m => {
+    const memberUserId = Number(m.userId)
+    const currentUserId = Number(currentUser.value.id)
+    return memberUserId === currentUserId
+  })
+  
+  return member ? member.role : null
+}
+
+// 判断用户是否为行程创建者
+const isOwner = computed(() => {
+  return getUserRoleInTrip() === 'owner'
+})
+
+// 判断用户是否为行程参与者（非创建者）
+const isParticipant = computed(() => {
+  const role = getUserRoleInTrip()
+  return role && role !== 'owner'
+})
+
+onMounted(async () => {
+  // 获取当前用户信息
+  try {
+    const userRes = await userApi.getCurrentUser()
+    if (userRes.code === 200 && userRes.data) {
+      currentUser.value = userRes.data
+    }
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+  }
+  
   loadTripDetail()
   loadPlaceTypes()
 })
@@ -826,7 +869,6 @@ const getItemTypeText = (type: string) => {
 const getRoleText = (role: string) => {
   const texts: Record<string, string> = {
     owner: '创建者',
-    admin: '管理员',
     member: '成员'
   }
   return texts[role] || role
@@ -852,6 +894,81 @@ const handleEdit = () => {
 
 const handleShare = () => {
   ElMessage.success('分享链接已复制到剪贴板')
+}
+
+const handleLeaveTrip = async () => {
+  try {
+    await ElMessageBox.confirm('确定要退出这个行程吗？退出后将无法查看行程信息和账单。', '确认退出', {
+      type: 'warning'
+    })
+    
+    const tripId = Number(route.params.id)
+    if (isNaN(tripId)) {
+      ElMessage.error('行程ID无效')
+      return
+    }
+    
+    console.log('准备退出行程:', {
+      tripId,
+      currentUser: currentUser.value,
+      userRole: getUserRoleInTrip(),
+      isOwner: isOwner.value,
+      isParticipant: isParticipant.value
+    })
+    
+    const res = await tripApi.leaveTrip(tripId)
+    console.log('退出行程响应:', res)
+    
+    if (res.code === 200) {
+      ElMessage.success('已退出行程')
+      router.push('/trips') // 跳转回行程列表
+    } else {
+      ElMessage.error(res.message || '退出失败')
+    }
+  } catch (error: any) {
+    if (error !== 'cancel' && error.message !== 'cancel') {
+      console.error('退出行程失败:', error)
+      ElMessage.error(error.message || '退出失败')
+    }
+  }
+}
+
+const handleDeleteTrip = async () => {
+  try {
+    await ElMessageBox.confirm('确定要删除这个行程吗？删除后无法恢复，相关的账单和数据也会被删除。', '确认删除', {
+      type: 'warning',
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消'
+    })
+    
+    const tripId = Number(route.params.id)
+    if (isNaN(tripId)) {
+      ElMessage.error('行程ID无效')
+      return
+    }
+    
+    console.log('准备删除行程:', {
+      tripId,
+      currentUser: currentUser.value,
+      userRole: getUserRoleInTrip(),
+      isOwner: isOwner.value
+    })
+    
+    const res = await tripApi.deleteTrip(tripId)
+    console.log('删除行程响应:', res)
+    
+    if (res.code === 200) {
+      ElMessage.success('行程已删除')
+      router.push('/trips') // 跳转回行程列表
+    } else {
+      ElMessage.error(res.message || '删除失败')
+    }
+  } catch (error: any) {
+    if (error !== 'cancel' && error.message !== 'cancel') {
+      console.error('删除行程失败:', error)
+      ElMessage.error(error.message || '删除失败')
+    }
+  }
 }
 
 // 格式化天数对应的日期

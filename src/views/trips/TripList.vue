@@ -86,7 +86,7 @@
               </div>
               
               <div class="trip-actions">
-                <el-button text @click.stop="handleEdit(trip)">
+                <el-button text @click.stop="handleEdit(trip)" v-if="isOwner(trip)">
                   <el-icon><Edit /></el-icon>
                   编辑
                 </el-button>
@@ -94,7 +94,7 @@
                   <el-icon><Share /></el-icon>
                   分享
                 </el-button>
-                <el-dropdown @click.stop>
+                <el-dropdown @click.stop v-if="isOwner(trip)">
                   <el-button text>
                     <el-icon><More /></el-icon>
                   </el-button>
@@ -109,6 +109,10 @@
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
+                <el-button text type="danger" @click.stop="handleLeaveTrip(trip)" v-if="isParticipant(trip)">
+                  <el-icon><CircleClose /></el-icon>
+                  退出行程
+                </el-button>
               </div>
             </el-card>
           </el-col>
@@ -132,17 +136,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '@/components/Layout.vue'
-import { tripApi } from '@/api'
+import { tripApi, userApi } from '@/api'
 import { formatImageUrl, formatAvatarUrl } from '@/utils/image'
+import { useUserStore } from '@/stores/user'
 import type { Trip } from '@/types'
 import dayjs from 'dayjs'
 
 const router = useRouter()
+const userStore = useUserStore()
 const loading = ref(false)
+
+// 当前用户信息
+const currentUser = ref<any>(null)
 
 // 筛选条件
 const filters = ref({
@@ -160,7 +169,17 @@ const pagination = ref({
 // 行程列表
 const trips = ref<Trip[]>([])
 
-onMounted(() => {
+onMounted(async () => {
+  // 获取当前用户信息
+  try {
+    const userRes = await userApi.getCurrentUser()
+    if (userRes.code === 200 && userRes.data) {
+      currentUser.value = userRes.data
+    }
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+  }
+  
   loadTrips()
 })
 
@@ -200,7 +219,7 @@ const loadTrips = async () => {
                 userId: String(m.userId || m.id || ''),
                 username: m.nickname || m.username || '',
                 avatar: m.avatarUrl || undefined,
-                role: m.role === 0 ? 'owner' : (m.role === 1 ? 'admin' : 'member'),
+                role: m.role === 0 ? 'owner' : 'member',
                 joinedAt: m.joinedAt || m.createTime || ''
               }))
             : [],
@@ -275,6 +294,30 @@ const formatDateRange = (startDate: string, endDate: string) => {
   return `${start} ~ ${end}`
 }
 
+// 判断用户在行程中的角色
+const getUserRoleInTrip = (trip: Trip) => {
+  if (!currentUser.value) return null
+  
+  const member = trip.members.find(m => {
+    const memberUserId = Number(m.userId)
+    const currentUserId = Number(currentUser.value.id)
+    return memberUserId === currentUserId
+  })
+  
+  return member ? member.role : null
+}
+
+// 判断用户是否为行程创建者
+const isOwner = (trip: Trip) => {
+  return getUserRoleInTrip(trip) === 'owner'
+}
+
+// 判断用户是否为行程参与者（非创建者）
+const isParticipant = (trip: Trip) => {
+  const role = getUserRoleInTrip(trip)
+  return role && role !== 'owner'
+}
+
 const handleEdit = (trip: Trip) => {
   // 跳转到编辑页面
   router.push(`/trips/${trip.id}/edit`)
@@ -311,6 +354,43 @@ const handleDelete = async (trip: Trip) => {
     if (error.message !== 'cancel') {
       console.error('删除行程失败:', error)
       ElMessage.error(error.message || '删除失败')
+    }
+  }
+}
+
+const handleLeaveTrip = async (trip: Trip) => {
+  try {
+    await ElMessageBox.confirm('确定要退出这个行程吗？退出后将无法查看行程信息和账单。', '确认退出', {
+      type: 'warning'
+    })
+    
+    const tripId = Number(trip.id)
+    if (isNaN(tripId)) {
+      ElMessage.error('行程ID无效')
+      return
+    }
+    
+    console.log('TripList - 准备退出行程:', {
+      tripId,
+      currentUser: currentUser.value,
+      userRole: getUserRoleInTrip(trip),
+      isOwner: isOwner(trip),
+      isParticipant: isParticipant(trip)
+    })
+    
+    const res = await tripApi.leaveTrip(tripId)
+    console.log('TripList - 退出行程响应:', res)
+    
+    if (res.code === 200) {
+      ElMessage.success('已退出行程')
+      loadTrips() // 重新加载列表
+    } else {
+      ElMessage.error(res.message || '退出失败')
+    }
+  } catch (error: any) {
+    if (error.message !== 'cancel') {
+      console.error('退出行程失败:', error)
+      ElMessage.error(error.message || '退出失败')
     }
   }
 }

@@ -8,6 +8,14 @@
           <p>管理你的旅行支出和账单分摊</p>
         </div>
         <div class="header-right">
+          <el-button @click="$router.push('/expenses/books')">
+            <el-icon><Folder /></el-icon>
+            账本管理
+          </el-button>
+          <el-button @click="$router.push('/expenses/split')">
+            <el-icon><Calculator /></el-icon>
+            分摊计算
+          </el-button>
           <el-button type="primary" @click="$router.push('/expenses/create')">
             <el-icon><Plus /></el-icon>
             添加账单
@@ -40,16 +48,31 @@
       </el-row>
 
       <!-- 账本选择 -->
-      <el-card class="book-selector" v-if="accountBooks.length > 0" style="margin-bottom: 16px;">
-        <el-radio-group v-model="selectedBookId" @change="handleBookChange">
-          <el-radio-button
+      <el-card class="book-selector" v-if="accountBooks.length > 1" style="margin-bottom: 16px;">
+        <template #header>
+          <div class="book-selector-header">
+            <span>选择行程账本</span>
+            <el-tooltip content="每个行程对应一个账本" placement="top">
+              <el-icon><QuestionFilled /></el-icon>
+            </el-tooltip>
+          </div>
+        </template>
+        <el-select v-model="selectedBookId" @change="handleBookChange" placeholder="选择行程账本" style="width: 100%;">
+          <el-option
             v-for="book in accountBooks"
             :key="book.bookId || book.id"
-            :label="book.bookId || book.id"
-          >
-            {{ book.name }}
-          </el-radio-button>
-        </el-radio-group>
+            :label="`${getTripName(book.tripId)} - ${book.name}`"
+            :value="book.bookId || book.id"
+          />
+        </el-select>
+      </el-card>
+      
+      <!-- 当前账本信息 -->
+      <el-card v-if="currentBook" class="current-book-info" style="margin-bottom: 16px;">
+        <div class="book-info">
+          <h3>{{ currentBook.name }}</h3>
+          <p>关联行程：{{ getTripName(currentBook.tripId) }}</p>
+        </div>
       </el-card>
 
       <!-- 筛选器 -->
@@ -106,9 +129,26 @@
         </el-row>
       </el-card>
 
+      <!-- 无账本提示 -->
+      <el-card v-if="!loading && accountBooks.length === 0" class="no-books-card">
+        <el-empty description="还没有账本">
+          <template #description>
+            <p>账本是管理行程支出的基础</p>
+            <p>每个行程可以创建一个账本来记录相关的收支</p>
+          </template>
+          <el-button type="primary" @click="$router.push('/expenses/books')">
+            创建第一个账本
+          </el-button>
+        </el-empty>
+      </el-card>
+
       <!-- 账单列表 -->
-      <el-card v-loading="loading">
-        <el-empty v-if="!loading && expenses.length === 0" description="暂无账单数据" />
+      <el-card v-loading="loading" v-if="accountBooks.length > 0">
+        <el-empty v-if="!loading && expenses.length === 0" description="暂无账单数据">
+          <el-button type="primary" @click="$router.push('/expenses/create')">
+            添加第一笔账单
+          </el-button>
+        </el-empty>
         <el-table :data="expenses" style="width: 100%" v-else>
           <el-table-column prop="title" label="账单标题" min-width="150">
             <template #default="{ row }">
@@ -224,12 +264,15 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import { expenseApi, tripApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import type { Expense, Trip } from '@/types'
 import dayjs from 'dayjs'
+
+const router = useRouter()
 
 // 筛选条件
 const filters = ref({
@@ -256,14 +299,22 @@ const selectedBookId = ref<number | null>(null)
 // 加载账本列表
 const loadAccountBooks = async () => {
   try {
+    console.log('开始加载账本列表...')
     const res = await expenseApi.getAllAccountBooks()
+    console.log('账本API响应:', res)
+    
     if (res.code === 200 && res.data) {
       accountBooks.value = Array.isArray(res.data) ? res.data : []
+      console.log('解析后的账本列表:', accountBooks.value)
+      
       // 如果有账本，默认选择第一个
       if (accountBooks.value.length > 0 && !selectedBookId.value) {
         selectedBookId.value = accountBooks.value[0].bookId || accountBooks.value[0].id
+        console.log('默认选择账本ID:', selectedBookId.value)
         loadExpenses()
       }
+    } else {
+      console.log('账本API返回错误:', res.message)
     }
   } catch (error: any) {
     console.error('加载账本列表失败:', error)
@@ -320,7 +371,18 @@ const stats = computed(() => {
   }
 })
 
-onMounted(() => {
+onMounted(async () => {
+  console.log('ExpenseList mounted')
+  console.log('当前用户:', userStore.user)
+  console.log('Token:', localStorage.getItem('token'))
+  
+  // 确保用户已登录
+  if (!userStore.user) {
+    console.log('用户未登录，尝试获取用户信息...')
+    await userStore.fetchCurrentUser()
+    console.log('获取用户信息后:', userStore.user)
+  }
+  
   loadAccountBooks()
   loadTrips()
 })
@@ -398,6 +460,17 @@ const handleBookChange = (bookId: number) => {
   loadExpenses()
 }
 
+// 获取行程名称
+const getTripName = (tripId: number) => {
+  const trip = trips.value.find(t => Number(t.id) === tripId)
+  return trip?.title || '未知行程'
+}
+
+// 当前选中的账本
+const currentBook = computed(() => {
+  return accountBooks.value.find(book => (book.bookId || book.id) === selectedBookId.value)
+})
+
 // 工具函数
 const formatDate = (date: string) => {
   return dayjs(date).format('MM-DD')
@@ -454,11 +527,11 @@ const isSettled = (expense: Expense) => {
 
 // 事件处理
 const viewExpense = (expense: Expense) => {
-  console.log('查看账单:', expense.id)
+  router.push(`/expenses/${expense.id}`)
 }
 
 const editExpense = (expense: Expense) => {
-  console.log('编辑账单:', expense.id)
+  router.push(`/expenses/${expense.id}/edit`)
 }
 
 const settleExpense = (expense: Expense) => {
@@ -474,9 +547,20 @@ const deleteExpense = async (expense: Expense) => {
     await ElMessageBox.confirm('确定要删除这个账单吗？', '确认删除', {
       type: 'warning'
     })
-    ElMessage.success('账单已删除')
-  } catch {
-    // 用户取消
+    
+    const res = await expenseApi.deleteRecord(Number(expense.id))
+    if (res.code === 200) {
+      ElMessage.success('账单已删除')
+      // 重新加载账单列表
+      loadExpenses()
+    } else {
+      ElMessage.error(res.message || '删除失败')
+    }
+  } catch (error: any) {
+    if (error.message !== 'cancel') {
+      console.error('删除账单失败:', error)
+      ElMessage.error(error.message || '删除失败，请稍后再试')
+    }
   }
 }
 </script>

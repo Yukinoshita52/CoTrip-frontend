@@ -1231,7 +1231,7 @@ const deleteItineraryItem = async (item: any) => {
     })
     
     const tripId = Number(route.params.id)
-    const placeId = item.placeId || item.id
+    const placeId = item.placeId
     
     if (!placeId) {
       ElMessage.error('无法获取地点ID')
@@ -1248,7 +1248,7 @@ const deleteItineraryItem = async (item: any) => {
       ElMessage.error(res.message || '删除失败')
     }
   } catch (error: any) {
-    if (error.message !== 'cancel') {
+    if (error !== 'cancel' && error.message !== 'cancel') {
       console.error('删除行程安排失败:', error)
       ElMessage.error(error.message || '删除失败，请稍后再试')
     }
@@ -1272,7 +1272,7 @@ const handleEditItinerary = async () => {
     
     editingItinerary.value = true
     const tripId = Number(route.params.id)
-    const placeId = currentEditItem.value.placeId || currentEditItem.value.id
+    const placeId = currentEditItem.value.placeId
     
     if (!placeId) {
       ElMessage.error('无法获取地点ID')

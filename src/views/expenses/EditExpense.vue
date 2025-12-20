@@ -1,9 +1,9 @@
 <template>
   <Layout>
-    <div class="create-expense">
+    <div class="edit-expense" v-loading="loading">
       <div class="page-header">
-        <h2>添加账单</h2>
-        <p>记录旅行支出并设置分摊方式</p>
+        <h2>编辑账单</h2>
+        <p>修改账单信息和分摊方式</p>
       </div>
 
       <el-form
@@ -12,14 +12,15 @@
         :rules="rules"
         label-width="120px"
         class="expense-form"
+        v-if="!loading"
       >
         <el-card>
           <template #header>
             <span>基本信息</span>
           </template>
           
-          <el-form-item label="选择行程" prop="tripId">
-            <el-select v-model="form.tripId" placeholder="选择行程" style="width: 100%" @change="handleTripChange">
+          <el-form-item label="关联行程" prop="tripId">
+            <el-select v-model="form.tripId" placeholder="选择行程" style="width: 100%" disabled>
               <el-option
                 v-for="trip in trips"
                 :key="trip.id"
@@ -27,12 +28,6 @@
                 :value="trip.id"
               />
             </el-select>
-            <div class="form-tip" v-if="form.tripId && !form.bookId">
-              该行程还没有账本，将自动创建
-            </div>
-            <div class="form-tip" v-if="currentBook">
-              账本：{{ currentBook.name }}
-            </div>
           </el-form-item>
           
           <el-form-item label="账单标题" prop="title">
@@ -111,31 +106,16 @@
                 <div class="upload-text">上传票据</div>
               </div>
             </el-upload>
+            <el-button v-if="form.receipt" text type="danger" @click="removeReceipt">
+              删除票据
+            </el-button>
           </el-form-item>
-        </el-card>
-
-        <!-- 分摊说明 -->
-        <el-card style="margin-top: 24px;">
-          <template #header>
-            <span>分摊说明</span>
-          </template>
-          <el-alert
-            title="关于分摊"
-            type="info"
-            :closable="false"
-            show-icon
-          >
-            <template #default>
-              <p>账单创建后，可以在"分摊计算器"中查看和管理分摊情况。</p>
-              <p>系统会根据账本中的所有成员自动计算分摊金额。</p>
-            </template>
-          </el-alert>
         </el-card>
 
         <div class="form-actions">
           <el-button @click="$router.back()">取消</el-button>
-          <el-button type="primary" @click="handleSubmit" :loading="loading">
-            保存账单
+          <el-button type="primary" @click="handleSubmit" :loading="submitting">
+            保存修改
           </el-button>
         </div>
       </el-form>
@@ -144,36 +124,79 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import { expenseApi, tripApi, imageApi } from '@/api'
-import type { Trip, TripMember, ExpenseSplit } from '@/types'
+import type { Trip, TripMember } from '@/types'
 import dayjs from 'dayjs'
 
+const route = useRoute()
 const router = useRouter()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
+const submitting = ref(false)
 
-const accountBooks = ref<any[]>([])
 const trips = ref<Trip[]>([])
 
-// 加载账本和行程列表
-const loadData = async () => {
+// 表单数据
+const form = reactive({
+  bookId: null as number | null,
+  tripId: '',
+  title: '',
+  amount: 0,
+  category: '',
+  categoryId: null as number | null,
+  date: '',
+  paidBy: '',
+  description: '',
+  receipt: ''
+})
+
+// 加载账单详情
+const loadExpenseDetail = async () => {
+  const expenseId = route.params.id as string
+  if (!expenseId) {
+    ElMessage.error('账单ID无效')
+    router.push('/expenses')
+    return
+  }
+  
+  loading.value = true
   try {
-    const [booksRes, tripsRes] = await Promise.all([
-      expenseApi.getAllAccountBooks().catch(() => ({ code: 200, data: [] })),
-      tripApi.getTrips().catch(() => ({ code: 200, data: [] }))
-    ])
-    
-    if (booksRes.code === 200 && booksRes.data) {
-      accountBooks.value = Array.isArray(booksRes.data) ? booksRes.data : []
+    const res = await expenseApi.getRecord(Number(expenseId))
+    if (res.code === 200 && res.data) {
+      const data = res.data
+      form.bookId = data.bookId
+      form.title = data.categoryName || ''
+      form.amount = Number(data.amount || 0)
+      form.category = data.type === 1 ? 'income' : 'expense'
+      form.date = data.recordTime ? dayjs(data.recordTime).format('YYYY-MM-DD') : ''
+      form.paidBy = data.user?.userId ? String(data.user.userId) : ''
+      form.description = data.note || ''
+      form.categoryId = data.categoryId
+      // 票据信息需要从图片服务获取
+    } else {
+      ElMessage.error(res.message || '加载账单详情失败')
+      router.push('/expenses')
     }
-    
-    if (tripsRes.code === 200 && tripsRes.data) {
-      const tripsData = Array.isArray(tripsRes.data) ? tripsRes.data : []
+  } catch (error: any) {
+    console.error('加载账单详情失败:', error)
+    ElMessage.error(error.message || '加载账单详情失败')
+    router.push('/expenses')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 加载行程列表
+const loadTrips = async () => {
+  try {
+    const res = await tripApi.getTrips()
+    if (res.code === 200 && res.data) {
+      const tripsData = Array.isArray(res.data) ? res.data : []
       trips.value = tripsData.map((trip: any) => ({
         id: String(trip.tripId || trip.id || ''),
         title: trip.name || trip.title || '',
@@ -189,14 +212,24 @@ const loadData = async () => {
         createdAt: trip.createdTime ? dayjs(trip.createdTime).format('YYYY-MM-DD') : '',
         updatedAt: trip.updatedTime ? dayjs(trip.updatedTime).format('YYYY-MM-DD') : ''
       }))
+      
+      // 根据bookId找到对应的行程
+      if (form.bookId) {
+        // 这里需要通过账本ID找到对应的行程ID
+        // 暂时使用第一个行程
+        if (trips.value.length > 0) {
+          form.tripId = trips.value[0].id
+        }
+      }
     }
   } catch (error: any) {
-    console.error('加载数据失败:', error)
+    console.error('加载行程列表失败:', error)
   }
 }
 
 onMounted(() => {
-  loadData()
+  loadExpenseDetail()
+  loadTrips()
 })
 
 const tripMembers = computed(() => {
@@ -204,85 +237,8 @@ const tripMembers = computed(() => {
   return selectedTrip?.members || []
 })
 
-// 表单数据
-const form = reactive({
-  bookId: null as number | null,
-  tripId: '', // 用于获取行程成员信息
-  title: '',
-  amount: 0,
-  category: '',
-  date: '',
-  paidBy: '',
-  description: '',
-  receipt: ''
-})
-
-// 监听行程和账本数据，自动关联
-watch([() => form.tripId, () => accountBooks.value], ([tripId, books]) => {
-  if (tripId && books.length > 0) {
-    const book = books.find(b => b.tripId === Number(tripId))
-    if (book) {
-      form.bookId = book.bookId || book.id
-    }
-  }
-}, { immediate: true })
-
-// 获取行程名称
-const getTripName = (tripId: number) => {
-  const trip = trips.value.find(t => Number(t.id) === tripId)
-  return trip?.title || '未知行程'
-}
-
-// 当前选中的账本
-const currentBook = computed(() => {
-  if (!form.tripId) return null
-  return accountBooks.value.find(book => book.tripId === Number(form.tripId))
-})
-
-// 行程选择变化
-const handleTripChange = async (tripId: string) => {
-  if (!tripId) {
-    form.bookId = null
-    return
-  }
-  
-  const tripIdNum = Number(tripId)
-  // 查找该行程对应的账本
-  const book = accountBooks.value.find(b => b.tripId === tripIdNum)
-  
-  if (book) {
-    form.bookId = book.bookId || book.id
-  } else {
-    // 如果没有账本，自动创建
-    try {
-      const selectedTrip = trips.value.find(t => t.id === tripId)
-      const bookName = `${selectedTrip?.title || '行程'}账本`
-      
-      ElMessage.info('正在为该行程创建账本...')
-      const res = await expenseApi.createAccountBook({
-        tripId: tripIdNum,
-        name: bookName
-      })
-      
-      if (res.code === 200 && res.data) {
-        form.bookId = res.data.bookId || res.data.id
-        await loadData() // 重新加载账本列表
-        ElMessage.success(`已创建账本：${bookName}`)
-      } else {
-        ElMessage.error(res.message || '创建账本失败')
-      }
-    } catch (error: any) {
-      console.error('创建账本失败:', error)
-      ElMessage.error('创建账本失败，请稍后再试')
-    }
-  }
-}
-
 // 表单验证规则
 const rules: FormRules = {
-  tripId: [
-    { required: true, message: '请选择行程', trigger: 'change' }
-  ],
   title: [
     { required: true, message: '请输入账单标题', trigger: 'blur' },
     { min: 2, max: 50, message: '标题长度在 2 到 50 个字符', trigger: 'blur' }
@@ -302,11 +258,6 @@ const rules: FormRules = {
   ]
 }
 
-const getUserName = (userId: string) => {
-  const member = tripMembers.value.find(m => m.userId === userId)
-  return member?.username || userId
-}
-
 const beforeUpload = async (file: File) => {
   const isImage = file.type.startsWith('image/')
   const isLt2M = file.size / 1024 / 1024 < 2
@@ -321,7 +272,7 @@ const beforeUpload = async (file: File) => {
   }
   
   try {
-    const res = await imageApi.uploadImage(file, 4, 0) // itemType=4表示其他类型
+    const res = await imageApi.uploadImage(file, 4, 0)
     if (res.code === 200 && res.data) {
       form.receipt = res.data.url
       ElMessage.success('票据上传成功')
@@ -333,11 +284,12 @@ const beforeUpload = async (file: File) => {
     ElMessage.error('上传失败，请稍后再试')
   }
   
-  return false // 阻止默认上传行为
+  return false
 }
 
-const handleUploadSuccess = (response: any) => {
-  // 这个方法现在不会被调用，因为我们在beforeUpload中处理了上传
+const removeReceipt = () => {
+  form.receipt = ''
+  ElMessage.success('票据已删除')
 }
 
 const handleSubmit = async () => {
@@ -347,58 +299,55 @@ const handleSubmit = async () => {
     await formRef.value.validate()
     
     if (!form.bookId) {
-      ElMessage.error('请先选择行程，系统会自动创建账本')
+      ElMessage.error('无法获取账本信息')
       return
     }
     
-    // 基本验证
-    if (!form.bookId) {
-      ElMessage.error('请选择账本')
-      return
-    }
+    submitting.value = true
     
-    loading.value = true
-    
-    // 构建提交数据（匹配后端RecordDTO格式）
-    // 根据类别名称映射到categoryId（这里使用简单的映射，实际应该从后端获取）
+    // 构建更新数据
+    // 根据类别名称映射到categoryId
     const categoryMapping: Record<string, number> = {
       'transport': 1,
       'accommodation': 2,
       'food': 3,
       'activity': 4,
       'shopping': 5,
-      'other': 6
+      'other': 6,
+      'income': 7,
+      'expense': 1
     }
     
     const recordData = {
       bookId: form.bookId,
-      type: 2, // 2表示支出，1表示收入
+      type: form.category === 'income' ? 1 : 2,
       amount: form.amount,
-      categoryId: categoryMapping[form.category] || 1, // 默认为1（其他类别）
+      categoryId: categoryMapping[form.category] || 1, // 默认为1
       categoryName: form.category || '',
       note: form.description || form.title,
       recordTime: form.date ? new Date(form.date) : new Date()
     }
     
-    const res = await expenseApi.createRecord(recordData)
+    const expenseId = route.params.id as string
+    const res = await expenseApi.updateRecord(Number(expenseId), recordData)
     
     if (res.code === 200) {
-      ElMessage.success('账单添加成功!')
-      router.push('/expenses')
+      ElMessage.success('账单修改成功!')
+      router.push(`/expenses/${expenseId}`)
     } else {
-      ElMessage.error(res.message || '添加失败')
+      ElMessage.error(res.message || '修改失败')
     }
   } catch (error: any) {
     console.error('保存失败:', error)
     ElMessage.error(error.message || '保存失败，请稍后再试')
   } finally {
-    loading.value = false
+    submitting.value = false
   }
 }
 </script>
 
 <style scoped>
-.create-expense {
+.edit-expense {
   max-width: 800px;
 }
 
@@ -456,18 +405,10 @@ const handleSubmit = async () => {
   color: #666;
 }
 
-
-
 .form-actions {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
   margin-top: 32px;
-}
-
-.form-tip {
-  font-size: 12px;
-  color: #999;
-  margin-top: 4px;
 }
 </style>

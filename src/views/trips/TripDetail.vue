@@ -136,35 +136,69 @@
                   </div>
                   
                   <div class="day-items">
-                    <div v-for="item in dayItems" :key="item.id" class="itinerary-item">
-                      <div class="item-time">{{ formatTime(item.startTime) }}</div>
-                      <div class="item-content">
-                        <div class="item-header">
-                          <span class="item-title clickable" @click="handleShowPlaceDetail(item)">{{ item.title }}</span>
-                          <el-tag size="small" :type="getItemTypeColor(item.type)">
-                            {{ getItemTypeText(item.type) }}
-                          </el-tag>
+                    <template v-for="(item, index) in dayItems" :key="item.id">
+                      <div class="itinerary-item">
+                        <div class="item-time">{{ formatTime(item.startTime) }}</div>
+                        <div class="item-content">
+                          <div class="item-header">
+                            <span class="item-title clickable" @click="handleShowPlaceDetail(item)">{{ item.title }}</span>
+                            <el-tag size="small" :type="getItemTypeColor(item.type)">
+                              {{ getItemTypeText(item.type) }}
+                            </el-tag>
+                          </div>
+                          <div class="item-location clickable" @click="handleShowPlaceDetail(item)">
+                            <el-icon><Location /></el-icon>
+                            {{ item.location }}
+                          </div>
+                          <div v-if="item.description" class="item-description">
+                            {{ item.description }}
+                          </div>
+                          <div v-if="item.cost" class="item-cost">
+                            预算：¥{{ item.cost }}
+                          </div>
                         </div>
-                        <div class="item-location clickable" @click="handleShowPlaceDetail(item)">
-                          <el-icon><Location /></el-icon>
-                          {{ item.location }}
-                        </div>
-                        <div v-if="item.description" class="item-description">
-                          {{ item.description }}
-                        </div>
-                        <div v-if="item.cost" class="item-cost">
-                          预算：¥{{ item.cost }}
+                        <div class="item-actions" v-if="isOwner">
+                          <el-button text @click="editItineraryItem(item)">
+                            <el-icon><Edit /></el-icon>
+                          </el-button>
+                          <el-button text type="danger" @click="deleteItineraryItem(item)">
+                            <el-icon><Delete /></el-icon>
+                          </el-button>
                         </div>
                       </div>
-                      <div class="item-actions" v-if="isOwner">
-                        <el-button text @click="editItineraryItem(item)">
-                          <el-icon><Edit /></el-icon>
-                        </el-button>
-                        <el-button text type="danger" @click="deleteItineraryItem(item)">
-                          <el-icon><Delete /></el-icon>
-                        </el-button>
+                      <!-- 交通信息：只在具体日期下显示，总览模式不显示 -->
+                      <div v-if="selectedDay !== null && index < dayItems.length - 1 && item.lat && item.lng && dayItems[index + 1]?.lat && dayItems[index + 1]?.lng" 
+                           class="transport-info-item">
+                        <div class="transport-info-content">
+                          <el-icon class="transport-icon"><ArrowRight /></el-icon>
+                          <div class="transport-details">
+                            <template v-if="getTransportInfo(item.id, dayItems[index + 1].id)">
+                              <div class="transport-modes">
+                                <div v-if="getTransportInfo(item.id, dayItems[index + 1].id)?.driving && getTransportInfo(item.id, dayItems[index + 1].id)!.driving!.distance > 0" 
+                                     class="transport-mode">
+                                  <el-icon><Car /></el-icon>
+                                  <span>驾车：{{ formatDistance(getTransportInfo(item.id, dayItems[index + 1].id)!.driving!.distance) }}，{{ formatDuration(getTransportInfo(item.id, dayItems[index + 1].id)!.driving!.duration) }}</span>
+                                </div>
+                                <div v-if="getTransportInfo(item.id, dayItems[index + 1].id)?.transit && getTransportInfo(item.id, dayItems[index + 1].id)!.transit!.distance > 0" 
+                                     class="transport-mode">
+                                  <el-icon><Guide /></el-icon>
+                                  <span>公交：{{ formatDistance(getTransportInfo(item.id, dayItems[index + 1].id)!.transit!.distance) }}，{{ formatDuration(getTransportInfo(item.id, dayItems[index + 1].id)!.transit!.duration) }}</span>
+                                </div>
+                                <div v-if="getTransportInfo(item.id, dayItems[index + 1].id)?.walking && getTransportInfo(item.id, dayItems[index + 1].id)!.walking!.distance > 0" 
+                                     class="transport-mode">
+                                  <el-icon><Position /></el-icon>
+                                  <span>步行：{{ formatDistance(getTransportInfo(item.id, dayItems[index + 1].id)!.walking!.distance) }}，{{ formatDuration(getTransportInfo(item.id, dayItems[index + 1].id)!.walking!.duration) }}</span>
+                                </div>
+                              </div>
+                            </template>
+                            <div v-else-if="isTransportInfoLoading(item.id, dayItems[index + 1].id)" class="transport-loading">
+                              <el-icon class="is-loading"><Loading /></el-icon>
+                              <span>正在获取路线信息...</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    </template>
                   </div>
                 </div>
                 <el-empty v-if="groupedItineraryByDay.size === 0" description="暂无行程安排" />
@@ -180,35 +214,69 @@
                   </div>
                   
                   <div class="day-items">
-                    <div v-for="item in selectedDayItems" :key="item.id" class="itinerary-item">
-                      <div class="item-time">{{ formatTime(item.startTime) }}</div>
-                      <div class="item-content">
-                        <div class="item-header">
-                          <span class="item-title clickable" @click="handleShowPlaceDetail(item)">{{ item.title }}</span>
-                          <el-tag size="small" :type="getItemTypeColor(item.type)">
-                            {{ getItemTypeText(item.type) }}
-                          </el-tag>
+                    <template v-for="(item, index) in selectedDayItems" :key="item.id">
+                      <div class="itinerary-item">
+                        <div class="item-time">{{ formatTime(item.startTime) }}</div>
+                        <div class="item-content">
+                          <div class="item-header">
+                            <span class="item-title clickable" @click="handleShowPlaceDetail(item)">{{ item.title }}</span>
+                            <el-tag size="small" :type="getItemTypeColor(item.type)">
+                              {{ getItemTypeText(item.type) }}
+                            </el-tag>
+                          </div>
+                          <div class="item-location clickable" @click="handleShowPlaceDetail(item)">
+                            <el-icon><Location /></el-icon>
+                            {{ item.location }}
+                          </div>
+                          <div v-if="item.description" class="item-description">
+                            {{ item.description }}
+                          </div>
+                          <div v-if="item.cost" class="item-cost">
+                            预算：¥{{ item.cost }}
+                          </div>
                         </div>
-                        <div class="item-location clickable" @click="handleShowPlaceDetail(item)">
-                          <el-icon><Location /></el-icon>
-                          {{ item.location }}
-                        </div>
-                        <div v-if="item.description" class="item-description">
-                          {{ item.description }}
-                        </div>
-                        <div v-if="item.cost" class="item-cost">
-                          预算：¥{{ item.cost }}
+                        <div class="item-actions" v-if="isOwner">
+                          <el-button text @click="editItineraryItem(item)">
+                            <el-icon><Edit /></el-icon>
+                          </el-button>
+                          <el-button text type="danger" @click="deleteItineraryItem(item)">
+                            <el-icon><Delete /></el-icon>
+                          </el-button>
                         </div>
                       </div>
-                      <div class="item-actions" v-if="isOwner">
-                        <el-button text @click="editItineraryItem(item)">
-                          <el-icon><Edit /></el-icon>
-                        </el-button>
-                        <el-button text type="danger" @click="deleteItineraryItem(item)">
-                          <el-icon><Delete /></el-icon>
-                        </el-button>
+                      <!-- 交通信息：显示在两个地点之间 -->
+                      <div v-if="index < selectedDayItems.length - 1 && item.lat && item.lng && selectedDayItems[index + 1]?.lat && selectedDayItems[index + 1]?.lng" 
+                           class="transport-info-item">
+                        <div class="transport-info-content">
+                          <el-icon class="transport-icon"><ArrowRight /></el-icon>
+                          <div class="transport-details">
+                            <template v-if="getTransportInfo(item.id, selectedDayItems[index + 1].id)">
+                              <div class="transport-modes">
+                                <div v-if="getTransportInfo(item.id, selectedDayItems[index + 1].id)?.driving && getTransportInfo(item.id, selectedDayItems[index + 1].id)!.driving!.distance > 0" 
+                                     class="transport-mode">
+                                  <el-icon><Car /></el-icon>
+                                  <span>驾车：{{ formatDistance(getTransportInfo(item.id, selectedDayItems[index + 1].id)!.driving!.distance) }}，{{ formatDuration(getTransportInfo(item.id, selectedDayItems[index + 1].id)!.driving!.duration) }}</span>
+                                </div>
+                                <div v-if="getTransportInfo(item.id, selectedDayItems[index + 1].id)?.transit && getTransportInfo(item.id, selectedDayItems[index + 1].id)!.transit!.distance > 0" 
+                                     class="transport-mode">
+                                  <el-icon><Guide /></el-icon>
+                                  <span>公交：{{ formatDistance(getTransportInfo(item.id, selectedDayItems[index + 1].id)!.transit!.distance) }}，{{ formatDuration(getTransportInfo(item.id, selectedDayItems[index + 1].id)!.transit!.duration) }}</span>
+                                </div>
+                                <div v-if="getTransportInfo(item.id, selectedDayItems[index + 1].id)?.walking && getTransportInfo(item.id, selectedDayItems[index + 1].id)!.walking!.distance > 0" 
+                                     class="transport-mode">
+                                  <el-icon><Position /></el-icon>
+                                  <span>步行：{{ formatDistance(getTransportInfo(item.id, selectedDayItems[index + 1].id)!.walking!.distance) }}，{{ formatDuration(getTransportInfo(item.id, selectedDayItems[index + 1].id)!.walking!.duration) }}</span>
+                                </div>
+                              </div>
+                            </template>
+                            <div v-else-if="isTransportInfoLoading(item.id, selectedDayItems[index + 1].id)" class="transport-loading">
+                              <el-icon class="is-loading"><Loading /></el-icon>
+                              <span>正在获取路线信息...</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    </template>
                   </div>
                 </div>
                 <el-empty v-else :description="selectedDay === 0 ? '暂无未规划的地点' : '该天暂无行程安排'" />
@@ -557,6 +625,14 @@ const routeInfo = ref<any>(null)
 const mapLoaded = ref(false)
 const unplannedMapLoaded = ref(false) // 未规划地图是否已加载
 const routeLoading = ref(false)
+
+// 交通信息状态：存储每两个地点之间的交通信息
+// key格式: "itemId1-itemId2", value: { driving, transit, walking }
+const transportInfo = ref<Record<string, {
+  driving?: { distance: number; duration: number; loading: boolean },
+  transit?: { distance: number; duration: number; loading: boolean },
+  walking?: { distance: number; duration: number; loading: boolean }
+}>>({})
 
 const loading = ref(false)
 const trip = ref<Trip | null>(null)
@@ -939,6 +1015,23 @@ watch([selectedDay, mapLoaded, unplannedMapLoaded], ([day, loaded, unplannedLoad
     initUnplannedMap().then(() => {
       showUnplannedMarkers()
     })
+  }
+}, { immediate: false })
+
+// 监听选择的天数变化，当选择具体日期时加载该天的交通信息
+watch(selectedDay, async (day) => {
+  // 只在选择具体日期时（非总览、非null）加载交通信息
+  if (day === null || day === 0 || !trip.value?.itinerary) return
+
+  const items = selectedDayItems.value
+  if (items.length >= 2) {
+    // 按时间排序
+    const sortedItems = [...items].sort((a, b) => {
+      const timeA = dayjs(a.startTime).valueOf()
+      const timeB = dayjs(b.startTime).valueOf()
+      return timeA - timeB
+    })
+    await loadTransportInfoForDay(sortedItems)
   }
 }, { immediate: false })
 
@@ -1329,7 +1422,7 @@ const adjustMapViewport = (plan: any, places: any[]) => {
     // 尝试从路线规划结果中获取路线点来调整视野
     try {
       const route = plan.getRoute(0)
-      if (route) {
+      if (route && typeof route.getStartPoint === 'function' && typeof route.getEndPoint === 'function') {
         // 获取路线的起点和终点来扩展视野
         const startPoint = route.getStartPoint()
         const endPoint = route.getEndPoint()
@@ -1451,6 +1544,176 @@ const formatDuration = (seconds: number) => {
     return `${hours}小时${minutes}分钟`
   }
   return `${minutes}分钟`
+}
+
+// 获取两个地点之间的交通信息
+const getTransportInfo = (itemId1: string, itemId2: string) => {
+  const key = `${itemId1}-${itemId2}`
+  const info = transportInfo.value[key]
+  if (!info) return null
+  
+  const hasLoadedData = (info.driving && !info.driving.loading && info.driving.distance > 0) ||
+                        (info.transit && !info.transit.loading && info.transit.distance > 0) ||
+                        (info.walking && !info.walking.loading && info.walking.distance > 0)
+  
+  return hasLoadedData ? info : null
+}
+
+// 检查交通信息是否正在加载
+const isTransportInfoLoading = (itemId1: string, itemId2: string) => {
+  const key = `${itemId1}-${itemId2}`
+  const info = transportInfo.value[key]
+  if (!info) return true // 如果没有信息，认为正在加载
+  
+  // 检查是否至少有一种方式正在加载
+  return (info.driving && info.driving.loading) ||
+         (info.transit && info.transit.loading) ||
+         (info.walking && info.walking.loading)
+}
+
+// 获取两个地点之间的路线信息（使用百度地图API）
+const fetchRouteBetweenPlaces = async (item1: any, item2: any, transportType: 'driving' | 'transit' | 'walking') => {
+  if (!item1.lat || !item1.lng || !item2.lat || !item2.lng) {
+    return
+  }
+
+  const key = `${item1.id}-${item2.id}`
+  
+  // 初始化交通信息对象
+  if (!transportInfo.value[key]) {
+    transportInfo.value[key] = {}
+  }
+
+  if (transportInfo.value[key][transportType] && !transportInfo.value[key][transportType].loading) {
+    return
+  }
+
+  // 设置加载状态
+  transportInfo.value[key][transportType] = {
+    distance: 0,
+    duration: 0,
+    loading: true
+  }
+
+  try {
+    await loadBaiduMap()
+    
+    const startPoint = new (window as any).BMap.Point(item1.lng, item1.lat)
+    const endPoint = new (window as any).BMap.Point(item2.lng, item2.lat)
+
+    return new Promise<void>((resolve) => {
+      let timeoutId: any = null
+      
+      timeoutId = setTimeout(() => {
+        if (transportInfo.value[key]) {
+          transportInfo.value[key][transportType] = {
+            distance: 0,
+            duration: 0,
+            loading: false
+          }
+        }
+        resolve()
+      }, 30000)
+
+      const tempMapDiv = document.createElement('div')
+      tempMapDiv.style.cssText = 'width:1px;height:1px;position:absolute;left:-9999px'
+      document.body.appendChild(tempMapDiv)
+      
+      const tempMap = new (window as any).BMap.Map(tempMapDiv, {
+        enableMapClick: false
+      })
+
+      const handleRouteComplete = (result: any, route: any) => {
+        clearTimeout(timeoutId)
+        try {
+          const status = route.getStatus()
+          if (status === 0) {
+            const plan = result.getPlan(0)
+            if (plan) {
+              const distance = plan.getDistance(false)
+              const duration = plan.getDuration(false)
+              transportInfo.value[key] = {
+                ...transportInfo.value[key],
+                [transportType]: {
+                  distance,
+                  duration,
+                  loading: false
+                }
+              }
+            } else {
+              transportInfo.value[key][transportType] = {
+                distance: 0,
+                duration: 0,
+                loading: false
+              }
+            }
+          } else {
+            transportInfo.value[key][transportType] = {
+              distance: 0,
+              duration: 0,
+              loading: false
+            }
+          }
+        } catch (error) {
+          if (transportInfo.value[key]) {
+            transportInfo.value[key][transportType] = {
+              distance: 0,
+              duration: 0,
+              loading: false
+            }
+          }
+        }
+        document.body.removeChild(tempMapDiv)
+        resolve()
+      }
+
+      let route: any = null
+      const routeOptions = {
+        renderOptions: {
+          map: null,
+          autoViewport: false,
+          panel: null
+        },
+        onSearchComplete: (result: any) => handleRouteComplete(result, route)
+      }
+
+      if (transportType === 'driving') {
+        route = new (window as any).BMap.DrivingRoute(tempMap, routeOptions)
+      } else if (transportType === 'transit') {
+        route = new (window as any).BMap.TransitRoute(tempMap, routeOptions)
+      } else if (transportType === 'walking') {
+        route = new (window as any).BMap.WalkingRoute(tempMap, routeOptions)
+      }
+
+      route.search(startPoint, endPoint)
+    })
+  } catch (error) {
+    if (transportInfo.value[key]) {
+      transportInfo.value[key][transportType] = {
+        distance: 0,
+        duration: 0,
+        loading: false
+      }
+    }
+  }
+}
+
+// 加载某一天所有地点之间的交通信息
+const loadTransportInfoForDay = async (items: any[]) => {
+  if (items.length < 2) return
+
+  for (let i = 0; i < items.length - 1; i++) {
+    const item1 = items[i]
+    const item2 = items[i + 1]
+
+    if (item1.lat && item1.lng && item2.lat && item2.lng) {
+      await Promise.all([
+        fetchRouteBetweenPlaces(item1, item2, 'driving'),
+        fetchRouteBetweenPlaces(item1, item2, 'transit'),
+        fetchRouteBetweenPlaces(item1, item2, 'walking')
+      ])
+    }
+  }
 }
 
 // 获取地点建议
@@ -2109,5 +2372,61 @@ const handleShowPlaceDetail = async (item: any) => {
 
 .clickable:hover {
   color: #409eff;
+}
+
+/* 交通信息样式 */
+.transport-info-item {
+  margin: 12px 0;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 3px solid #409eff;
+}
+
+.transport-info-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.transport-icon {
+  color: #409eff;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.transport-details {
+  flex: 1;
+}
+
+.transport-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.transport-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #666;
+}
+
+.transport-mode .el-icon {
+  color: #409eff;
+  font-size: 16px;
+}
+
+.transport-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #999;
+}
+
+.transport-loading .el-icon {
+  font-size: 16px;
 }
 </style>

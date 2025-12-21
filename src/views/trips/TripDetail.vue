@@ -51,10 +51,15 @@
           <div class="itinerary-section">
             <div class="section-header">
               <h3>行程安排</h3>
-              <el-button @click="showAddItinerary = true" v-if="isOwner">
-                <el-icon><Plus /></el-icon>
-                添加安排
-              </el-button>
+              <div class="section-actions" v-if="isOwner">
+                <el-button @click="showAddItinerary = true">
+                  <el-icon><Plus /></el-icon>
+                  添加安排
+                </el-button>
+                <el-button type="primary" plain @click="showBatchImport = true">
+                  批量导入
+                </el-button>
+              </div>
             </div>
             
             <!-- 日期按钮列表 -->
@@ -66,7 +71,7 @@
               >
                 总览
               </el-button>
-              <el-button 
+              <el-button
                 v-for="day in availableDays" 
                 :key="day"
                 :type="selectedDay === day ? 'primary' : ''" 
@@ -74,6 +79,13 @@
                 @click="handleSelectDay(day)"
               >
                 {{ getDayDate(day) }}
+              </el-button>
+              <el-button
+                :type="selectedDay === 0 ? 'primary' : ''"
+                size="small"
+                @click="handleSelectDay(0)"
+              >
+                未规划
               </el-button>
             </div>
             
@@ -101,14 +113,25 @@
               </div>
             </div>
             
+            <!-- 未规划地图显示区域（只显示地点标记，不规划路线） -->
+            <div v-if="shouldShowUnplannedMap" class="route-map-container">
+              <div class="map-header">
+                <h4>地点分布</h4>
+                <el-button size="small" @click="refreshUnplannedMap" :loading="routeLoading">
+                  刷新地图
+                </el-button>
+              </div>
+              <div id="unplanned-map" class="baidu-map"></div>
+            </div>
+
             <!-- 行程列表 -->
             <div class="itinerary-timeline">
               <!-- 总览模式：显示所有天数 -->
               <template v-if="selectedDay === null">
-                <div v-for="(dayItems, day) in groupedItineraryByDay" :key="day" class="day-group">
+                <div v-for="[day, dayItems] in groupedItineraryByDay" :key="day" class="day-group">
                   <div class="day-header">
-                    <h4>第{{ day }}天</h4>
-                    <span class="day-date">{{ getDayDate(Number(day)) }}</span>
+                    <h4>{{ day === 0 ? '未规划' : `第${day}天` }}</h4>
+                    <span v-if="day !== 0" class="day-date">{{ getDayDate(day) }}</span>
                     <span class="day-count">{{ dayItems.length }} 项安排</span>
                   </div>
                   
@@ -117,12 +140,12 @@
                       <div class="item-time">{{ formatTime(item.startTime) }}</div>
                       <div class="item-content">
                         <div class="item-header">
-                          <span class="item-title">{{ item.title }}</span>
+                          <span class="item-title clickable" @click="handleShowPlaceDetail(item)">{{ item.title }}</span>
                           <el-tag size="small" :type="getItemTypeColor(item.type)">
                             {{ getItemTypeText(item.type) }}
                           </el-tag>
                         </div>
-                        <div class="item-location">
+                        <div class="item-location clickable" @click="handleShowPlaceDetail(item)">
                           <el-icon><Location /></el-icon>
                           {{ item.location }}
                         </div>
@@ -144,15 +167,15 @@
                     </div>
                   </div>
                 </div>
-                <el-empty v-if="Object.keys(groupedItineraryByDay).length === 0" description="暂无行程安排" />
+                <el-empty v-if="groupedItineraryByDay.size === 0" description="暂无行程安排" />
               </template>
               
               <!-- 选择具体天数：只显示该天的行程 -->
               <template v-else>
                 <div v-if="selectedDayItems.length > 0" class="day-group">
                   <div class="day-header">
-                    <h4>第{{ selectedDay }}天</h4>
-                    <span class="day-date">{{ getDayDate(selectedDay) }}</span>
+                    <h4>{{ selectedDay === 0 ? '未规划' : `第${selectedDay}天` }}</h4>
+                    <span v-if="selectedDay !== 0" class="day-date">{{ getDayDate(selectedDay) }}</span>
                     <span class="day-count">{{ selectedDayItems.length }} 项安排</span>
                   </div>
                   
@@ -161,12 +184,12 @@
                       <div class="item-time">{{ formatTime(item.startTime) }}</div>
                       <div class="item-content">
                         <div class="item-header">
-                          <span class="item-title">{{ item.title }}</span>
+                          <span class="item-title clickable" @click="handleShowPlaceDetail(item)">{{ item.title }}</span>
                           <el-tag size="small" :type="getItemTypeColor(item.type)">
                             {{ getItemTypeText(item.type) }}
                           </el-tag>
                         </div>
-                        <div class="item-location">
+                        <div class="item-location clickable" @click="handleShowPlaceDetail(item)">
                           <el-icon><Location /></el-icon>
                           {{ item.location }}
                         </div>
@@ -188,7 +211,7 @@
                     </div>
                   </div>
                 </div>
-                <el-empty v-else description="该天暂无行程安排" />
+                <el-empty v-else :description="selectedDay === 0 ? '暂无未规划的地点' : '该天暂无行程安排'" />
               </template>
             </div>
           </div>
@@ -308,7 +331,8 @@
       <el-form :model="itineraryForm" :rules="itineraryRules" ref="itineraryFormRef" label-width="80px">
         <el-form-item label="选择天数" prop="day">
           <el-select v-model="itineraryForm.day" placeholder="请选择第几天" style="width: 100%">
-            <el-option 
+            <el-option label="未规划" :value="0" />
+            <el-option
               v-for="day in availableDays" 
               :key="day" 
               :label="`第${day}天 (${formatDayDate(day)})`" 
@@ -372,7 +396,8 @@
         
         <el-form-item label="选择天数" prop="day">
           <el-select v-model="editItineraryForm.day" placeholder="请选择第几天" style="width: 100%">
-            <el-option 
+            <el-option label="未规划" :value="0" />
+            <el-option
               v-for="day in availableDays" 
               :key="day" 
               :label="`第${day}天 (${formatDayDate(day)})`" 
@@ -420,6 +445,85 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 批量导入地点对话框 -->
+    <el-dialog v-model="showBatchImport" title="批量导入地点" width="600px">
+      <el-form label-width="120px">
+        <el-form-item label="地点列表">
+          <el-input
+            v-model="batchImportText"
+            type="textarea"
+            :rows="8"
+            placeholder="请输入你想去的地点"
+            maxlength="5000"
+            show-word-limit
+          />
+          <div class="form-tip">
+            导入的地点将全部进入“未规划”。
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showBatchImport = false">取消</el-button>
+        <el-button type="primary" @click="handleBatchImport" :loading="batchImporting">
+          开始导入
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 地点详情对话框 -->
+    <el-dialog v-model="showPlaceDetail" title="地点详情" width="600px">
+      <div v-loading="placeDetailLoading">
+        <el-descriptions v-if="placeDetail" :column="1" border>
+          <el-descriptions-item label="名称">
+            {{ placeDetail.name }}
+          </el-descriptions-item>
+
+          <el-descriptions-item label="类型">
+            {{ placeDetail.type }}
+          </el-descriptions-item>
+
+          <el-descriptions-item label="地址">
+            {{ placeDetail.address }}
+          </el-descriptions-item>
+
+          <el-descriptions-item
+              v-if="hasValue(placeDetail.telephone)"
+              label="电话">
+            {{ placeDetail.telephone }}
+          </el-descriptions-item>
+
+          <el-descriptions-item
+              v-if="hasValue(placeDetail.detailInfo?.classified_poi_tag)"
+              label="分类标签">
+            {{ placeDetail.detailInfo.classified_poi_tag }}
+          </el-descriptions-item>
+
+          <el-descriptions-item
+              v-if="hasValue(placeDetail.detailInfo?.price)"
+              label="价格">
+            {{ placeDetail.detailInfo.price }}
+          </el-descriptions-item>
+
+          <el-descriptions-item
+              v-if="hasValue(placeDetail.detailInfo?.shop_hours)"
+              label="营业时间">
+            {{ placeDetail.detailInfo.shop_hours }}
+          </el-descriptions-item>
+
+          <el-descriptions-item
+              v-if="hasValue(placeDetail.detailInfo?.overall_rating)"
+              label="评分">
+            {{ placeDetail.detailInfo.overall_rating }}
+          </el-descriptions-item>
+        </el-descriptions>
+      </div>
+
+      <template #footer>
+        <el-button @click="showPlaceDetail = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
   </Layout>
 </template>
 
@@ -440,14 +544,18 @@ const activeTab = ref('itinerary')
 const showAddItinerary = ref(false)
 const showEditItinerary = ref(false)
 const showInviteMember = ref(false)
+const showBatchImport = ref(false)
+const showPlaceDetail = ref(false)
 
 // 选择的天数（null表示总览，显示所有天数）
 const selectedDay = ref<number | null>(null)
 
 // 地图相关状态
 const mapInstance = ref<any>(null)
+const unplannedMapInstance = ref<any>(null) // 未规划地图实例
 const routeInfo = ref<any>(null)
 const mapLoaded = ref(false)
+const unplannedMapLoaded = ref(false) // 未规划地图是否已加载
 const routeLoading = ref(false)
 
 const loading = ref(false)
@@ -455,6 +563,8 @@ const trip = ref<Trip | null>(null)
 const relatedExpenses = ref<Expense[]>([])
 const pendingInvitations = ref<any[]>([])
 const currentUser = ref<any>(null)
+const placeDetail = ref<any>(null)
+const placeDetailLoading = ref(false)
 
 // 添加行程安排表单
 const itineraryFormRef = ref<FormInstance>()
@@ -462,7 +572,7 @@ const addingItinerary = ref(false)
 const selectedPlace = ref<any>(null)
 const placeTypes = ref<any[]>([])
 const itineraryForm = ref({
-  day: 1,
+  day: 0,
   placeName: '',
   placeUid: '',
   placeType: null as number | null
@@ -483,6 +593,10 @@ const inviteLoading = ref(false)
 const inviteForm = ref({
   invitee: ''
 })
+
+// 批量导入表单
+const batchImportText = ref('')
+const batchImporting = ref(false)
 
 // 行程安排表单验证规则
 const itineraryRules: FormRules = {
@@ -535,10 +649,10 @@ const loadTripDetail = async () => {
       const itinerary: any[] = []
       const startDate = dayjs(data.startDate)
       places.forEach((dayPlaces: any) => {
-        const day = dayPlaces.day || 1
+        const day = dayPlaces.day !== null && dayPlaces.day !== undefined ? dayPlaces.day : 1
         const placesList = dayPlaces.places || []
-        // 根据天数计算正确的日期
-        const itemDate = startDate.add(day - 1, 'day').format('YYYY-MM-DD')
+        // 根据天数计算正确的日期（day=0 时使用起始日期）
+        const itemDate = day > 0 ? startDate.add(day - 1, 'day').format('YYYY-MM-DD') : startDate.format('YYYY-MM-DD')
         placesList.forEach((place: any, index: number) => {
           const placeId = place.placeId || place.id
           itinerary.push({
@@ -691,11 +805,11 @@ const loadPendingInvitations = async (tripId: number) => {
 // 计算属性
 const availableDays = computed(() => {
   if (!trip.value?.startDate || !trip.value?.endDate) return [1]
-  
+
   const start = dayjs(trip.value.startDate)
   const end = dayjs(trip.value.endDate)
   const days = end.diff(start, 'day') + 1
-  
+
   return Array.from({ length: days }, (_, i) => i + 1)
 })
 
@@ -703,19 +817,25 @@ const availableDays = computed(() => {
 const groupedItineraryByDay = computed(() => {
   const groups: Record<number, ItineraryItem[]> = {}
   trip.value?.itinerary.forEach(item => {
-    const day = item.day || 1
+    const day = item.day !== null && item.day !== undefined ? item.day : 0
     if (!groups[day]) {
       groups[day] = []
     }
     groups[day].push(item)
   })
-  // 按天数排序
-  const sortedGroups: Record<number, ItineraryItem[]> = {}
+  // 按天数排序，但day=0（未规划）放在最后
+  // 使用Map来保持插入顺序
+  const sortedGroups = new Map<number, ItineraryItem[]>()
   Object.keys(groups)
     .map(Number)
-    .sort((a, b) => a - b)
+    .sort((a, b) => {
+      // 0放在最后
+      if (a === 0) return 1
+      if (b === 0) return -1
+      return a - b
+    })
     .forEach(day => {
-      sortedGroups[day] = groups[day]
+      sortedGroups.set(day, groups[day])
     })
   return sortedGroups
 })
@@ -726,9 +846,14 @@ const selectedDayItems = computed(() => {
   return trip.value.itinerary.filter(item => item.day === selectedDay.value)
 })
 
-// 是否显示地图（只在选择具体天数时显示，且至少2个地点）
+// 是否显示路线规划地图（只在选择具体天数时显示，且至少2个地点，day=0不显示）
 const shouldShowMap = computed(() => {
-  return selectedDay.value !== null && selectedDayItems.value.length >= 2
+  return selectedDay.value !== null && selectedDay.value !== 0 && selectedDayItems.value.length >= 2
+})
+
+// 是否显示未规划地图（day=0且至少有1个地点）
+const shouldShowUnplannedMap = computed(() => {
+  return selectedDay.value === 0 && selectedDayItems.value.some((item: any) => item.lat && item.lng)
 })
 
 // 获取当前选择天数的地点坐标
@@ -747,8 +872,8 @@ const getCurrentDayPlaces = computed(() => {
 const expenseSummary = computed(() => {
   const total = relatedExpenses.value.reduce((sum, expense) => sum + expense.amount, 0)
   const count = relatedExpenses.value.length
-  const average = trip.value && trip.value.members.length > 0 
-    ? Math.round(total / trip.value.members.length) 
+  const average = trip.value && trip.value.members.length > 0
+    ? Math.round(total / trip.value.members.length)
     : 0
   return { total, count, average }
 })
@@ -756,13 +881,13 @@ const expenseSummary = computed(() => {
 // 判断用户在行程中的角色
 const getUserRoleInTrip = () => {
   if (!currentUser.value || !trip.value) return null
-  
+
   const member = trip.value.members.find(m => {
     const memberUserId = Number(m.userId)
     const currentUserId = Number(currentUser.value.id)
     return memberUserId === currentUserId
   })
-  
+
   return member ? member.role : null
 }
 
@@ -787,25 +912,42 @@ onMounted(async () => {
   } catch (error) {
     console.error('获取用户信息失败:', error)
   }
-  
+
   loadTripDetail()
   loadPlaceTypes()
 })
 
 // 监听选择的天数变化，自动加载地图和路线
-watch([selectedDay, mapLoaded], ([day, loaded]) => {
-  if (day !== null && loaded) {
+watch([selectedDay, mapLoaded, unplannedMapLoaded], ([day, loaded, unplannedLoaded]) => {
+  // 处理普通天数的路线规划地图（day > 0）
+  if (day !== null && day !== 0 && loaded) {
     nextTick(() => {
       refreshRoute()
     })
-  } else if (day !== null && !loaded && getCurrentDayPlaces.value.length >= 2) {
+  } else if (day !== null && day !== 0 && !loaded && getCurrentDayPlaces.value.length >= 2) {
     initMap().then(() => {
       getRoute()
+    })
+  }
+
+  // 处理未规划的地图（day = 0）
+  if (day === 0 && unplannedLoaded) {
+    nextTick(() => {
+      showUnplannedMarkers()
+    })
+  } else if (day === 0 && !unplannedLoaded && getCurrentDayPlaces.value.length > 0) {
+    initUnplannedMap().then(() => {
+      showUnplannedMarkers()
     })
   }
 }, { immediate: false })
 
 // 工具函数
+// 判断值是否有效（非空、非null、非undefined）
+const hasValue = (value: any): boolean => {
+  return value !== null && value !== undefined && value !== ''
+}
+
 const formatDate = (date: string | Date) => {
   if (!date) return ''
   const d = dayjs(date)
@@ -901,13 +1043,13 @@ const handleLeaveTrip = async () => {
     await ElMessageBox.confirm('确定要退出这个行程吗？退出后将无法查看行程信息和账单。', '确认退出', {
       type: 'warning'
     })
-    
+
     const tripId = Number(route.params.id)
     if (isNaN(tripId)) {
       ElMessage.error('行程ID无效')
       return
     }
-    
+
     console.log('准备退出行程:', {
       tripId,
       currentUser: currentUser.value,
@@ -915,10 +1057,10 @@ const handleLeaveTrip = async () => {
       isOwner: isOwner.value,
       isParticipant: isParticipant.value
     })
-    
+
     const res = await tripApi.leaveTrip(tripId)
     console.log('退出行程响应:', res)
-    
+
     if (res.code === 200) {
       ElMessage.success('已退出行程')
       router.push('/trips') // 跳转回行程列表
@@ -940,23 +1082,23 @@ const handleDeleteTrip = async () => {
       confirmButtonText: '确认删除',
       cancelButtonText: '取消'
     })
-    
+
     const tripId = Number(route.params.id)
     if (isNaN(tripId)) {
       ElMessage.error('行程ID无效')
       return
     }
-    
+
     console.log('准备删除行程:', {
       tripId,
       currentUser: currentUser.value,
       userRole: getUserRoleInTrip(),
       isOwner: isOwner.value
     })
-    
+
     const res = await tripApi.deleteTrip(tripId)
     console.log('删除行程响应:', res)
-    
+
     if (res.code === 200) {
       ElMessage.success('行程已删除')
       router.push('/trips') // 跳转回行程列表
@@ -1001,22 +1143,22 @@ const loadBaiduMap = () => {
       resolve((window as any).BMap)
       return
     }
-    
+
     const baiduAk = (import.meta as any).env?.VITE_BAIDU_MAP_AK || ''
     if (!baiduAk) {
       ElMessage.error('请配置百度地图AK环境变量：VITE_BAIDU_MAP_AK')
       reject(new Error('百度地图AK未配置'))
       return
     }
-    
+
     const script = document.createElement('script')
     script.src = `https://api.map.baidu.com/api?v=3.0&ak=${baiduAk}&callback=initBaiduMap`
     script.onerror = reject
-    
+
     ;(window as any).initBaiduMap = () => {
       resolve((window as any).BMap)
     }
-    
+
     document.head.appendChild(script)
   })
 }
@@ -1026,18 +1168,18 @@ const initMap = async () => {
   try {
     await loadBaiduMap()
     await nextTick()
-    
+
     const mapContainer = document.getElementById('baidu-map')
     if (!mapContainer) return
-    
+
     mapInstance.value = new (window as any).BMap.Map('baidu-map')
-    
+
     if (getCurrentDayPlaces.value.length > 0) {
       const firstPlace = getCurrentDayPlaces.value[0]
       const point = new (window as any).BMap.Point(firstPlace.lng, firstPlace.lat)
       mapInstance.value.centerAndZoom(point, 13)
     }
-    
+
     mapLoaded.value = true
   } catch (error) {
     console.error('加载百度地图失败:', error)
@@ -1052,21 +1194,21 @@ const getRoute = async () => {
     ElMessage.warning('至少需要2个地点才能规划路线')
     return
   }
-  
+
   if (!mapInstance.value) {
     ElMessage.warning('地图未初始化')
     return
   }
-  
+
   routeLoading.value = true
-  
+
   try {
     const places = getCurrentDayPlaces.value
     console.log('开始路线规划，地点数量:', places.length)
-    
+
     // 清除之前的覆盖物（包括路线和标记）
     mapInstance.value.clearOverlays()
-    
+
     // 先添加地点标记
     places.forEach((place, index) => {
       const point = new (window as any).BMap.Point(place.lng, place.lat)
@@ -1075,11 +1217,11 @@ const getRoute = async () => {
         width: 200,
         height: 50
       })
-      
+
       marker.addEventListener('click', () => {
         mapInstance.value.openInfoWindow(infoWindow, point)
       })
-      
+
       const label = new (window as any).BMap.Label(
         index === 0 ? '起点' : (index === places.length - 1 ? '终点' : `${index + 1}`),
         { offset: new (window as any).BMap.Size(20, -10) }
@@ -1087,9 +1229,9 @@ const getRoute = async () => {
       marker.setLabel(label)
       mapInstance.value.addOverlay(marker)
     })
-    
+
     console.log('地点标记已添加')
-    
+
     // 使用百度地图JS API的路线规划（让百度地图自动绘制路线）
     const driving = new (window as any).BMap.DrivingRoute(mapInstance.value, {
       renderOptions: {
@@ -1100,28 +1242,28 @@ const getRoute = async () => {
       onSearchComplete: (result: any) => {
         routeLoading.value = false
         const status = driving.getStatus()
-        
+
         console.log('路线规划完成，状态码:', status)
-        
+
         // 使用数字比较，0 表示成功
         if (status === 0) {
           const plan = result.getPlan(0) // 获取第一条路线
-          
+
           console.log('获取到的路线规划:', plan)
-          
+
           if (plan) {
             // 获取路线信息
             const distance = plan.getDistance(false) // 总距离（米）
             const duration = plan.getDuration(false) // 总时间（秒）
-            
+
             console.log('路线距离:', distance, '米，时间:', duration, '秒')
-            
+
             routeInfo.value = {
               distance: distance,
               duration: duration,
               toll: 0 // JS API不提供过路费信息
             }
-            
+
             // 百度地图会自动绘制路线，我们只需要调整视野和添加标记
             // 确保标记在地图最上层
             setTimeout(() => {
@@ -1144,11 +1286,11 @@ const getRoute = async () => {
         }
       }
     })
-    
+
     // 设置起点和终点
     const startPoint = new (window as any).BMap.Point(places[0].lng, places[0].lat)
     const endPoint = new (window as any).BMap.Point(places[places.length - 1].lng, places[places.length - 1].lat)
-    
+
     // 如果有途径点
     if (places.length > 2) {
       const waypoints: any[] = []
@@ -1161,7 +1303,7 @@ const getRoute = async () => {
       // 搜索路线（百度地图会自动绘制）
       driving.search(startPoint, endPoint)
     }
-    
+
   } catch (error) {
     console.error('获取路线失败:', error)
     ElMessage.error('获取路线失败')
@@ -1176,14 +1318,14 @@ const adjustMapViewport = (plan: any, places: any[]) => {
     console.error('地图实例不存在')
     return
   }
-  
+
   try {
     // 收集所有地点坐标
     const allPoints: any[] = []
     places.forEach(place => {
       allPoints.push(new (window as any).BMap.Point(place.lng, place.lat))
     })
-    
+
     // 尝试从路线规划结果中获取路线点来调整视野
     try {
       const route = plan.getRoute(0)
@@ -1197,7 +1339,7 @@ const adjustMapViewport = (plan: any, places: any[]) => {
     } catch (e) {
       console.warn('无法获取路线点:', e)
     }
-    
+
     if (allPoints.length > 0) {
       mapInstance.value.setViewport(allPoints)
       console.log('地图视野已调整')
@@ -1214,6 +1356,81 @@ const refreshRoute = () => {
   } else {
     initMap().then(() => {
       getRoute()
+    })
+  }
+}
+
+// 初始化未规划地图（只显示地点标记，不规划路线）
+const initUnplannedMap = async () => {
+  try {
+    await loadBaiduMap()
+    await nextTick()
+
+    const mapContainer = document.getElementById('unplanned-map')
+    if (!mapContainer) return
+
+    unplannedMapInstance.value = new (window as any).BMap.Map('unplanned-map')
+
+    const places = getCurrentDayPlaces.value
+    if (places.length > 0) {
+      const firstPlace = places[0]
+      const point = new (window as any).BMap.Point(firstPlace.lng, firstPlace.lat)
+      unplannedMapInstance.value.centerAndZoom(point, 13)
+    }
+
+    unplannedMapLoaded.value = true
+  } catch (error) {
+    console.error('加载百度地图失败:', error)
+    ElMessage.error('地图加载失败，请检查百度地图AK配置')
+  }
+}
+
+// 显示未规划地点标记
+const showUnplannedMarkers = () => {
+  if (!unplannedMapInstance.value) return
+
+  const places = getCurrentDayPlaces.value
+  if (places.length === 0) return
+
+  // 清除之前的覆盖物
+  unplannedMapInstance.value.clearOverlays()
+
+  // 添加地点标记
+  const points: any[] = []
+  places.forEach((place, index) => {
+    const point = new (window as any).BMap.Point(place.lng, place.lat)
+    points.push(point)
+
+    const marker = new (window as any).BMap.Marker(point)
+    const infoWindow = new (window as any).BMap.InfoWindow(place.name, {
+      width: 200,
+      height: 50
+    })
+
+    marker.addEventListener('click', () => {
+      unplannedMapInstance.value.openInfoWindow(infoWindow, point)
+    })
+
+    const label = new (window as any).BMap.Label(`${index + 1}`, {
+      offset: new (window as any).BMap.Size(20, -10)
+    })
+    marker.setLabel(label)
+    unplannedMapInstance.value.addOverlay(marker)
+  })
+
+  // 调整视野以包含所有地点
+  if (points.length > 0) {
+    unplannedMapInstance.value.setViewport(points)
+  }
+}
+
+// 刷新未规划地图
+const refreshUnplannedMap = () => {
+  if (unplannedMapLoaded.value) {
+    showUnplannedMarkers()
+  } else {
+    initUnplannedMap().then(() => {
+      showUnplannedMarkers()
     })
   }
 }
@@ -1242,11 +1459,11 @@ const fetchPlaceSuggestions = async (queryString: string, cb: (suggestions: any[
     cb([])
     return
   }
-  
+
   try {
     const tripId = Number(route.params.id)
     const res = await tripApi.getPlaceSuggestions(tripId, queryString.trim())
-    
+
     if (res.code === 200 && res.data) {
       const suggestions = res.data.map((item: any) => ({
         value: item.name,
@@ -1288,37 +1505,37 @@ const getSelectedTypeName = () => {
 // 添加行程安排
 const handleAddItinerary = async () => {
   if (!itineraryFormRef.value) return
-  
+
   try {
     await itineraryFormRef.value.validate()
-    
+
     if (!itineraryForm.value.placeUid) {
       ElMessage.error('请选择一个地点')
       return
     }
-    
+
     addingItinerary.value = true
     const tripId = Number(route.params.id)
-    
+
     const res = await tripApi.addPlaceToTrip(tripId, {
       uid: itineraryForm.value.placeUid,
       day: itineraryForm.value.day,
       typeId: itineraryForm.value.placeType ?? undefined
     })
-    
+
     if (res.code === 200) {
       ElMessage.success('行程安排添加成功')
       showAddItinerary.value = false
-      
+
       // 重置表单
       itineraryForm.value = {
-        day: 1,
+        day: 0,
         placeName: '',
         placeUid: '',
         placeType: null
       }
       selectedPlace.value = null
-      
+
       // 重新加载行程详情
       await loadTripDetail()
     } else {
@@ -1335,7 +1552,7 @@ const handleAddItinerary = async () => {
 const editItineraryItem = (item: any) => {
   currentEditItem.value = item
   editItineraryForm.value = {
-    day: item.day || 1,
+    day: item.day !== null && item.day !== undefined ? item.day : 0,
     placeType: item.typeId || null
   }
   showEditItinerary.value = true
@@ -1346,17 +1563,17 @@ const deleteItineraryItem = async (item: any) => {
     await ElMessageBox.confirm('确定要删除这个行程安排吗？', '确认删除', {
       type: 'warning'
     })
-    
+
     const tripId = Number(route.params.id)
     const placeId = item.placeId
-    
+
     if (!placeId) {
       ElMessage.error('无法获取地点ID')
       return
     }
-    
+
     const res = await tripApi.deletePlace(tripId, Number(placeId))
-    
+
     if (res.code === 200) {
       ElMessage.success('行程安排已删除')
       // 重新加载行程详情
@@ -1383,35 +1600,35 @@ const removeMember = (member: TripMember) => {
 // 处理编辑行程安排
 const handleEditItinerary = async () => {
   if (!editItineraryFormRef.value || !currentEditItem.value) return
-  
+
   try {
     await editItineraryFormRef.value.validate()
-    
+
     editingItinerary.value = true
     const tripId = Number(route.params.id)
     const placeId = currentEditItem.value.placeId
-    
+
     if (!placeId) {
       ElMessage.error('无法获取地点ID')
       return
     }
-    
+
     const res = await tripApi.updatePlace(tripId, Number(placeId), {
       day: editItineraryForm.value.day,
       typeId: editItineraryForm.value.placeType ?? undefined
     })
-    
+
     if (res.code === 200) {
       ElMessage.success('行程安排已更新')
       showEditItinerary.value = false
-      
+
       // 重置表单
       editItineraryForm.value = {
         day: 1,
         placeType: null
       }
       currentEditItem.value = null
-      
+
       // 重新加载行程详情
       await loadTripDetail()
     } else {
@@ -1428,19 +1645,19 @@ const handleEditItinerary = async () => {
 // 邀请成员
 const handleInviteMember = async () => {
   if (!inviteFormRef.value) return
-  
+
   try {
     await inviteFormRef.value.validate()
   } catch (error) {
     console.log('表单验证失败:', error)
     return
   }
-  
+
   if (!trip.value) {
     ElMessage.error('行程信息不存在')
     return
   }
-  
+
   inviteLoading.value = true
   try {
     const res = await tripApi.createInvitation(Number(trip.value.id), inviteForm.value.invitee)
@@ -1471,7 +1688,7 @@ const cancelInvitation = async (invitationId: number) => {
     await ElMessageBox.confirm('确定要撤销这个邀请吗？', '确认撤销', {
       type: 'warning'
     })
-    
+
     const res = await invitationApi.cancelInvitation(invitationId)
     if (res.code === 200) {
       ElMessage.success('已撤销邀请')
@@ -1487,6 +1704,81 @@ const cancelInvitation = async (invitationId: number) => {
       console.error('撤销邀请失败:', error)
       ElMessage.error(error.message || '撤销邀请失败')
     }
+  }
+}
+
+// 批量导入地点
+const handleBatchImport = async () => {
+  const text = batchImportText.value.trim()
+  if (!text) {
+    ElMessage.warning('请输入要导入的地点')
+    return
+  }
+
+  const tripId = Number(route.params.id)
+  if (!tripId) {
+    ElMessage.error('行程ID无效')
+    return
+  }
+
+  try {
+    batchImporting.value = true
+
+    // 1) 调用后端批量导入
+    const res = await tripApi.importPlaces(tripId, text)
+    if (res.code !== 200) {
+      ElMessage.error(res.message || '批量导入失败')
+      return
+    }
+
+    // 2) 将导入的地点全部设置为未规划(day=0)
+    const imported = Array.isArray(res.data) ? res.data : []
+    await Promise.all(
+      imported
+        .map((p: any) => p?.id)
+        .filter((id: any) => typeof id === 'number' || typeof id === 'string')
+        .map((id: any) => tripApi.updatePlace(tripId, Number(id), { day: 0 }))
+    )
+
+    ElMessage.success(`已导入 ${imported.length} 个地点，已放入未规划`) // imported.length 可能为 0
+    showBatchImport.value = false
+    batchImportText.value = ''
+
+    await loadTripDetail()
+  } catch (error: any) {
+    console.error('批量导入地点失败:', error)
+    ElMessage.error(error.message || '批量导入失败，请稍后再试')
+  } finally {
+    batchImporting.value = false
+  }
+}
+
+// 查看地点详情
+const handleShowPlaceDetail = async (item: any) => {
+  const tripId = Number(route.params.id)
+  const placeId = Number(item?.placeId)
+
+  if (!tripId || !placeId) {
+    ElMessage.warning('无法获取地点信息')
+    return
+  }
+
+  showPlaceDetail.value = true
+  placeDetailLoading.value = true
+  placeDetail.value = null
+
+  try {
+    const res = await tripApi.getPlaceDetail(tripId, placeId)
+    if (res.code === 200 && res.data) {
+      placeDetail.value = res.data
+    } else {
+      ElMessage.error(res.message || '加载地点详情失败')
+    }
+  } catch (error: any) {
+    console.error('加载地点详情失败:', error)
+    ElMessage.error(error.message || '加载地点详情失败')
+  } finally {
+    placeDetailLoading.value = false
   }
 }
 </script>
@@ -1803,5 +2095,19 @@ const cancelInvitation = async (invitationId: number) => {
   border-radius: 8px;
   font-size: 14px;
   color: #666;
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  color: #409eff;
 }
 </style>

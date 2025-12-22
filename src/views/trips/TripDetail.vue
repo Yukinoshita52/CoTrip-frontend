@@ -59,6 +59,10 @@
                 <el-button type="primary" plain @click="showBatchImport = true">
                   批量导入
                 </el-button>
+                <el-button type="success" plain @click="handleAutoPlanRoute" :loading="autoPlanLoading">
+                  <el-icon><Guide /></el-icon>
+                  一键规划
+                </el-button>
               </div>
             </div>
             
@@ -601,7 +605,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import Layout from '@/components/Layout.vue'
-import { tripApi, expenseApi, placeTypeApi, invitationApi, userApi } from '@/api'
+import { tripApi, expenseApi, placeTypeApi, invitationApi, userApi, baiduRouteApi } from '@/api'
 import type { Trip, ItineraryItem, Expense, TripMember } from '@/types'
 import { formatAvatarUrl } from '@/utils/image'
 import dayjs from 'dayjs'
@@ -673,6 +677,9 @@ const inviteForm = ref({
 // 批量导入表单
 const batchImportText = ref('')
 const batchImporting = ref(false)
+
+// 一键规划状态
+const autoPlanLoading = ref(false)
 
 // 行程安排表单验证规则
 const itineraryRules: FormRules = {
@@ -1280,7 +1287,7 @@ const initMap = async () => {
   }
 }
 
-// 调用百度路线规划API（使用JS API）
+// 调用百度路线规划API（使用JS API，带完整缓存）
 const getRoute = async () => {
   const places = getCurrentDayPlaces.value
   if (places.length < 2) {
@@ -1296,111 +1303,272 @@ const getRoute = async () => {
   routeLoading.value = true
 
   try {
-    const places = getCurrentDayPlaces.value
     console.log('开始路线规划，地点数量:', places.length)
 
-    // 清除之前的覆盖物（包括路线和标记）
-    mapInstance.value.clearOverlays()
+    // 准备缓存检查的地点数据
+    const cacheCheckPlaces = places.map(place => ({
+      lng: place.lng,
+      lat: place.lat,
+      name: place.name
+    }))
 
-    // 先添加地点标记
-    places.forEach((place, index) => {
-      const point = new (window as any).BMap.Point(place.lng, place.lat)
-      const marker = new (window as any).BMap.Marker(point)
-      const infoWindow = new (window as any).BMap.InfoWindow(place.name, {
-        width: 200,
-        height: 50
-      })
-
-      marker.addEventListener('click', () => {
-        mapInstance.value.openInfoWindow(infoWindow, point)
-      })
-
-      const label = new (window as any).BMap.Label(
-        index === 0 ? '起点' : (index === places.length - 1 ? '终点' : `${index + 1}`),
-        { offset: new (window as any).BMap.Size(20, -10) }
-      )
-      marker.setLabel(label)
-      mapInstance.value.addOverlay(marker)
-    })
-
-    console.log('地点标记已添加')
-
-    // 使用百度地图JS API的路线规划（让百度地图自动绘制路线）
-    const driving = new (window as any).BMap.DrivingRoute(mapInstance.value, {
-      renderOptions: {
-        map: mapInstance.value, // 自动绘制到地图
-        autoViewport: true, // 自动调整视野
-        panel: null // 不显示路线面板
-      },
-      onSearchComplete: (result: any) => {
-        routeLoading.value = false
-        const status = driving.getStatus()
-
-        console.log('路线规划完成，状态码:', status)
-
-        // 使用数字比较，0 表示成功
-        if (status === 0) {
-          const plan = result.getPlan(0) // 获取第一条路线
-
-          console.log('获取到的路线规划:', plan)
-
-          if (plan) {
-            // 获取路线信息
-            const distance = plan.getDistance(false) // 总距离（米）
-            const duration = plan.getDuration(false) // 总时间（秒）
-
-            console.log('路线距离:', distance, '米，时间:', duration, '秒')
-
-            routeInfo.value = {
-              distance: distance,
-              duration: duration,
-              toll: 0 // JS API不提供过路费信息
-            }
-
-            // 百度地图会自动绘制路线，我们只需要调整视野和添加标记
-            // 确保标记在地图最上层
-            setTimeout(() => {
-              adjustMapViewport(plan, places)
-            }, 100) // 稍微延迟确保路线已绘制
-          } else {
-            console.error('未找到路线规划结果')
-            ElMessage.error('未找到路线规划结果')
-          }
-        } else {
-          let errorMsg = '路线规划失败'
-          // 使用数字比较状态码
-          if (status === 1) {
-            errorMsg = '未找到路线，请检查起点和终点'
-          } else if (status === 2) {
-            errorMsg = '路线规划请求无效'
-          }
-          console.error('路线规划失败:', errorMsg, '状态码:', status)
-          ElMessage.error(errorMsg)
-        }
+    // 1. 先检查缓存
+    console.log('检查路线规划缓存...')
+    const cacheRes = await baiduRouteApi.checkRouteCache(cacheCheckPlaces)
+    
+    if (cacheRes.code === 200 && cacheRes.data) {
+      // 缓存命中，直接使用缓存结果
+      console.log('路线规划缓存命中，使用缓存结果:', cacheRes.data)
+      const cachedRoute = cacheRes.data
+      
+      // 清除之前的覆盖物
+      mapInstance.value.clearOverlays()
+      
+      // 添加地点标记
+      addPlaceMarkers(places)
+      
+      // 使用缓存的路线信息
+      routeInfo.value = {
+        distance: cachedRoute.distance || 0,
+        duration: cachedRoute.duration || 0,
+        toll: cachedRoute.toll || 0
       }
-    })
-
-    // 设置起点和终点
-    const startPoint = new (window as any).BMap.Point(places[0].lng, places[0].lat)
-    const endPoint = new (window as any).BMap.Point(places[places.length - 1].lng, places[places.length - 1].lat)
-
-    // 如果有途径点
-    if (places.length > 2) {
-      const waypoints: any[] = []
-      for (let i = 1; i < places.length - 1; i++) {
-        waypoints.push(new (window as any).BMap.Point(places[i].lng, places[i].lat))
+      
+      // 如果缓存中有路线绘制数据，直接绘制
+      // 兼容新旧字段名：routePolyline (新) 或 routePoints (旧)
+      const polylineData = cachedRoute.routePolyline || cachedRoute.routePoints
+      if (polylineData && polylineData.length > 0) {
+        console.log('使用缓存的路线绘制数据，路径点数量:', polylineData.length)
+        drawCachedRoute(polylineData, places)
+      } else {
+        console.log('缓存中没有路线绘制数据，调用百度地图API绘制并更新缓存')
+        // 如果缓存中没有绘制数据，调用API绘制并更新缓存
+        callBaiduAPIForDrawing(places, true) // 改为 true，重新缓存完整数据
       }
-      // 搜索路线（百度地图会自动绘制）
-      driving.search(startPoint, endPoint, { waypoints: waypoints })
-    } else {
-      // 搜索路线（百度地图会自动绘制）
-      driving.search(startPoint, endPoint)
+      
+      routeLoading.value = false
+      return
     }
+
+    // 2. 缓存未命中，调用百度地图API
+    console.log('缓存未命中，调用百度地图API')
+    callBaiduAPIForDrawing(places, true)
 
   } catch (error) {
     console.error('获取路线失败:', error)
     ElMessage.error('获取路线失败')
     routeLoading.value = false
+  }
+}
+
+// 调用百度地图API进行路线规划和绘制
+const callBaiduAPIForDrawing = (places: any[], shouldCache: boolean) => {
+  // 清除之前的覆盖物（包括路线和标记）
+  mapInstance.value.clearOverlays()
+
+  // 先添加地点标记
+  addPlaceMarkers(places)
+
+  // 准备缓存数据
+  const cacheCheckPlaces = places.map(place => ({
+    lng: place.lng,
+    lat: place.lat,
+    name: place.name
+  }))
+
+  // 使用百度地图JS API的路线规划（让百度地图自动绘制路线）
+  const driving = new (window as any).BMap.DrivingRoute(mapInstance.value, {
+    renderOptions: {
+      map: mapInstance.value, // 自动绘制到地图
+      autoViewport: true, // 自动调整视野
+      panel: null // 不显示路线面板
+    },
+    onSearchComplete: async (result: any) => {
+      routeLoading.value = false
+      const status = driving.getStatus()
+
+      console.log('百度地图路线规划完成，状态码:', status)
+
+      // 使用数字比较，0 表示成功
+      if (status === 0) {
+        const plan = result.getPlan(0) // 获取第一条路线
+
+        console.log('获取到的路线规划:', plan)
+
+        if (plan) {
+          // 获取路线信息
+          const distance = plan.getDistance(false) // 总距离（米）
+          const duration = plan.getDuration(false) // 总时间（秒）
+
+          console.log('路线距离:', distance, '米，时间:', duration, '秒')
+
+          // 提取路线绘制数据
+          let routePolyline: Array<{lng: number, lat: number}> = []
+          try {
+            const route = plan.getRoute(0)
+            if (route && typeof route.getPath === 'function') {
+              const path = route.getPath()
+              if (path && path.length > 0) {
+                routePolyline = path.map((point: any) => ({
+                  lng: point.lng,
+                  lat: point.lat
+                }))
+                console.log('提取到路线路径点数量:', routePolyline.length)
+              }
+            }
+          } catch (e) {
+            console.warn('无法提取路线路径点:', e)
+          }
+
+          const routeData = {
+            distance: distance,
+            duration: duration,
+            toll: 0, // JS API不提供过路费信息
+            routePolyline: routePolyline, // 存储路线绘制数据
+            timestamp: Date.now() // 添加时间戳
+          }
+
+          routeInfo.value = {
+            distance: routeData.distance,
+            duration: routeData.duration,
+            toll: routeData.toll
+          }
+
+          // 3. 保存到缓存（如果需要）
+          if (shouldCache) {
+            try {
+              console.log('保存完整路线规划结果到缓存（包含绘制数据）...')
+              await baiduRouteApi.saveRouteCache(cacheCheckPlaces, routeData)
+              console.log('完整路线规划结果已保存到缓存')
+            } catch (cacheError) {
+              console.error('保存路线规划缓存失败:', cacheError)
+              // 缓存失败不影响主要功能
+            }
+          }
+
+          // 百度地图会自动绘制路线，我们只需要调整视野
+          setTimeout(() => {
+            adjustMapViewport(plan, places)
+          }, 100) // 稍微延迟确保路线已绘制
+        } else {
+          console.error('未找到路线规划结果')
+          ElMessage.error('未找到路线规划结果')
+        }
+      } else {
+        let errorMsg = '路线规划失败'
+        // 使用数字比较状态码
+        if (status === 1) {
+          errorMsg = '未找到路线，请检查起点和终点'
+        } else if (status === 2) {
+          errorMsg = '路线规划请求无效'
+        }
+        console.error('路线规划失败:', errorMsg, '状态码:', status)
+        ElMessage.error(errorMsg)
+      }
+    }
+  })
+
+  // 设置起点和终点
+  const startPoint = new (window as any).BMap.Point(places[0].lng, places[0].lat)
+  const endPoint = new (window as any).BMap.Point(places[places.length - 1].lng, places[places.length - 1].lat)
+
+  // 如果有途径点
+  if (places.length > 2) {
+    const waypoints: any[] = []
+    for (let i = 1; i < places.length - 1; i++) {
+      waypoints.push(new (window as any).BMap.Point(places[i].lng, places[i].lat))
+    }
+    // 搜索路线（百度地图会自动绘制）
+    driving.search(startPoint, endPoint, { waypoints: waypoints })
+  } else {
+    // 搜索路线（百度地图会自动绘制）
+    driving.search(startPoint, endPoint)
+  }
+}
+
+// 添加地点标记的辅助函数
+const addPlaceMarkers = (places: any[]) => {
+  places.forEach((place, index) => {
+    const point = new (window as any).BMap.Point(place.lng, place.lat)
+    const marker = new (window as any).BMap.Marker(point)
+    const infoWindow = new (window as any).BMap.InfoWindow(place.name, {
+      width: 200,
+      height: 50
+    })
+
+    marker.addEventListener('click', () => {
+      mapInstance.value.openInfoWindow(infoWindow, point)
+    })
+
+    const label = new (window as any).BMap.Label(
+      index === 0 ? '起点' : (index === places.length - 1 ? '终点' : `${index + 1}`),
+      { offset: new (window as any).BMap.Size(20, -10) }
+    )
+    marker.setLabel(label)
+    mapInstance.value.addOverlay(marker)
+  })
+  console.log('地点标记已添加')
+}
+
+// 绘制缓存的路线
+const drawCachedRoute = (routePolyline: Array<{lng: number, lat: number}>, places: any[]) => {
+  try {
+    console.log('开始绘制缓存的路线，路径点数量:', routePolyline.length)
+    
+    if (routePolyline.length < 2) {
+      console.warn('缓存的路线路径点不足，无法绘制')
+      return
+    }
+
+    // 将路径点转换为百度地图Point对象
+    const points = routePolyline.map(point => 
+      new (window as any).BMap.Point(point.lng, point.lat)
+    )
+
+    // 创建折线对象
+    const polyline = new (window as any).BMap.Polyline(points, {
+      strokeColor: '#3388ff',    // 路线颜色
+      strokeWeight: 6,           // 路线宽度
+      strokeOpacity: 0.8,        // 路线透明度
+      strokeStyle: 'solid'       // 路线样式
+    })
+
+    // 添加折线到地图
+    mapInstance.value.addOverlay(polyline)
+
+    // 调整地图视野以包含整条路线和地点标记
+    try {
+      // 收集所有需要显示的点（路线点 + 地点标记）
+      const allPoints = [...points]
+      
+      // 添加地点标记的坐标
+      places.forEach(place => {
+        allPoints.push(new (window as any).BMap.Point(place.lng, place.lat))
+      })
+
+      // 使用百度地图的 setViewport 方法调整视野
+      mapInstance.value.setViewport(allPoints, {
+        margins: [50, 50, 50, 50] // 设置边距
+      })
+      
+      console.log('地图视野已调整，包含所有路线点和地点标记')
+    } catch (viewportError) {
+      console.warn('调整地图视野失败，使用默认视野:', viewportError)
+      // 如果调整视野失败，至少确保能看到起点和终点
+      if (places.length >= 2) {
+        const bounds = new (window as any).BMap.Bounds()
+        bounds.extend(new (window as any).BMap.Point(places[0].lng, places[0].lat))
+        bounds.extend(new (window as any).BMap.Point(places[places.length - 1].lng, places[places.length - 1].lat))
+        mapInstance.value.setViewport(bounds)
+      }
+    }
+
+    console.log('缓存路线绘制完成')
+  } catch (error) {
+    console.error('绘制缓存路线失败:', error)
+    // 如果绘制失败，回退到调用百度地图API
+    console.log('绘制缓存路线失败，回退到百度地图API')
+    callBaiduAPIForDrawing(places, false)
   }
 }
 
@@ -2013,6 +2181,46 @@ const handleBatchImport = async () => {
     ElMessage.error(error.message || '批量导入失败，请稍后再试')
   } finally {
     batchImporting.value = false
+  }
+}
+
+// 一键规划行程路线
+const handleAutoPlanRoute = async () => {
+  const tripId = Number(route.params.id)
+  if (!tripId) {
+    ElMessage.error('行程ID无效')
+    return
+  }
+
+  // 检查是否有未规划的地点
+  const unplannedPlaces = trip.value?.places?.find(dayPlaces => dayPlaces.day === 0)?.places || []
+  if (unplannedPlaces.length === 0) {
+    ElMessage.warning('没有未规划的地点，无需进行路线规划')
+    return
+  }
+
+  try {
+    autoPlanLoading.value = true
+    
+    const res = await tripApi.autoPlanRoute(tripId)
+    if (res.code !== 200) {
+      ElMessage.error(res.message || '路线规划失败')
+      return
+    }
+
+    ElMessage.success(res.data || '路线规划完成')
+    
+    // 重新加载行程详情以显示规划结果
+    await loadTripDetail()
+    
+    // 切换到总览模式显示规划结果
+    selectedDay.value = null
+    
+  } catch (error: any) {
+    console.error('一键规划失败:', error)
+    ElMessage.error(error.message || '路线规划失败，请稍后再试')
+  } finally {
+    autoPlanLoading.value = false
   }
 }
 

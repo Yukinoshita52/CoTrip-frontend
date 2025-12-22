@@ -422,3 +422,29 @@ export const announcementApi = {
   }
 }
 
+// 百度地图路线规划缓存API
+export const baiduRouteApi = {
+  // 检查路线规划缓存
+  checkRouteCache(places: Array<{ lng: number; lat: number; name?: string }>) {
+    return request.post('/baidu-route/cache/check', places)
+  },
+
+  // 保存路线规划结果到缓存
+  saveRouteCache(places: Array<{ lng: number; lat: number; name?: string }>, routeData: any) {
+    return request.post('/baidu-route/cache/save', {
+      places,
+      routeData
+    })
+  },
+
+  // 获取缓存统计信息
+  getCacheStats() {
+    return request.get('/baidu-route/cache/stats')
+  },
+
+  // 清除所有缓存
+  clearAllCache() {
+    return request.delete('/baidu-route/cache/all')
+  }
+}
+

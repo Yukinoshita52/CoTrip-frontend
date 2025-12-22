@@ -78,18 +78,7 @@
       <!-- 筛选器 -->
       <el-card class="filter-card">
         <el-row :gutter="16">
-          <el-col :span="4">
-            <el-select v-model="filters.tripId" placeholder="选择行程" clearable>
-              <el-option label="全部行程" value="" />
-              <el-option
-                v-for="trip in trips"
-                :key="trip.id"
-                :label="trip.title"
-                :value="trip.id"
-              />
-            </el-select>
-          </el-col>
-          <el-col :span="4">
+          <el-col :span="5">
             <el-select v-model="filters.category" placeholder="支出类别" clearable>
               <el-option label="全部类别" value="" />
               <el-option label="交通" value="transport" />
@@ -100,7 +89,7 @@
               <el-option label="其他" value="other" />
             </el-select>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="7">
             <el-date-picker
               v-model="filters.dateRange"
               type="daterange"
@@ -111,7 +100,7 @@
               value-format="YYYY-MM-DD"
             />
           </el-col>
-          <el-col :span="6">
+          <el-col :span="7">
             <el-input
               v-model="filters.keyword"
               placeholder="搜索账单标题"
@@ -122,7 +111,7 @@
               </template>
             </el-input>
           </el-col>
-          <el-col :span="4">
+          <el-col :span="5">
             <el-button @click="handleSearch">搜索</el-button>
             <el-button @click="resetFilters">重置</el-button>
           </el-col>
@@ -276,7 +265,6 @@ const router = useRouter()
 
 // 筛选条件
 const filters = ref({
-  tripId: '',
   category: '',
   dateRange: [] as string[],
   keyword: ''
@@ -434,7 +422,6 @@ const handleSearch = () => {
 
 const resetFilters = () => {
   filters.value = {
-    tripId: '',
     category: '',
     dateRange: [],
     keyword: ''
@@ -510,15 +497,19 @@ const getSplitTypeText = (splitType: string) => {
 }
 
 const getUserName = (userId: string) => {
-  // 从行程成员中查找用户名
-  const selectedTrip = trips.value.find(trip => trip.id === filters.value.tripId)
-  if (selectedTrip) {
-    const member = selectedTrip.members.find(m => m.userId === userId)
-    if (member) {
-      return member.username
+  // 从当前账本关联的行程中查找用户名
+  if (currentBook.value && currentBook.value.tripId) {
+    const selectedTrip = trips.value.find(trip => Number(trip.id) === currentBook.value.tripId)
+    if (selectedTrip) {
+      const member = selectedTrip.members.find(m => m.userId === userId)
+      if (member) {
+        return member.username
+      }
     }
   }
-  return userId
+  
+  // 如果找不到，返回用户ID或默认名称
+  return userId || '未知用户'
 }
 
 const isSettled = (expense: Expense) => {

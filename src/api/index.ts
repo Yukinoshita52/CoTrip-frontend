@@ -169,6 +169,11 @@ export const expenseApi = {
     return request.get(`/account/book/${bookId}/split`)
   },
 
+  // 获取分摊金额（别名）
+  getSplitAmount(bookId: number) {
+    return this.splitAmount(bookId)
+  },
+
   // 添加分类
   addCategory(name: string, type: number, file?: File) {
     const formData = new FormData()

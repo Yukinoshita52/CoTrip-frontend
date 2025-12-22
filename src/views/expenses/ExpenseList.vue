@@ -8,18 +8,7 @@
           <p>管理你的旅行支出和账单分摊</p>
         </div>
         <div class="header-right">
-          <el-button @click="$router.push('/expenses/books')">
-            <el-icon><Folder /></el-icon>
-            账本管理
-          </el-button>
-          <el-button @click="$router.push('/expenses/split')">
-            <el-icon><Calculator /></el-icon>
-            分摊计算
-          </el-button>
-          <el-button type="primary" @click="$router.push('/expenses/create')">
-            <el-icon><Plus /></el-icon>
-            添加账单
-          </el-button>
+          <!-- 移除账本管理按钮，其他按钮移到搜索栏 -->
         </div>
       </div>
 
@@ -48,7 +37,7 @@
       </el-row>
 
       <!-- 账本选择 -->
-      <el-card class="book-selector" v-if="accountBooks.length > 1" style="margin-bottom: 16px;">
+      <el-card class="book-selector" style="margin-bottom: 16px;">
         <template #header>
           <div class="book-selector-header">
             <span>选择行程账本</span>
@@ -57,7 +46,7 @@
             </el-tooltip>
           </div>
         </template>
-        <el-select v-model="selectedBookId" @change="handleBookChange" placeholder="选择行程账本" style="width: 100%;">
+        <el-select v-model="selectedBookId" @change="handleBookChange" placeholder="请选择行程账本" style="width: 100%;">
           <el-option
             v-for="book in accountBooks"
             :key="book.bookId || book.id"
@@ -78,32 +67,10 @@
       <!-- 筛选器 -->
       <el-card class="filter-card">
         <el-row :gutter="16">
-          <el-col :span="5">
-            <el-select v-model="filters.category" placeholder="支出类别" clearable>
-              <el-option label="全部类别" value="" />
-              <el-option label="交通" value="transport" />
-              <el-option label="住宿" value="accommodation" />
-              <el-option label="餐饮" value="food" />
-              <el-option label="活动" value="activity" />
-              <el-option label="购物" value="shopping" />
-              <el-option label="其他" value="other" />
-            </el-select>
-          </el-col>
-          <el-col :span="7">
-            <el-date-picker
-              v-model="filters.dateRange"
-              type="daterange"
-              range-separator="至"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
-              format="YYYY-MM-DD"
-              value-format="YYYY-MM-DD"
-            />
-          </el-col>
-          <el-col :span="7">
+          <el-col :span="12">
             <el-input
               v-model="filters.keyword"
-              placeholder="搜索账单标题"
+              placeholder="搜索账单"
               clearable
             >
               <template #prefix>
@@ -111,9 +78,19 @@
               </template>
             </el-input>
           </el-col>
-          <el-col :span="5">
-            <el-button @click="handleSearch">搜索</el-button>
-            <el-button @click="resetFilters">重置</el-button>
+          <el-col :span="12">
+            <div class="filter-actions">
+              <el-button @click="handleSearch">搜索</el-button>
+              <el-button @click="resetFilters">重置</el-button>
+              <el-button @click="$router.push('/expenses/split')">
+                <el-icon><Calculator /></el-icon>
+                分摊计算
+              </el-button>
+              <el-button type="primary" @click="handleAddExpenseClick">
+                <el-icon><Plus /></el-icon>
+                添加账单
+              </el-button>
+            </div>
           </el-col>
         </el-row>
       </el-card>
@@ -132,29 +109,39 @@
       </el-card>
 
       <!-- 账单列表 -->
-      <el-card v-loading="loading" v-if="accountBooks.length > 0">
-        <el-empty v-if="!loading && expenses.length === 0" description="暂无账单数据">
+      <el-card v-loading="loading">
+        <!-- 未选择账本提示 -->
+        <el-empty v-if="!selectedBookId && accountBooks.length > 0" description="请先选择账本">
+          <template #description>
+            <p>请在上方选择一个行程账本来查看和管理账单</p>
+          </template>
+        </el-empty>
+        
+        <!-- 无账单数据 -->
+        <el-empty v-else-if="selectedBookId && !loading && expenses.length === 0" description="暂无账单数据">
           <el-button type="primary" @click="showAddExpenseDialog = true">
             添加第一笔账单
           </el-button>
         </el-empty>
-        <el-table :data="expenses" style="width: 100%" v-else>
-          <el-table-column prop="title" label="账单标题" min-width="150">
+        
+        <!-- 账单表格 -->
+        <el-table :data="expenses" style="width: 100%" v-else-if="selectedBookId && expenses.length > 0">
+          <el-table-column prop="title" label="账单描述" width="200">
             <template #default="{ row }">
               <div class="expense-title">
-                <span>{{ row.title }}</span>
+                <span class="title-text">{{ row.title }}</span>
                 <el-tag v-if="row.receipt" size="small" type="success">有票据</el-tag>
               </div>
             </template>
           </el-table-column>
           
-          <el-table-column prop="amount" label="金额" width="120" align="right">
+          <el-table-column prop="amount" label="金额" width="200" align="">
             <template #default="{ row }">
               <span class="expense-amount">¥{{ row.amount }}</span>
             </template>
           </el-table-column>
           
-          <el-table-column prop="category" label="类别" width="100">
+          <el-table-column prop="category" label="类别" width="200" align="">
             <template #default="{ row }">
               <el-tag size="small" :type="getCategoryColor(row.category)">
                 {{ getCategoryText(row.category) }}
@@ -162,29 +149,9 @@
             </template>
           </el-table-column>
           
-          <el-table-column prop="paidBy" label="付款人" width="120">
+          <el-table-column prop="paidBy" label="付款人" width="200" align="left">
             <template #default="{ row }">
-              <div class="payer-info">
-                <el-avatar size="small">{{ getUserName(row.paidBy).charAt(0) }}</el-avatar>
-                <span>{{ getUserName(row.paidBy) }}</span>
-              </div>
-            </template>
-          </el-table-column>
-          
-          <el-table-column prop="participants" label="参与人" width="150">
-            <template #default="{ row }">
-              <el-avatar-group :max="3" size="small">
-                <el-avatar v-for="userId in row.participants" :key="userId">
-                  {{ getUserName(userId).charAt(0) }}
-                </el-avatar>
-              </el-avatar-group>
-              <span class="participant-count">{{ row.participants.length }}人</span>
-            </template>
-          </el-table-column>
-          
-          <el-table-column prop="splitType" label="分摊方式" width="100">
-            <template #default="{ row }">
-              <span>{{ getSplitTypeText(row.splitType) }}</span>
+              <span>{{ getUserName(row.paidBy) }}</span>
             </template>
           </el-table-column>
           
@@ -194,42 +161,22 @@
             </template>
           </el-table-column>
           
-          <el-table-column prop="settled" label="状态" width="100">
+          <el-table-column label="操作" width="220" fixed="right" align="center">
             <template #default="{ row }">
-              <el-tag :type="isSettled(row) ? 'success' : 'warning'" size="small">
-                {{ isSettled(row) ? '已结算' : '待结算' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          
-          <el-table-column label="操作" width="150" fixed="right">
-            <template #default="{ row }">
-              <el-button text @click="viewExpense(row)">
-                <el-icon><View /></el-icon>
-                查看
-              </el-button>
-              <el-button text @click="editExpense(row)">
-                <el-icon><Edit /></el-icon>
-                编辑
-              </el-button>
-              <el-dropdown>
-                <el-button text>
-                  <el-icon><More /></el-icon>
+              <div class="action-buttons">
+                <el-button text @click="viewExpense(row)" size="small">
+                  <el-icon><View /></el-icon>
+                  查看
                 </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item @click="settleExpense(row)">
-                      结算账单
-                    </el-dropdown-item>
-                    <el-dropdown-item @click="duplicateExpense(row)">
-                      复制账单
-                    </el-dropdown-item>
-                    <el-dropdown-item @click="deleteExpense(row)" divided>
-                      删除账单
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+                <el-button text @click="editExpense(row)" size="small">
+                  <el-icon><Edit /></el-icon>
+                  编辑
+                </el-button>
+                <el-button text @click="deleteExpense(row)" type="danger" size="small">
+                  <el-icon><Delete /></el-icon>
+                  删除
+                </el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -257,11 +204,11 @@
         :rules="expenseRules"
         label-width="100px"
       >
-        <el-form-item label="账单标题" prop="title">
+        <el-form-item label="账单描述" prop="title">
           <el-input
             v-model="expenseForm.title"
             placeholder="如：大阪城门票、午餐费用等"
-            maxlength="50"
+            maxlength="20"
             show-word-limit
           />
         </el-form-item>
@@ -299,24 +246,13 @@
           />
         </el-form-item>
         
-        <el-form-item label="付款人" prop="paidBy">
-          <el-select v-model="expenseForm.paidBy" placeholder="选择付款人" style="width: 100%">
-            <el-option
-              v-for="member in currentTripMembers"
-              :key="member.userId"
-              :label="member.username"
-              :value="member.userId"
-            />
-          </el-select>
-        </el-form-item>
-        
         <el-form-item label="账单描述">
           <el-input
             v-model="expenseForm.description"
             type="textarea"
             :rows="3"
             placeholder="详细描述这笔支出"
-            maxlength="200"
+            maxlength="100"
             show-word-limit
           />
         </el-form-item>
@@ -344,6 +280,119 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 查看账单对话框 -->
+    <el-dialog v-model="showViewExpenseDialog" title="查看账单" width="600px">
+      <div v-if="currentExpense" class="expense-detail">
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="账单描述">{{ currentExpense.title }}</el-descriptions-item>
+          <el-descriptions-item label="支出金额">¥{{ currentExpense.amount }}</el-descriptions-item>
+          <el-descriptions-item label="支出类别">
+            <el-tag :type="getCategoryColor(currentExpense.category)">
+              {{ getCategoryText(currentExpense.category) }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="支出日期">{{ currentExpense.date }}</el-descriptions-item>
+          <el-descriptions-item label="付款人">{{ getUserName(currentExpense.paidBy) }}</el-descriptions-item>
+          <el-descriptions-item label="创建时间">{{ currentExpense.createdAt }}</el-descriptions-item>
+          <el-descriptions-item label="票据" :span="2" v-if="currentExpense.receipt">
+            <img :src="currentExpense.receipt" class="receipt-preview" />
+          </el-descriptions-item>
+        </el-descriptions>
+      </div>
+      
+      <template #footer>
+        <el-button @click="showViewExpenseDialog = false">关闭</el-button>
+        <el-button type="primary" @click="showViewExpenseDialog = false; editExpense(currentExpense!)">
+          编辑账单
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 编辑账单对话框 -->
+    <el-dialog v-model="showEditExpenseDialog" title="编辑账单" width="600px" @close="resetEditForm">
+      <el-form
+        ref="editFormRef"
+        :model="editForm"
+        :rules="editRules"
+        label-width="100px"
+      >
+        <el-form-item label="账单描述" prop="title">
+          <el-input
+            v-model="editForm.title"
+            placeholder="如：大阪城门票、午餐费用等"
+            maxlength="50"
+            show-word-limit
+          />
+        </el-form-item>
+        
+        <el-form-item label="支出金额" prop="amount">
+          <el-input-number
+            v-model="editForm.amount"
+            :min="0"
+            :precision="2"
+            placeholder="0.00"
+            style="width: 200px"
+          />
+          <span style="margin-left: 8px;">元</span>
+        </el-form-item>
+        
+        <el-form-item label="支出类别" prop="category">
+          <el-select v-model="editForm.category" placeholder="选择类别" style="width: 100%">
+            <el-option label="交通" value="transport" />
+            <el-option label="住宿" value="accommodation" />
+            <el-option label="餐饮" value="food" />
+            <el-option label="活动" value="activity" />
+            <el-option label="购物" value="shopping" />
+            <el-option label="其他" value="other" />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="支出日期" prop="date">
+          <el-date-picker
+            v-model="editForm.date"
+            type="date"
+            placeholder="选择日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
+        </el-form-item>
+        
+        <el-form-item label="账单描述">
+          <el-input
+            v-model="editForm.description"
+            type="textarea"
+            :rows="3"
+            placeholder="详细描述这笔支出"
+            maxlength="200"
+            show-word-limit
+          />
+        </el-form-item>
+        
+        <el-form-item label="票据上传">
+          <el-upload
+            class="receipt-uploader"
+            :show-file-list="false"
+            :before-upload="beforeEditUpload"
+            :auto-upload="false"
+          >
+            <img v-if="editForm.receipt" :src="editForm.receipt" class="receipt-image" />
+            <div v-else class="upload-placeholder">
+              <el-icon><Plus /></el-icon>
+              <div class="upload-text">上传票据</div>
+            </div>
+          </el-upload>
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="showEditExpenseDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleEditExpense" :loading="editingExpense">
+          保存修改
+        </el-button>
+      </template>
+    </el-dialog>
   </Layout>
 </template>
 
@@ -362,8 +411,6 @@ const router = useRouter()
 
 // 筛选条件
 const filters = ref({
-  category: '',
-  dateRange: [] as string[],
   keyword: ''
 })
 
@@ -380,17 +427,31 @@ const accountBooks = ref<any[]>([])
 const trips = ref<Trip[]>([])
 const expenses = ref<Expense[]>([])
 const selectedBookId = ref<number | null>(null)
+const splitData = ref<any>(null) // 存储分摊计算结果
 
 // 添加账单对话框相关
 const showAddExpenseDialog = ref(false)
+const showViewExpenseDialog = ref(false)
+const showEditExpenseDialog = ref(false)
 const addingExpense = ref(false)
+const editingExpense = ref(false)
+const currentExpense = ref<Expense | null>(null)
 const expenseFormRef = ref<FormInstance>()
+const editFormRef = ref<FormInstance>()
 const expenseForm = ref({
   title: '',
   amount: 0,
   category: '',
   date: '',
   paidBy: '',
+  description: '',
+  receipt: ''
+})
+const editForm = ref({
+  title: '',
+  amount: 0,
+  category: '',
+  date: '',
   description: '',
   receipt: ''
 })
@@ -406,12 +467,8 @@ const loadAccountBooks = async () => {
       accountBooks.value = Array.isArray(res.data) ? res.data : []
       console.log('解析后的账本列表:', accountBooks.value)
       
-      // 如果有账本，默认选择第一个
-      if (accountBooks.value.length > 0 && !selectedBookId.value) {
-        selectedBookId.value = accountBooks.value[0].bookId || accountBooks.value[0].id
-        console.log('默认选择账本ID:', selectedBookId.value)
-        loadExpenses()
-      }
+      // 不再自动选择第一个账本，让用户主动选择
+      console.log('账本加载完成，等待用户选择')
     } else {
       console.log('账本API返回错误:', res.message)
     }
@@ -449,18 +506,26 @@ const loadTrips = async () => {
 
 // 统计数据
 const stats = computed(() => {
-  const expenseRecords = expenses.value.filter(e => e.category !== 'income')
-  const totalAmount = expenseRecords.reduce((sum, expense) => sum + expense.amount, 0)
+  // 总支出：这个账本所有的金额之和
+  const totalAmount = expenses.value.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0)
   const totalCount = expenses.value.length
   
-  // 计算我的支出和待结算金额（基于实际数据）
-  const myAmount = expenseRecords
-    .filter(e => e.paidBy === userStore.user?.userId || e.paidBy === userStore.user?.id)
-    .reduce((sum, expense) => sum + expense.amount, 0)
+  // 我的支出：当前用户在本次旅行中支付的流水
+  const currentUserId = String(userStore.user?.userId || userStore.user?.id || '')
+  const myAmount = expenses.value
+    .filter(e => String(e.paidBy) === currentUserId)
+    .reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0)
   
-  const pendingAmount = expenseRecords
-    .filter(e => !isSettled(e))
-    .reduce((sum, expense) => sum + expense.amount, 0)
+  // 待结算：当前用户应该付给其他用户的金额（从分摊计算结果获取）
+  let pendingAmount = 0
+  if (splitData.value && splitData.value.members) {
+    const currentUserSplit = splitData.value.members.find((member: any) => 
+      String(member.userId) === currentUserId
+    )
+    if (currentUserSplit && currentUserSplit.shouldPay > 0) {
+      pendingAmount = currentUserSplit.shouldPay
+    }
+  }
   
   return { 
     totalAmount, 
@@ -488,41 +553,107 @@ onMounted(async () => {
 
 const loadExpenses = async () => {
   if (!selectedBookId.value) {
+    console.log('没有选择账本，清空账单列表')
     expenses.value = []
+    splitData.value = null
     return
   }
   
   loading.value = true
   try {
+    console.log('开始加载账单，bookId:', selectedBookId.value)
     const res = await expenseApi.getRecords(selectedBookId.value, pagination.value.page, pagination.value.pageSize)
+    console.log('账单API响应:', res)
+    
     if (res.code === 200 && res.data) {
       const data = res.data
-      const items = data.items || data.list || []
+      const items = data.lists || data.items || data.list || []
+      console.log('解析到的账单数据:', items)
+      console.log('账单数据类型:', typeof items, '是否为数组:', Array.isArray(items))
       
-      expenses.value = items.map((record: any) => ({
-        id: String(record.recordId || record.id || ''),
-        tripId: String(record.bookId || ''),
-        title: record.categoryName || record.note || '未命名',
-        amount: Number(record.amount || 0),
-        currency: 'CNY',
-        category: record.type === 1 ? 'income' : (record.type === 2 ? 'expense' : 'other'),
-        description: record.note || '',
-        paidBy: record.user?.userId ? String(record.user.userId) : '',
-        participants: [],
-        splitType: 'equal',
-        splits: [],
-        receipt: record.receipt || '',
-        date: record.recordTime ? dayjs(record.recordTime).format('YYYY-MM-DD') : '',
-        createdAt: record.recordTime ? dayjs(record.recordTime).format('YYYY-MM-DD') : ''
-      }))
+      if (!Array.isArray(items)) {
+        console.error('账单数据不是数组格式:', items)
+        console.error('完整的data对象:', data)
+        expenses.value = []
+        splitData.value = null
+        return
+      }
       
+      expenses.value = items.map((record: any): Expense => {
+        console.log('处理账单记录:', record)
+        const mappedRecord: Expense = {
+          id: String(record.recordId || record.id || ''),
+          tripId: String(selectedBookId.value || ''),
+          title: String(record.note || record.categoryName || '未命名'),
+          amount: Number(record.amount || 0),
+          currency: 'CNY',
+          category: getCategoryFromType(record.type, record.categoryName),
+          description: String(record.note || ''),
+          paidBy: String(record.user?.userId || ''),
+          participants: [String(record.user?.userId || '')],
+          splitType: 'equal',
+          splits: [],
+          receipt: String(record.receipt || ''),
+          date: record.recordTime ? dayjs(record.recordTime).format('YYYY-MM-DD') : '',
+          createdAt: record.recordTime ? dayjs(record.recordTime).format('YYYY-MM-DD') : ''
+        }
+        // 添加额外的用户名信息（不在Expense类型中，但用于显示）
+        ;(mappedRecord as any).paidByName = record.user?.nickname || '未知用户'
+        console.log('转换后的记录:', mappedRecord)
+        return mappedRecord
+      })
+      
+      console.log('转换后的账单数据:', expenses.value)
+      console.log('账单数据长度:', expenses.value.length)
       pagination.value.total = data.total || items.length
+      
+      // 加载分摊计算数据
+      await loadSplitData()
+      
+      if (expenses.value.length === 0) {
+        console.log('账单列表为空')
+      } else {
+        console.log(`成功加载 ${expenses.value.length} 条账单`)
+        // 输出第一条记录的详细信息用于调试
+        if (expenses.value.length > 0) {
+          console.log('第一条账单详情:', expenses.value[0])
+        }
+      }
+    } else {
+      console.log('账单API返回错误:', res.message)
+      expenses.value = []
+      splitData.value = null
+      ElMessage.error(res.message || '加载账单失败')
     }
   } catch (error: any) {
     console.error('加载账单列表失败:', error)
+    expenses.value = []
+    splitData.value = null
     ElMessage.error(error.message || '加载账单列表失败')
   } finally {
     loading.value = false
+  }
+}
+
+// 加载分摊计算数据
+const loadSplitData = async () => {
+  if (!selectedBookId.value) return
+  
+  try {
+    console.log('开始加载分摊计算数据，bookId:', selectedBookId.value)
+    const res = await expenseApi.splitAmount(selectedBookId.value)
+    console.log('分摊计算API响应:', res)
+    
+    if (res.code === 200 && res.data) {
+      splitData.value = res.data
+      console.log('分摊计算数据:', splitData.value)
+    } else {
+      console.log('分摊计算API返回错误:', res.message)
+      splitData.value = null
+    }
+  } catch (error: any) {
+    console.error('加载分摊计算数据失败:', error)
+    splitData.value = null
   }
 }
 
@@ -533,8 +664,6 @@ const handleSearch = () => {
 
 const resetFilters = () => {
   filters.value = {
-    category: '',
-    dateRange: [],
     keyword: ''
   }
   loadExpenses()
@@ -558,6 +687,15 @@ const handleBookChange = (bookId: number) => {
   loadExpenses()
 }
 
+// 处理添加账单按钮点击
+const handleAddExpenseClick = () => {
+  if (!selectedBookId.value) {
+    ElMessage.warning('请先选择一个账本')
+    return
+  }
+  showAddExpenseDialog.value = true
+}
+
 // 获取行程名称
 const getTripName = (tripId: number) => {
   const trip = trips.value.find(t => Number(t.id) === tripId)
@@ -569,18 +707,11 @@ const currentBook = computed(() => {
   return accountBooks.value.find(book => (book.bookId || book.id) === selectedBookId.value)
 })
 
-// 当前行程的成员列表
-const currentTripMembers = computed(() => {
-  if (!currentBook.value) return []
-  const trip = trips.value.find(t => Number(t.id) === currentBook.value.tripId)
-  return trip?.members || []
-})
-
 // 添加账单表单验证规则
 const expenseRules: FormRules = {
   title: [
-    { required: true, message: '请输入账单标题', trigger: 'blur' },
-    { min: 2, max: 50, message: '标题长度在 2 到 50 个字符', trigger: 'blur' }
+    { required: true, message: '请输入账单描述', trigger: 'blur' },
+    { min: 2, max: 50, message: '标题描述在 2 到 50 个字符', trigger: 'blur' }
   ],
   amount: [
     { required: true, message: '请输入支出金额', trigger: 'blur' },
@@ -591,15 +722,28 @@ const expenseRules: FormRules = {
   ],
   date: [
     { required: true, message: '请选择支出日期', trigger: 'change' }
-  ],
-  paidBy: [
-    { required: true, message: '请选择付款人', trigger: 'change' }
   ]
 }
+
+// 编辑账单表单验证规则（与添加相同）
+const editRules: FormRules = expenseRules
 
 // 工具函数
 const formatDate = (date: string) => {
   return dayjs(date).format('MM-DD')
+}
+
+const getCategoryFromType = (_recordType: number, categoryName: string): 'transport' | 'accommodation' | 'food' | 'activity' | 'shopping' | 'other' => {
+  // 根据categoryName映射到前端的category类型
+  const categoryMap: Record<string, 'transport' | 'accommodation' | 'food' | 'activity' | 'shopping' | 'other'> = {
+    '交通': 'transport',
+    '住宿': 'accommodation', 
+    '餐饮': 'food',
+    '活动': 'activity',
+    '购物': 'shopping'
+  }
+  
+  return categoryMap[categoryName] || 'other'
 }
 
 const getCategoryColor = (category: string) => {
@@ -626,50 +770,48 @@ const getCategoryText = (category: string) => {
   return texts[category] || category
 }
 
-const getSplitTypeText = (splitType: string) => {
-  const texts: Record<string, string> = {
-    equal: '平均分摊',
-    custom: '自定义',
-    percentage: '按比例'
+const getUserName = (userId: string | number) => {
+  const userIdStr = String(userId)
+  
+  // 首先尝试从账单数据中获取用户名（最准确）
+  const expense = expenses.value.find(e => String(e.paidBy) === userIdStr)
+  if (expense && (expense as any).paidByName) {
+    return (expense as any).paidByName
   }
-  return texts[splitType] || splitType
-}
-
-const getUserName = (userId: string) => {
+  
   // 从当前账本关联的行程中查找用户名
   if (currentBook.value && currentBook.value.tripId) {
     const selectedTrip = trips.value.find(trip => Number(trip.id) === currentBook.value.tripId)
     if (selectedTrip) {
-      const member = selectedTrip.members.find(m => m.userId === userId)
+      const member = selectedTrip.members.find(m => String(m.userId) === userIdStr)
       if (member) {
-        return member.username
+        return member.username || '未知用户'
       }
     }
   }
   
-  // 如果找不到，返回用户ID或默认名称
-  return userId || '未知用户'
-}
-
-const isSettled = (expense: Expense) => {
-  return expense.splits.every(split => split.settled)
+  // 如果找不到，返回默认名称
+  return '未知用户'
 }
 
 // 事件处理
 const viewExpense = (expense: Expense) => {
-  router.push(`/expenses/${expense.id}`)
+  currentExpense.value = expense
+  showViewExpenseDialog.value = true
 }
 
 const editExpense = (expense: Expense) => {
-  router.push(`/expenses/${expense.id}/edit`)
-}
-
-const settleExpense = (expense: Expense) => {
-  ElMessage.success('账单已结算')
-}
-
-const duplicateExpense = (expense: Expense) => {
-  ElMessage.success('账单已复制')
+  currentExpense.value = expense
+  // 填充编辑表单
+  editForm.value = {
+    title: expense.title,
+    amount: expense.amount,
+    category: expense.category,
+    date: expense.date,
+    description: expense.description || '',
+    receipt: expense.receipt || ''
+  }
+  showEditExpenseDialog.value = true
 }
 
 const deleteExpense = async (expense: Expense) => {
@@ -681,7 +823,6 @@ const deleteExpense = async (expense: Expense) => {
     const res = await expenseApi.deleteRecord(Number(expense.id))
     if (res.code === 200) {
       ElMessage.success('账单已删除')
-      // 重新加载账单列表
       loadExpenses()
     } else {
       ElMessage.error(res.message || '删除失败')
@@ -707,6 +848,22 @@ const resetExpenseForm = () => {
   }
   if (expenseFormRef.value) {
     expenseFormRef.value.clearValidate()
+  }
+}
+
+// 重置编辑账单表单
+const resetEditForm = () => {
+  editForm.value = {
+    title: '',
+    amount: 0,
+    category: '',
+    date: '',
+    description: '',
+    receipt: ''
+  }
+  currentExpense.value = null
+  if (editFormRef.value) {
+    editFormRef.value.clearValidate()
   }
 }
 
@@ -738,6 +895,36 @@ const beforeUpload = async (file: File) => {
   }
   
   return false // 阻止默认上传行为
+}
+
+// 编辑时的票据上传处理
+const beforeEditUpload = async (file: File) => {
+  const isImage = file.type.startsWith('image/')
+  const isLt2M = file.size / 1024 / 1024 < 2
+
+  if (!isImage) {
+    ElMessage.error('只能上传图片文件!')
+    return false
+  }
+  if (!isLt2M) {
+    ElMessage.error('图片大小不能超过 2MB!')
+    return false
+  }
+  
+  try {
+    const res = await imageApi.uploadImage(file, 4, 0)
+    if (res.code === 200 && res.data) {
+      editForm.value.receipt = res.data.url
+      ElMessage.success('票据上传成功')
+    } else {
+      ElMessage.error('上传失败')
+    }
+  } catch (error: any) {
+    console.error('上传失败:', error)
+    ElMessage.error('上传失败，请稍后再试')
+  }
+  
+  return false
 }
 
 // 处理添加账单
@@ -792,6 +979,53 @@ const handleAddExpense = async () => {
     addingExpense.value = false
   }
 }
+
+// 处理编辑账单
+const handleEditExpense = async () => {
+  if (!editFormRef.value || !currentExpense.value) return
+  
+  try {
+    await editFormRef.value.validate()
+    
+    editingExpense.value = true
+    
+    // 构建提交数据
+    const categoryMapping: Record<string, number> = {
+      'transport': 1,
+      'accommodation': 2,
+      'food': 3,
+      'activity': 4,
+      'shopping': 5,
+      'other': 6
+    }
+    
+    const recordData = {
+      bookId: selectedBookId.value,
+      type: 2,
+      amount: editForm.value.amount,
+      categoryId: categoryMapping[editForm.value.category] || 1,
+      categoryName: getCategoryText(editForm.value.category),
+      note: editForm.value.description || editForm.value.title,
+      recordTime: editForm.value.date ? new Date(editForm.value.date) : new Date()
+    }
+    
+    const res = await expenseApi.updateRecord(Number(currentExpense.value.id), recordData)
+    
+    if (res.code === 200) {
+      ElMessage.success('账单更新成功!')
+      showEditExpenseDialog.value = false
+      resetEditForm()
+      loadExpenses()
+    } else {
+      ElMessage.error(res.message || '更新失败')
+    }
+  } catch (error: any) {
+    console.error('更新失败:', error)
+    ElMessage.error(error.message || '更新失败，请稍后再试')
+  } finally {
+    editingExpense.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -836,6 +1070,14 @@ const handleAddExpense = async () => {
   gap: 8px;
 }
 
+.title-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+}
+
 .expense-amount {
   font-weight: bold;
   color: #f56c6c;
@@ -845,12 +1087,6 @@ const handleAddExpense = async () => {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.participant-count {
-  margin-left: 8px;
-  font-size: 12px;
-  color: #999;
 }
 
 .pagination {
@@ -891,5 +1127,28 @@ const handleAddExpense = async () => {
   margin-top: 8px;
   font-size: 14px;
   color: #666;
+}
+
+.expense-detail {
+  margin: 16px 0;
+}
+
+.receipt-preview {
+  max-width: 200px;
+  max-height: 150px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 </style>

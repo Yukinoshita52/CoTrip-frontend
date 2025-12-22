@@ -61,24 +61,6 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '分摊计算器', requiresAuth: true }
   },
   {
-    path: '/expenses/create',
-    name: 'CreateExpense',
-    component: () => import('@/views/expenses/CreateExpense.vue'),
-    meta: { title: '添加账单', requiresAuth: true }
-  },
-  {
-    path: '/expenses/:id',
-    name: 'ExpenseDetail',
-    component: () => import('@/views/expenses/ExpenseDetail.vue'),
-    meta: { title: '账单详情', requiresAuth: true }
-  },
-  {
-    path: '/expenses/:id/edit',
-    name: 'EditExpense',
-    component: () => import('@/views/expenses/EditExpense.vue'),
-    meta: { title: '编辑账单', requiresAuth: true }
-  },
-  {
     path: '/community',
     name: 'Community',
     component: () => import('@/views/community/CommunityList.vue'),

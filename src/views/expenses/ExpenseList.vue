@@ -134,7 +134,7 @@
       <!-- 账单列表 -->
       <el-card v-loading="loading" v-if="accountBooks.length > 0">
         <el-empty v-if="!loading && expenses.length === 0" description="暂无账单数据">
-          <el-button type="primary" @click="$router.push('/expenses/create')">
+          <el-button type="primary" @click="showAddExpenseDialog = true">
             添加第一笔账单
           </el-button>
         </el-empty>
@@ -248,6 +248,102 @@
         </div>
       </el-card>
     </div>
+
+    <!-- 添加账单对话框 -->
+    <el-dialog v-model="showAddExpenseDialog" title="添加账单" width="600px" @close="resetExpenseForm">
+      <el-form
+        ref="expenseFormRef"
+        :model="expenseForm"
+        :rules="expenseRules"
+        label-width="100px"
+      >
+        <el-form-item label="账单标题" prop="title">
+          <el-input
+            v-model="expenseForm.title"
+            placeholder="如：大阪城门票、午餐费用等"
+            maxlength="50"
+            show-word-limit
+          />
+        </el-form-item>
+        
+        <el-form-item label="支出金额" prop="amount">
+          <el-input-number
+            v-model="expenseForm.amount"
+            :min="0"
+            :precision="2"
+            placeholder="0.00"
+            style="width: 200px"
+          />
+          <span style="margin-left: 8px;">元</span>
+        </el-form-item>
+        
+        <el-form-item label="支出类别" prop="category">
+          <el-select v-model="expenseForm.category" placeholder="选择类别" style="width: 100%">
+            <el-option label="交通" value="transport" />
+            <el-option label="住宿" value="accommodation" />
+            <el-option label="餐饮" value="food" />
+            <el-option label="活动" value="activity" />
+            <el-option label="购物" value="shopping" />
+            <el-option label="其他" value="other" />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="支出日期" prop="date">
+          <el-date-picker
+            v-model="expenseForm.date"
+            type="date"
+            placeholder="选择日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
+        </el-form-item>
+        
+        <el-form-item label="付款人" prop="paidBy">
+          <el-select v-model="expenseForm.paidBy" placeholder="选择付款人" style="width: 100%">
+            <el-option
+              v-for="member in currentTripMembers"
+              :key="member.userId"
+              :label="member.username"
+              :value="member.userId"
+            />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="账单描述">
+          <el-input
+            v-model="expenseForm.description"
+            type="textarea"
+            :rows="3"
+            placeholder="详细描述这笔支出"
+            maxlength="200"
+            show-word-limit
+          />
+        </el-form-item>
+        
+        <el-form-item label="票据上传">
+          <el-upload
+            class="receipt-uploader"
+            :show-file-list="false"
+            :before-upload="beforeUpload"
+            :auto-upload="false"
+          >
+            <img v-if="expenseForm.receipt" :src="expenseForm.receipt" class="receipt-image" />
+            <div v-else class="upload-placeholder">
+              <el-icon><Plus /></el-icon>
+              <div class="upload-text">上传票据</div>
+            </div>
+          </el-upload>
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="showAddExpenseDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleAddExpense" :loading="addingExpense">
+          保存账单
+        </el-button>
+      </template>
+    </el-dialog>
   </Layout>
 </template>
 
@@ -255,8 +351,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import Layout from '@/components/Layout.vue'
-import { expenseApi, tripApi } from '@/api'
+import { expenseApi, tripApi, imageApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import type { Expense, Trip } from '@/types'
 import dayjs from 'dayjs'
@@ -283,6 +380,20 @@ const accountBooks = ref<any[]>([])
 const trips = ref<Trip[]>([])
 const expenses = ref<Expense[]>([])
 const selectedBookId = ref<number | null>(null)
+
+// 添加账单对话框相关
+const showAddExpenseDialog = ref(false)
+const addingExpense = ref(false)
+const expenseFormRef = ref<FormInstance>()
+const expenseForm = ref({
+  title: '',
+  amount: 0,
+  category: '',
+  date: '',
+  paidBy: '',
+  description: '',
+  receipt: ''
+})
 
 // 加载账本列表
 const loadAccountBooks = async () => {
@@ -458,6 +569,34 @@ const currentBook = computed(() => {
   return accountBooks.value.find(book => (book.bookId || book.id) === selectedBookId.value)
 })
 
+// 当前行程的成员列表
+const currentTripMembers = computed(() => {
+  if (!currentBook.value) return []
+  const trip = trips.value.find(t => Number(t.id) === currentBook.value.tripId)
+  return trip?.members || []
+})
+
+// 添加账单表单验证规则
+const expenseRules: FormRules = {
+  title: [
+    { required: true, message: '请输入账单标题', trigger: 'blur' },
+    { min: 2, max: 50, message: '标题长度在 2 到 50 个字符', trigger: 'blur' }
+  ],
+  amount: [
+    { required: true, message: '请输入支出金额', trigger: 'blur' },
+    { type: 'number', min: 0.01, message: '金额必须大于0', trigger: 'blur' }
+  ],
+  category: [
+    { required: true, message: '请选择支出类别', trigger: 'change' }
+  ],
+  date: [
+    { required: true, message: '请选择支出日期', trigger: 'change' }
+  ],
+  paidBy: [
+    { required: true, message: '请选择付款人', trigger: 'change' }
+  ]
+}
+
 // 工具函数
 const formatDate = (date: string) => {
   return dayjs(date).format('MM-DD')
@@ -554,6 +693,105 @@ const deleteExpense = async (expense: Expense) => {
     }
   }
 }
+
+// 重置添加账单表单
+const resetExpenseForm = () => {
+  expenseForm.value = {
+    title: '',
+    amount: 0,
+    category: '',
+    date: '',
+    paidBy: '',
+    description: '',
+    receipt: ''
+  }
+  if (expenseFormRef.value) {
+    expenseFormRef.value.clearValidate()
+  }
+}
+
+// 票据上传处理
+const beforeUpload = async (file: File) => {
+  const isImage = file.type.startsWith('image/')
+  const isLt2M = file.size / 1024 / 1024 < 2
+
+  if (!isImage) {
+    ElMessage.error('只能上传图片文件!')
+    return false
+  }
+  if (!isLt2M) {
+    ElMessage.error('图片大小不能超过 2MB!')
+    return false
+  }
+  
+  try {
+    const res = await imageApi.uploadImage(file, 4, 0) // itemType=4表示其他类型
+    if (res.code === 200 && res.data) {
+      expenseForm.value.receipt = res.data.url
+      ElMessage.success('票据上传成功')
+    } else {
+      ElMessage.error('上传失败')
+    }
+  } catch (error: any) {
+    console.error('上传失败:', error)
+    ElMessage.error('上传失败，请稍后再试')
+  }
+  
+  return false // 阻止默认上传行为
+}
+
+// 处理添加账单
+const handleAddExpense = async () => {
+  if (!expenseFormRef.value) return
+  
+  try {
+    await expenseFormRef.value.validate()
+    
+    if (!selectedBookId.value) {
+      ElMessage.error('请先选择账本')
+      return
+    }
+    
+    addingExpense.value = true
+    
+    // 构建提交数据（匹配后端RecordDTO格式）
+    const categoryMapping: Record<string, number> = {
+      'transport': 1,
+      'accommodation': 2,
+      'food': 3,
+      'activity': 4,
+      'shopping': 5,
+      'other': 6
+    }
+    
+    const recordData = {
+      bookId: selectedBookId.value,
+      type: 2, // 2表示支出，1表示收入
+      amount: expenseForm.value.amount,
+      categoryId: categoryMapping[expenseForm.value.category] || 1,
+      categoryName: expenseForm.value.category || '',
+      note: expenseForm.value.description || expenseForm.value.title,
+      recordTime: expenseForm.value.date ? new Date(expenseForm.value.date) : new Date()
+    }
+    
+    const res = await expenseApi.createRecord(recordData)
+    
+    if (res.code === 200) {
+      ElMessage.success('账单添加成功!')
+      showAddExpenseDialog.value = false
+      resetExpenseForm()
+      // 重新加载账单列表
+      loadExpenses()
+    } else {
+      ElMessage.error(res.message || '添加失败')
+    }
+  } catch (error: any) {
+    console.error('保存失败:', error)
+    ElMessage.error(error.message || '保存失败，请稍后再试')
+  } finally {
+    addingExpense.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -619,5 +857,39 @@ const deleteExpense = async (expense: Expense) => {
   display: flex;
   justify-content: center;
   margin-top: 24px;
+}
+
+.receipt-uploader {
+  display: inline-block;
+}
+
+.receipt-image {
+  width: 150px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.upload-placeholder {
+  width: 150px;
+  height: 100px;
+  border: 2px dashed #dcdfe6;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.upload-placeholder:hover {
+  border-color: #409eff;
+}
+
+.upload-text {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #666;
 }
 </style>

@@ -26,12 +26,12 @@
         </el-col>
         <el-col :span="6">
           <el-card class="stat-card">
-            <el-statistic title="待结算" :value="stats.pendingAmount" prefix="¥" />
+            <el-statistic title="总账单数" :value="stats.totalCount" suffix="笔" />
           </el-card>
         </el-col>
         <el-col :span="6">
           <el-card class="stat-card">
-            <el-statistic title="账单数量" :value="stats.totalCount" suffix="笔" />
+            <el-statistic title="我的账单数" :value="stats.myCount" suffix="笔" />
           </el-card>
         </el-col>
       </el-row>
@@ -82,7 +82,7 @@
             <div class="filter-actions">
               <el-button @click="handleSearch">搜索</el-button>
               <el-button @click="resetFilters">重置</el-button>
-              <el-button @click="$router.push('/expenses/split')">
+              <el-button @click="handleSplitCalculation">
                 <el-icon><Calculator /></el-icon>
                 分摊计算
               </el-button>
@@ -126,12 +126,11 @@
         
         <!-- 账单表格 -->
         <el-table :data="expenses" style="width: 100%" v-else-if="selectedBookId && expenses.length > 0">
-          <el-table-column prop="title" label="账单描述" width="200">
+          <el-table-column prop="category" label="类别" width="200" align="">
             <template #default="{ row }">
-              <div class="expense-title">
-                <span class="title-text">{{ row.title }}</span>
-                <el-tag v-if="row.receipt" size="small" type="success">有票据</el-tag>
-              </div>
+              <el-tag size="small" :type="getCategoryColor(row.category)">
+                {{ getCategoryText(row.category) }}
+              </el-tag>
             </template>
           </el-table-column>
           
@@ -141,17 +140,22 @@
             </template>
           </el-table-column>
           
-          <el-table-column prop="category" label="类别" width="200" align="">
-            <template #default="{ row }">
-              <el-tag size="small" :type="getCategoryColor(row.category)">
-                {{ getCategoryText(row.category) }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          
           <el-table-column prop="paidBy" label="付款人" width="200" align="left">
             <template #default="{ row }">
               <span>{{ getUserName(row.paidBy) }}</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="title" label="账单描述" width="200">
+            <template #default="{ row }">
+              <div class="expense-title" v-if="row.title && row.title.trim()">
+                <span class="title-text">{{ row.title }}</span>
+                <el-tag v-if="row.receipt" size="small" type="success">有票据</el-tag>
+              </div>
+              <div class="expense-title" v-else-if="row.receipt">
+                <el-tag size="small" type="success">有票据</el-tag>
+              </div>
+              <span v-else class="no-description">-</span>
             </template>
           </el-table-column>
           
@@ -161,21 +165,24 @@
             </template>
           </el-table-column>
           
-          <el-table-column label="操作" width="220" fixed="right" align="center">
+          <el-table-column label="操作" width="200" fixed="right" align="center">
             <template #default="{ row }">
               <div class="action-buttons">
                 <el-button text @click="viewExpense(row)" size="small">
                   <el-icon><View /></el-icon>
                   查看
                 </el-button>
-                <el-button text @click="editExpense(row)" size="small">
-                  <el-icon><Edit /></el-icon>
-                  编辑
-                </el-button>
-                <el-button text @click="deleteExpense(row)" type="danger" size="small">
-                  <el-icon><Delete /></el-icon>
-                  删除
-                </el-button>
+                <template v-if="isCurrentUserExpense(row)">
+                  <el-button text @click="editExpense(row)" size="small">
+                    <el-icon><Edit /></el-icon>
+                    编辑
+                  </el-button>
+                  <el-button text @click="deleteExpense(row)" type="danger" size="small">
+                    <el-icon><Delete /></el-icon>
+                    删除
+                  </el-button>
+                </template>
+                
               </div>
             </template>
           </el-table-column>
@@ -204,15 +211,6 @@
         :rules="expenseRules"
         label-width="100px"
       >
-        <el-form-item label="账单描述" prop="title">
-          <el-input
-            v-model="expenseForm.title"
-            placeholder="如：大阪城门票、午餐费用等"
-            maxlength="20"
-            show-word-limit
-          />
-        </el-form-item>
-        
         <el-form-item label="支出金额" prop="amount">
           <el-input-number
             v-model="expenseForm.amount"
@@ -285,7 +283,7 @@
     <el-dialog v-model="showViewExpenseDialog" title="查看账单" width="600px">
       <div v-if="currentExpense" class="expense-detail">
         <el-descriptions :column="2" border>
-          <el-descriptions-item label="账单描述">{{ currentExpense.title }}</el-descriptions-item>
+          <el-descriptions-item label="账单描述" v-if="currentExpense.title && currentExpense.title.trim()">{{ currentExpense.title }}</el-descriptions-item>
           <el-descriptions-item label="支出金额">¥{{ currentExpense.amount }}</el-descriptions-item>
           <el-descriptions-item label="支出类别">
             <el-tag :type="getCategoryColor(currentExpense.category)">
@@ -303,9 +301,6 @@
       
       <template #footer>
         <el-button @click="showViewExpenseDialog = false">关闭</el-button>
-        <el-button type="primary" @click="showViewExpenseDialog = false; editExpense(currentExpense!)">
-          编辑账单
-        </el-button>
       </template>
     </el-dialog>
 
@@ -317,15 +312,6 @@
         :rules="editRules"
         label-width="100px"
       >
-        <el-form-item label="账单描述" prop="title">
-          <el-input
-            v-model="editForm.title"
-            placeholder="如：大阪城门票、午餐费用等"
-            maxlength="50"
-            show-word-limit
-          />
-        </el-form-item>
-        
         <el-form-item label="支出金额" prop="amount">
           <el-input-number
             v-model="editForm.amount"
@@ -393,21 +379,85 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 分摊计算对话框 -->
+    <el-dialog v-model="showSplitDialog" title="分摊计算" width="600px">
+      <div v-if="splitResults.length === 0" class="no-split-data">
+        <el-empty description="暂无分摊数据">
+          <template #description>
+            <p>请先添加一些账单记录</p>
+          </template>
+        </el-empty>
+      </div>
+      
+      <div v-else class="split-results">
+        <h4 style="margin-bottom: 16px; color: #333;">成员分摊详细</h4>
+        
+        <div class="split-summary" style="margin-bottom: 20px; padding: 16px; background: #f5f7fa; border-radius: 8px;">
+          <div class="summary-item">
+            <span class="label">行程总支出：</span>
+            <span class="value">¥{{ stats.totalAmount.toFixed(2) }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">我的支出：</span>
+            <span class="value">¥{{ stats.myAmount.toFixed(2) }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">成员总人数：</span>
+            <span class="value">{{ splitData?.totalMembers || 0 }}人</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">人均花费：</span>
+            <span class="value">¥{{ (splitData?.totalMembers || 0) > 0 ? (stats.totalAmount / (splitData?.totalMembers || 1)).toFixed(2) : '0.00' }}</span>
+          </div>
+        </div>
+        
+        <div class="split-list">
+          <div 
+            v-for="result in splitResults" 
+            :key="result.userId"
+            class="split-item"
+            :class="{
+              'split-pay': result.type === 'pay',
+              'split-receive': result.type === 'receive',
+              'split-none': result.type === 'none'
+            }"
+          >
+            <div class="split-icon">
+              <el-icon v-if="result.type === 'pay'" color="#f56c6c"><ArrowRight /></el-icon>
+              <el-icon v-else-if="result.type === 'receive'" color="#67c23a"><ArrowLeft /></el-icon>
+              <el-icon v-else color="#909399"><Minus /></el-icon>
+            </div>
+            <div class="split-content">
+              <div class="split-description">{{ result.description }}</div>
+              <div v-if="result.amount > 0" class="split-amount" :class="{
+                'amount-pay': result.type === 'pay',
+                'amount-receive': result.type === 'receive'
+              }">
+                ¥{{ result.amount.toFixed(2) }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <template #footer>
+        <el-button @click="showSplitDialog = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </Layout>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowRight, ArrowLeft, Minus } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import { expenseApi, tripApi, imageApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import type { Expense, Trip } from '@/types'
 import dayjs from 'dayjs'
-
-const router = useRouter()
 
 // 筛选条件
 const filters = ref({
@@ -428,11 +478,13 @@ const trips = ref<Trip[]>([])
 const expenses = ref<Expense[]>([])
 const selectedBookId = ref<number | null>(null)
 const splitData = ref<any>(null) // 存储分摊计算结果
+const myExpenseStats = ref<any>(null) // 存储我的支出统计
 
 // 添加账单对话框相关
 const showAddExpenseDialog = ref(false)
 const showViewExpenseDialog = ref(false)
 const showEditExpenseDialog = ref(false)
+const showSplitDialog = ref(false) // 分摊计算对话框
 const addingExpense = ref(false)
 const editingExpense = ref(false)
 const currentExpense = ref<Expense | null>(null)
@@ -510,28 +562,15 @@ const stats = computed(() => {
   const totalAmount = expenses.value.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0)
   const totalCount = expenses.value.length
   
-  // 我的支出：当前用户在本次旅行中支付的流水
-  const currentUserId = String(userStore.user?.userId || userStore.user?.id || '')
-  const myAmount = expenses.value
-    .filter(e => String(e.paidBy) === currentUserId)
-    .reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0)
-  
-  // 待结算：当前用户应该付给其他用户的金额（从分摊计算结果获取）
-  let pendingAmount = 0
-  if (splitData.value && splitData.value.members) {
-    const currentUserSplit = splitData.value.members.find((member: any) => 
-      String(member.userId) === currentUserId
-    )
-    if (currentUserSplit && currentUserSplit.shouldPay > 0) {
-      pendingAmount = currentUserSplit.shouldPay
-    }
-  }
+  // 我的支出和我的账单数：从API获取的准确数据
+  const myAmount = myExpenseStats.value?.myExpenseAmount || 0
+  const myCount = myExpenseStats.value?.myExpenseCount || 0
   
   return { 
     totalAmount, 
     myAmount,
-    pendingAmount,
-    totalCount 
+    totalCount,
+    myCount
   }
 })
 
@@ -556,6 +595,7 @@ const loadExpenses = async () => {
     console.log('没有选择账本，清空账单列表')
     expenses.value = []
     splitData.value = null
+    myExpenseStats.value = null
     return
   }
   
@@ -576,6 +616,7 @@ const loadExpenses = async () => {
         console.error('完整的data对象:', data)
         expenses.value = []
         splitData.value = null
+        myExpenseStats.value = null
         return
       }
       
@@ -584,11 +625,11 @@ const loadExpenses = async () => {
         const mappedRecord: Expense = {
           id: String(record.recordId || record.id || ''),
           tripId: String(selectedBookId.value || ''),
-          title: String(record.note || record.categoryName || '未命名'),
+          title: String(record.note || ''), // 保持title字段用于显示
           amount: Number(record.amount || 0),
           currency: 'CNY',
           category: getCategoryFromType(record.type, record.categoryName),
-          description: String(record.note || ''),
+          description: String(record.note || ''), // description也映射到note
           paidBy: String(record.user?.userId || ''),
           participants: [String(record.user?.userId || '')],
           splitType: 'equal',
@@ -607,8 +648,11 @@ const loadExpenses = async () => {
       console.log('账单数据长度:', expenses.value.length)
       pagination.value.total = data.total || items.length
       
-      // 加载分摊计算数据
-      await loadSplitData()
+      // 加载分摊计算数据和我的支出统计
+      await Promise.all([
+        loadSplitData(),
+        loadMyExpenseStats()
+      ])
       
       if (expenses.value.length === 0) {
         console.log('账单列表为空')
@@ -623,12 +667,14 @@ const loadExpenses = async () => {
       console.log('账单API返回错误:', res.message)
       expenses.value = []
       splitData.value = null
+      myExpenseStats.value = null
       ElMessage.error(res.message || '加载账单失败')
     }
   } catch (error: any) {
     console.error('加载账单列表失败:', error)
     expenses.value = []
     splitData.value = null
+    myExpenseStats.value = null
     ElMessage.error(error.message || '加载账单列表失败')
   } finally {
     loading.value = false
@@ -654,6 +700,28 @@ const loadSplitData = async () => {
   } catch (error: any) {
     console.error('加载分摊计算数据失败:', error)
     splitData.value = null
+  }
+}
+
+// 加载我的支出统计数据
+const loadMyExpenseStats = async () => {
+  if (!selectedBookId.value) return
+  
+  try {
+    console.log('开始加载我的支出统计，bookId:', selectedBookId.value)
+    const res = await expenseApi.getMyExpenseStats(selectedBookId.value)
+    console.log('我的支出统计API响应:', res)
+    
+    if (res.code === 200 && res.data) {
+      myExpenseStats.value = res.data
+      console.log('我的支出统计数据:', myExpenseStats.value)
+    } else {
+      console.log('我的支出统计API返回错误:', res.message)
+      myExpenseStats.value = null
+    }
+  } catch (error: any) {
+    console.error('加载我的支出统计失败:', error)
+    myExpenseStats.value = null
   }
 }
 
@@ -696,6 +764,66 @@ const handleAddExpenseClick = () => {
   showAddExpenseDialog.value = true
 }
 
+// 处理分摊计算按钮点击
+const handleSplitCalculation = () => {
+  if (!selectedBookId.value) {
+    ElMessage.warning('请先选择一个账本')
+    return
+  }
+  showSplitDialog.value = true
+}
+
+// 分摊计算结果
+const splitResults = computed(() => {
+  if (!splitData.value || !splitData.value.members) {
+    return []
+  }
+  
+  const results: Array<{
+    userId: string
+    nickname: string
+    amount: number
+    type: 'pay' | 'receive' | 'none' // 我应支付 | 我应被支付 | 无需支付
+    description: string
+  }> = []
+  
+  for (const member of splitData.value.members) {
+    const memberUserId = String(member.userId)
+    const amount = Number(member.shouldPay || 0)
+    
+    if (Math.abs(amount) < 0.01) {
+      // 金额小于0.01元，视为无需支付
+      results.push({
+        userId: memberUserId,
+        nickname: member.nickname,
+        amount: 0,
+        type: 'none',
+        description: `我和${member.nickname}互相不用支付`
+      })
+    } else if (amount > 0) {
+      // 正数表示该成员应该付给当前用户
+      results.push({
+        userId: memberUserId,
+        nickname: member.nickname,
+        amount: Math.abs(amount),
+        type: 'receive',
+        description: `${member.nickname}应支付我${Math.abs(amount).toFixed(2)}元`
+      })
+    } else {
+      // 负数表示当前用户应该付给该成员
+      results.push({
+        userId: memberUserId,
+        nickname: member.nickname,
+        amount: Math.abs(amount),
+        type: 'pay',
+        description: `我应支付${member.nickname}${Math.abs(amount).toFixed(2)}元`
+      })
+    }
+  }
+  
+  return results
+})
+
 // 获取行程名称
 const getTripName = (tripId: number) => {
   const trip = trips.value.find(t => Number(t.id) === tripId)
@@ -709,10 +837,6 @@ const currentBook = computed(() => {
 
 // 添加账单表单验证规则
 const expenseRules: FormRules = {
-  title: [
-    { required: true, message: '请输入账单描述', trigger: 'blur' },
-    { min: 2, max: 50, message: '标题描述在 2 到 50 个字符', trigger: 'blur' }
-  ],
   amount: [
     { required: true, message: '请输入支出金额', trigger: 'blur' },
     { type: 'number', min: 0.01, message: '金额必须大于0', trigger: 'blur' }
@@ -794,6 +918,13 @@ const getUserName = (userId: string | number) => {
   return '未知用户'
 }
 
+// 判断是否是当前用户的账单
+const isCurrentUserExpense = (expense: Expense) => {
+  const currentUserId = String(userStore.user?.userId || userStore.user?.id || '')
+  const expensePaidBy = String(expense.paidBy || '')
+  return currentUserId === expensePaidBy
+}
+
 // 事件处理
 const viewExpense = (expense: Expense) => {
   currentExpense.value = expense
@@ -804,7 +935,7 @@ const editExpense = (expense: Expense) => {
   currentExpense.value = expense
   // 填充编辑表单
   editForm.value = {
-    title: expense.title,
+    title: '', // 不再使用title字段
     amount: expense.amount,
     category: expense.category,
     date: expense.date,
@@ -953,11 +1084,11 @@ const handleAddExpense = async () => {
     
     const recordData = {
       bookId: selectedBookId.value,
-      type: 2, // 2表示支出，1表示收入
+      type: 1, // 1表示支出，2表示收入
       amount: expenseForm.value.amount,
       categoryId: categoryMapping[expenseForm.value.category] || 1,
-      categoryName: expenseForm.value.category || '',
-      note: expenseForm.value.description || expenseForm.value.title,
+      categoryName: getCategoryText(expenseForm.value.category),
+      note: expenseForm.value.description?.trim() || '',
       recordTime: expenseForm.value.date ? new Date(expenseForm.value.date) : new Date()
     }
     
@@ -1001,11 +1132,11 @@ const handleEditExpense = async () => {
     
     const recordData = {
       bookId: selectedBookId.value,
-      type: 2,
+      type: 1, // 1表示支出，2表示收入
       amount: editForm.value.amount,
       categoryId: categoryMapping[editForm.value.category] || 1,
       categoryName: getCategoryText(editForm.value.category),
-      note: editForm.value.description || editForm.value.title,
+      note: editForm.value.description?.trim() || '',
       recordTime: editForm.value.date ? new Date(editForm.value.date) : new Date()
     }
     
@@ -1144,11 +1275,109 @@ const handleEditExpense = async () => {
   display: flex;
   gap: 4px;
   align-items: center;
+  justify-content: center;
 }
 
 .filter-actions {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+}
+
+.no-split-data {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.split-results {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.split-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.summary-item .label {
+  color: #666;
+  font-size: 14px;
+}
+
+.summary-item .value {
+  font-weight: bold;
+  color: #333;
+}
+
+.split-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.split-item {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+  transition: all 0.3s;
+}
+
+.split-item.split-pay {
+  background: #fef0f0;
+  border-color: #fbc4c4;
+}
+
+.split-item.split-receive {
+  background: #f0f9ff;
+  border-color: #b3d8ff;
+}
+
+.split-item.split-none {
+  background: #f5f7fa;
+  border-color: #dcdfe6;
+}
+
+.split-icon {
+  margin-right: 12px;
+  font-size: 18px;
+}
+
+.split-content {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.split-description {
+  font-size: 14px;
+  color: #333;
+}
+
+.split-amount {
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.amount-pay {
+  color: #f56c6c;
+}
+
+.amount-receive {
+  color: #67c23a;
+}
+
+.no-description {
+  color: #c0c4cc;
+  font-style: italic;
 }
 </style>

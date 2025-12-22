@@ -174,6 +174,11 @@ export const expenseApi = {
     return this.splitAmount(bookId)
   },
 
+  // 获取我的支出统计
+  getMyExpenseStats(bookId: number) {
+    return request.get(`/account/book/${bookId}/my-expense`)
+  },
+
   // 添加分类
   addCategory(name: string, type: number, file?: File) {
     const formData = new FormData()

@@ -9,6 +9,7 @@ export interface ApiResponse<T = any> {
 
 // 用户相关类型
 export interface UserVO {
+  id: number
   username: string
   nickname: string
   avatarUrl: string

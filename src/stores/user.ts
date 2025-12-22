@@ -49,6 +49,8 @@ export const useUserStore = defineStore('user', () => {
         
         // 将后端返回的UserVO转换为前端User类型
         const userData: User = {
+          id: res.data.id,
+          userId: res.data.id, // 兼容性，同时设置userId
           username: res.data.username,
           nickname: res.data.nickname,
           phone: res.data.phone,

@@ -55,12 +55,6 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '账本管理', requiresAuth: true }
   },
   {
-    path: '/expenses/split',
-    name: 'SplitCalculator',
-    component: () => import('@/views/expenses/SplitCalculator.vue'),
-    meta: { title: '分摊计算器', requiresAuth: true }
-  },
-  {
     path: '/community',
     name: 'Community',
     component: () => import('@/views/community/CommunityList.vue'),

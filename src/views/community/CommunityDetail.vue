@@ -230,10 +230,36 @@
                   <el-icon><Delete /></el-icon>
                   删除
                 </el-button>
+                <!-- 回复展开/折叠按钮 -->
+                <el-button 
+                  text 
+                  size="small" 
+                  v-if="comment.children && comment.children.length > 0"
+                  @click="toggleReplies(comment.commentId)"
+                  class="reply-toggle-btn"
+                >
+                  <el-icon>
+                    <ArrowDown v-if="!isRepliesExpanded(comment.commentId)" />
+                    <ArrowUp v-else />
+                  </el-icon>
+                  {{ isRepliesExpanded(comment.commentId) ? '收起' : '展开' }}回复 ({{ comment.children.length }})
+                </el-button>
+              </div>
+              
+              <!-- 折叠状态下的回复预览 -->
+              <div 
+                v-if="comment.children && comment.children.length > 0 && !isRepliesExpanded(comment.commentId)" 
+                class="replies-preview"
+                @click="toggleReplies(comment.commentId)"
+              >
+                <div class="preview-text">
+                  <el-icon><ChatDotRound /></el-icon>
+                  {{ comment.children.length }} 条回复，点击展开查看
+                </div>
               </div>
               
               <!-- 子评论 -->
-              <div v-if="comment.children && comment.children.length > 0" class="replies">
+              <div v-if="comment.children && comment.children.length > 0 && isRepliesExpanded(comment.commentId)" class="replies">
                 <div v-for="reply in comment.children" :key="reply.commentId" class="reply-item">
                   <div class="reply-avatar">
                     <el-avatar :size="32" :src="getAvatarUrl(reply.user)">
@@ -377,6 +403,9 @@ const replyingTo = ref<any>(null)
 const commentForm = ref({
   content: ''
 })
+
+// 回复折叠状态管理
+const expandedReplies = ref<Set<number>>(new Set())
 
 // 图片预览相关状态
 const showImageViewer = ref(false)
@@ -588,6 +617,12 @@ const submitComment = async () => {
     if (res.code === 200) {
       ElMessage.success(replyingTo.value ? '回复成功' : '评论成功')
       showCommentDialog.value = false
+      
+      // 如果是回复，自动展开该评论的回复区域
+      if (replyingTo.value?.commentId) {
+        expandedReplies.value.add(replyingTo.value.commentId)
+      }
+      
       resetCommentForm()
       // 重新加载评论
       await loadComments(Number(route.params.id))
@@ -675,6 +710,19 @@ const getAvatarFallback = (user: any) => {
     return user.username.charAt(0)
   }
   return '?'
+}
+
+// 回复折叠/展开功能
+const toggleReplies = (commentId: number) => {
+  if (expandedReplies.value.has(commentId)) {
+    expandedReplies.value.delete(commentId)
+  } else {
+    expandedReplies.value.add(commentId)
+  }
+}
+
+const isRepliesExpanded = (commentId: number) => {
+  return expandedReplies.value.has(commentId)
 }
 
 // 计算属性
@@ -1191,12 +1239,57 @@ const handleDeletePost = async () => {
 .comment-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.reply-toggle-btn {
+  color: #409eff !important;
+}
+
+.reply-toggle-btn:hover {
+  background-color: #ecf5ff !important;
+}
+
+.replies-preview {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  border-left: 3px solid #409eff;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.replies-preview:hover {
+  background-color: #ecf5ff;
+}
+
+.preview-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #666;
 }
 
 .replies {
   margin-top: 12px;
   padding-left: 16px;
   border-left: 2px solid #f0f0f0;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+  }
+  to {
+    opacity: 1;
+    max-height: 1000px;
+    overflow: visible;
+  }
 }
 
 .reply-item {

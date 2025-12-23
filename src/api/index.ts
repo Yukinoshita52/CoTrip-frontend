@@ -112,6 +112,11 @@ export const tripApi = {
   // 获取行程邀请列表
   getTripInvitations(tripId: number) {
     return request.get(`/trips/${tripId}/invitations`)
+  },
+
+  // 修改成员角色
+  updateMemberRole(tripId: number, data: { userId: number; role: number }) {
+    return request.put(`/trips/${tripId}/members/role`, data)
   }
 }
 

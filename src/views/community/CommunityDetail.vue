@@ -580,7 +580,7 @@ const loadTripDetail = async (tripId: number) => {
       post.value.trip.members = tripData.members?.map((m: any) => ({
         userId: String(m.userId || m.id || ''),
         username: m.username || '',
-        role: m.role === 0 ? 'owner' : 'member',
+        role: m.role === 0 ? 'owner' : m.role === 1 ? 'admin' : 'member',
         joinedAt: m.joinedAt || ''
       })) || []
     }

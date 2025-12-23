@@ -219,7 +219,7 @@ const loadTrips = async () => {
                 userId: String(m.userId || m.id || ''),
                 username: m.nickname || m.username || '',
                 avatar: m.avatarUrl || undefined,
-                role: m.role === 0 ? 'owner' : 'member',
+                role: m.role === 0 ? 'owner' : m.role === 1 ? 'admin' : 'member',
                 joinedAt: m.joinedAt || m.createTime || ''
               }))
             : [],

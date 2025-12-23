@@ -24,7 +24,7 @@
             <p class="trip-description">{{ trip.description }}</p>
           </div>
           <div class="trip-actions">
-            <el-button @click="handleEdit" v-if="isOwner">
+            <el-button @click="handleEdit" v-if="hasEditPermission">
               <el-icon><Edit /></el-icon>
               编辑行程
             </el-button>
@@ -51,7 +51,7 @@
           <div class="itinerary-section">
             <div class="section-header">
               <h3>行程安排</h3>
-              <div class="section-actions" v-if="isOwner">
+              <div class="section-actions" v-if="hasEditPermission">
                 <el-button @click="showAddItinerary = true">
                   <el-icon><Plus /></el-icon>
                   添加安排
@@ -161,7 +161,7 @@
                             预算：¥{{ item.cost }}
                           </div>
                         </div>
-                        <div class="item-actions" v-if="isOwner">
+                        <div class="item-actions" v-if="hasEditPermission">
                           <el-button text @click="editItineraryItem(item)">
                             <el-icon><Edit /></el-icon>
                           </el-button>
@@ -239,7 +239,7 @@
                             预算：¥{{ item.cost }}
                           </div>
                         </div>
-                        <div class="item-actions" v-if="isOwner">
+                        <div class="item-actions" v-if="hasEditPermission">
                           <el-button text @click="editItineraryItem(item)">
                             <el-icon><Edit /></el-icon>
                           </el-button>
@@ -294,7 +294,7 @@
           <div class="members-section">
             <div class="section-header">
               <h3>成员管理</h3>
-              <el-button @click="showInviteMember = true" v-if="isOwner">
+              <el-button @click="showInviteMember = true" v-if="isOwner || getUserRoleInTrip() === 'admin'">
                 <el-icon><UserFilled /></el-icon>
                 邀请成员
               </el-button>
@@ -315,7 +315,7 @@
                     加入时间：{{ formatDate(member.joinedAt) }}
                   </div>
                 </div>
-                <div class="member-actions" v-if="member.role !== 'owner'">
+                <div class="member-actions" v-if="member.role !== 'owner' && (isOwner || getUserRoleInTrip() === 'admin')">
                   <el-dropdown>
                     <el-button text>
                       <el-icon><More /></el-icon>
@@ -767,7 +767,7 @@ const loadTripDetail = async () => {
             userId: String(m.userId || m.id || ''),
             username: m.nickname || m.username || '',
             avatar: m.avatarUrl || undefined,
-            role: m.role === 0 ? 'owner' : 'member',
+            role: m.role === 0 ? 'owner' : m.role === 1 ? 'admin' : 'member',
             joinedAt: m.joinedAt || m.createTime || ''
           })
         })
@@ -985,6 +985,12 @@ const isParticipant = computed(() => {
   return role && role !== 'owner'
 })
 
+// 判断用户是否有编辑权限（创建者或管理员）
+const hasEditPermission = computed(() => {
+  const role = getUserRoleInTrip()
+  return role === 'owner' || role === 'admin'
+})
+
 onMounted(async () => {
   // 获取当前用户信息
   try {
@@ -1111,7 +1117,8 @@ const getItemTypeText = (type: string) => {
 const getRoleText = (role: string) => {
   const texts: Record<string, string> = {
     owner: '创建者',
-    member: '成员'
+    admin: '管理员',
+    member: '参与者'
   }
   return texts[role] || role
 }
@@ -1912,12 +1919,115 @@ const deleteItineraryItem = async (item: any) => {
   }
 }
 
-const changeRole = (_member: TripMember) => {
-  // TODO: 实现更改角色功能
+const changeRole = async (member: TripMember) => {
+  try {
+    const currentRole = member.role
+    const roleOptions = [
+      { label: '参与者', value: 'member', backendValue: 2 },
+      { label: '管理员', value: 'admin', backendValue: 1 }
+    ]
+    
+    // 过滤掉当前角色
+    const availableRoles = roleOptions.filter(opt => opt.value !== currentRole)
+    
+    if (availableRoles.length === 0) {
+      ElMessage.warning('没有可更改的角色')
+      return
+    }
+    
+    // 如果只有一个选项，直接确认
+    if (availableRoles.length === 1) {
+      const selectedRoleOption = availableRoles[0]
+      await ElMessageBox.confirm(
+        `确定将 "${member.username}" 的角色更改为 "${selectedRoleOption.label}" 吗？`,
+        '更改角色',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      )
+      
+      const tripId = Number(route.params.id)
+      const res = await tripApi.updateMemberRole(tripId, {
+        userId: Number(member.userId),
+        role: selectedRoleOption.backendValue
+      })
+      
+      if (res.code === 200) {
+        ElMessage.success('角色已更新')
+        await loadTripDetail()
+      } else {
+        ElMessage.error(res.message || '更新角色失败')
+      }
+      return
+    }
+    
+    // 多个选项时，使用 prompt 让用户输入选项编号
+    const optionsText = availableRoles.map((opt, index) => `${index + 1}. ${opt.label}`).join('\n')
+    const promptMessage = `请选择新角色：\n\n${optionsText}\n\n请输入选项编号（1-${availableRoles.length}）：`
+    
+    const { value } = await ElMessageBox.prompt(
+      promptMessage,
+      '更改角色',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        inputPattern: new RegExp(`^[1-${availableRoles.length}]$`),
+        inputErrorMessage: `请输入 1 到 ${availableRoles.length} 之间的数字`
+      }
+    )
+    
+    if (!value) return
+    
+    const selectedIndex = parseInt(value) - 1
+    if (selectedIndex < 0 || selectedIndex >= availableRoles.length) {
+      ElMessage.error('无效的选项')
+      return
+    }
+    
+    const selectedRoleOption = availableRoles[selectedIndex]
+    
+    const tripId = Number(route.params.id)
+    const res = await tripApi.updateMemberRole(tripId, {
+      userId: Number(member.userId),
+      role: selectedRoleOption.backendValue
+    })
+    
+    if (res.code === 200) {
+      ElMessage.success('角色已更新')
+      await loadTripDetail()
+    } else {
+      ElMessage.error(res.message || '更新角色失败')
+    }
+  } catch (error: any) {
+    if (error !== 'cancel' && error.message !== 'cancel') {
+      console.error('更改角色失败:', error)
+      ElMessage.error(error.message || '更改角色失败，请稍后再试')
+    }
+  }
 }
 
-const removeMember = (_member: TripMember) => {
-  // TODO: 实现移除成员功能
+const removeMember = async (member: TripMember) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要移除成员 "${member.username}" 吗？`,
+      '确认移除',
+      {
+        type: 'warning'
+      }
+    )
+    
+    // 注意：这里需要后端提供移除成员的接口
+    // 目前只能通过退出行程的方式，但那是用户自己操作
+    // 暂时提示功能未实现
+    ElMessage.warning('移除成员功能待实现')
+  } catch (error: any) {
+    if (error !== 'cancel' && error.message !== 'cancel') {
+      console.error('移除成员失败:', error)
+      ElMessage.error(error.message || '移除成员失败，请稍后再试')
+    }
+  }
 }
 
 // 处理编辑行程安排

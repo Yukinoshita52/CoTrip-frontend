@@ -8,7 +8,7 @@
           <p>发现精彩行程，分享旅行体验</p>
         </div>
         <div class="header-right">
-          <el-button type="primary" @click="showShareDialog = true">
+          <el-button type="primary" @click="handleShareButtonClick">
             <el-icon><Share /></el-icon>
             分享我的行程
           </el-button>
@@ -150,6 +150,16 @@
                 :value="trip.id"
               />
             </el-select>
+            <div v-if="myTrips.length === 0" class="no-trips-hint">
+              <el-text type="info" size="small">
+                <span v-if="!isLoggedIn">
+                  请先登录后再分享行程。
+                </span>
+                <span v-else>
+                  暂无可分享的行程。只能分享您创建的且未分享过的行程。
+                </span>
+              </el-text>
+            </div>
           </el-form-item>
           
           <el-form-item label="分享标题">
@@ -169,7 +179,12 @@
       
       <template #footer>
         <el-button @click="showShareDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleShare" :loading="shareLoading">
+        <el-button 
+          type="primary" 
+          @click="handleShare" 
+          :loading="shareLoading"
+          :disabled="!isLoggedIn || myTrips.length === 0"
+        >
           分享行程
         </el-button>
       </template>
@@ -178,10 +193,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import Layout from '@/components/Layout.vue'
-import { communityApi, tripApi } from '@/api'
+import { communityApi, tripApi, userApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 import type { CommunityPost, Trip } from '@/types'
 import { formatAvatarUrl, formatImageUrl } from '@/utils/image'
 import dayjs from 'dayjs'
@@ -210,16 +226,89 @@ const shareForm = reactive({
 
 // 我的行程（用于分享）
 const myTrips = ref<Trip[]>([])
+// 已分享的行程ID列表
+const sharedTripIds = ref<Set<string>>(new Set())
 
-// 加载我的行程（只显示当前用户创建的行程）
+// 加载已分享的行程ID列表
+const loadSharedTripIds = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      console.warn('用户未登录，跳过加载已分享行程ID')
+      return
+    }
+    
+    console.log('开始加载已分享的行程ID...')
+    const res = await communityApi.getMySharedTripIds()
+    console.log('已分享行程ID API响应:', res)
+    
+    if (res.code === 200 && res.data) {
+      sharedTripIds.value = new Set(res.data.map((id: number) => String(id)))
+      console.log('已分享的行程ID:', Array.from(sharedTripIds.value))
+    } else {
+      console.log('获取已分享行程ID失败:', res)
+    }
+  } catch (error: any) {
+    console.error('加载已分享行程ID失败:', error)
+    // 如果是401错误，说明用户未登录，不显示错误消息
+    if (error.response?.status !== 401) {
+      ElMessage.error('加载已分享行程失败')
+    }
+  }
+}
+
+// 加载我的行程（只显示当前用户创建的、未被分享过的行程）
 const loadMyTrips = async () => {
   try {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      console.warn('用户未登录，无法加载我的行程')
+      myTrips.value = []
+      return
+    }
+    
+    console.log('开始加载我的行程...')
+    
+    // 先加载已分享的行程ID
+    await loadSharedTripIds()
+    
+    console.log('调用 tripApi.getTrips()...')
     const res = await tripApi.getTrips()
+    console.log('tripApi.getTrips() 响应:', res)
+    
     if (res.code === 200 && res.data) {
       const tripsData = Array.isArray(res.data) ? res.data : []
-      // 只显示当前用户创建的行程（role=0表示创建者）
-      const myCreatedTrips = tripsData.filter((trip: any) => trip.role === 0)
-      myTrips.value = myCreatedTrips.map((trip: any) => {
+      console.log('原始行程数据:', tripsData)
+      
+      // 获取当前用户ID（需要从用户store或其他地方获取）
+      // 暂时从localStorage获取，或者调用用户API
+      const currentUserId = await getCurrentUserId()
+      console.log('当前用户ID:', currentUserId)
+      
+      // 只显示当前用户创建的行程（在members中找到当前用户且role=0）
+      const myCreatedTrips = tripsData.filter((trip: any) => {
+        console.log(`检查行程 ${trip.tripId || trip.id}:`, trip)
+        
+        if (!trip.members || !Array.isArray(trip.members)) {
+          console.log(`行程 ${trip.tripId || trip.id} 没有members字段或不是数组`)
+          return false
+        }
+        
+        const currentUserMember = trip.members.find((member: any) => 
+          String(member.userId) === String(currentUserId)
+        )
+        
+        if (!currentUserMember) {
+          console.log(`行程 ${trip.tripId || trip.id} 中未找到当前用户`)
+          return false
+        }
+        
+        console.log(`行程 ${trip.tripId || trip.id} 中当前用户的role:`, currentUserMember.role)
+        return currentUserMember.role === 0 // 0表示创建者
+      })
+      console.log('我创建的行程:', myCreatedTrips)
+      
+      const mappedTrips = myCreatedTrips.map((trip: any) => {
         const startDate = trip.startDate || trip.start_date
         const endDate = trip.endDate || trip.end_date
         const now = dayjs()
@@ -235,9 +324,9 @@ const loadMyTrips = async () => {
           }
         }
         
-        return {
-          id: String(trip.tripId || trip.id || ''),
-          title: trip.name || trip.title || '',
+        const mappedTrip = {
+          id: String(trip.tripId || trip.id || trip.trip_id || ''),
+          title: trip.name || trip.title || trip.tripName || '',
           description: trip.description || '',
           destination: trip.region || trip.destination || '',
           startDate: startDate ? dayjs(startDate).format('YYYY-MM-DD') : '',
@@ -250,11 +339,54 @@ const loadMyTrips = async () => {
           createdAt: trip.createdTime ? dayjs(trip.createdTime).format('YYYY-MM-DD') : '',
           updatedAt: trip.updatedTime ? dayjs(trip.updatedTime).format('YYYY-MM-DD') : ''
         }
+        
+        console.log(`映射行程 ${mappedTrip.id}:`, mappedTrip)
+        return mappedTrip
       })
+      
+      console.log('映射后的行程:', mappedTrips)
+      console.log('已分享的行程ID集合:', Array.from(sharedTripIds.value))
+      
+      myTrips.value = mappedTrips.filter((trip: Trip) => {
+        const isShared = sharedTripIds.value.has(trip.id)
+        console.log(`行程 ${trip.id} (${trip.title}) 是否已分享:`, isShared)
+        return !isShared
+      })
+      
+      console.log('最终可分享的行程数量:', myTrips.value.length)
+      console.log('最终可分享的行程:', myTrips.value.map(t => ({ id: t.id, title: t.title })))
+    } else {
+      console.log('tripApi.getTrips() 返回失败:', res)
     }
   } catch (error: any) {
     console.error('加载我的行程失败:', error)
+    // 如果是401错误，说明用户未登录，不显示错误消息
+    if (error.response?.status !== 401) {
+      ElMessage.error('加载我的行程失败')
+    }
+    myTrips.value = []
   }
+}
+
+// 获取当前用户ID的辅助函数
+const getCurrentUserId = async () => {
+  // 首先尝试从用户store获取
+  const userStore = useUserStore()
+  if (userStore.user && (userStore.user.id || userStore.user.userId)) {
+    return String(userStore.user.id || userStore.user.userId)
+  }
+  
+  // 如果store中没有，尝试调用API获取
+  try {
+    const res = await userApi.getCurrentUser()
+    if (res.code === 200 && res.data && res.data.id) {
+      return String(res.data.id)
+    }
+  } catch (error) {
+    console.error('获取当前用户ID失败:', error)
+  }
+  
+  return null
 }
 
 // 社区动态
@@ -262,9 +394,19 @@ const posts = ref<CommunityPost[]>([])
 const loading = ref(false)
 const likedPosts = ref<Set<number>>(new Set())
 
+// 检查用户是否已登录
+const isLoggedIn = computed(() => !!localStorage.getItem('token'))
+
 onMounted(() => {
   loadPosts()
   loadMyTrips()
+})
+
+// 监听分享对话框打开，重新加载可分享行程
+watch(showShareDialog, (newVal) => {
+  if (newVal) {
+    loadMyTrips()
+  }
 })
 
 const loadPosts = async () => {
@@ -333,6 +475,12 @@ const loadPosts = async () => {
 
 // 加载用户的点赞状态和统计数据
 const loadLikeStatuses = async () => {
+  // 如果用户未登录，跳过点赞状态加载
+  if (!isLoggedIn.value) {
+    console.log('用户未登录，跳过点赞状态加载')
+    return
+  }
+  
   try {
     const likePromises = posts.value.map(async (post) => {
       try {
@@ -435,6 +583,11 @@ const isLiked = (post: CommunityPost) => {
 }
 
 const toggleLike = async (post: CommunityPost) => {
+  if (!isLoggedIn.value) {
+    ElMessage.warning('请先登录后再点赞')
+    return
+  }
+  
   const postId = Number(post.id)
   if (isNaN(postId)) return
   
@@ -458,7 +611,11 @@ const toggleLike = async (post: CommunityPost) => {
     }
   } catch (error: any) {
     console.error('点赞操作失败:', error)
-    ElMessage.error(error.message || '操作失败')
+    if (error.response?.status === 401) {
+      ElMessage.warning('请先登录后再点赞')
+    } else {
+      ElMessage.error(error.message || '操作失败')
+    }
   }
 }
 
@@ -472,6 +629,14 @@ const collectPost = (post: CommunityPost) => {
 
 const reportPost = (post: CommunityPost) => {
   ElMessage.success('举报已提交，我们会尽快处理')
+}
+
+const handleShareButtonClick = () => {
+  if (!isLoggedIn.value) {
+    ElMessage.warning('请先登录后再分享行程')
+    return
+  }
+  showShareDialog.value = true
 }
 
 const handleShare = async () => {
@@ -500,8 +665,11 @@ const handleShare = async () => {
         description: ''
       })
       
-      // 刷新列表
-      loadPosts()
+      // 刷新列表和可分享行程
+      await Promise.all([
+        loadPosts(),
+        loadMyTrips() // 重新加载可分享行程，排除刚分享的行程
+      ])
     }
   } catch (error) {
     console.error('分享失败:', error)
@@ -688,5 +856,13 @@ const handleShare = async () => {
 
 .share-form {
   padding: 16px 0;
+}
+
+.no-trips-hint {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+  border-left: 3px solid #409eff;
 }
 </style>

@@ -281,6 +281,11 @@ export const communityApi = {
     return request.get('/community/search/user', {
       params: { keyword }
     })
+  },
+
+  // 获取当前用户已分享的行程ID列表
+  getMySharedTripIds() {
+    return request.get('/community/my-shared-trips')
   }
 }
 

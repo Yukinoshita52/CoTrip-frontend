@@ -490,8 +490,8 @@ const loadPostDetail = async () => {
       // 加载评论
       await loadComments(postId)
       
-      // 加载点赞状态
-      await loadLikeStatus(postId)
+      // 加载点赞状态和最新统计数据（从Redis）
+      await loadLikeStatusAndStats(postId)
     } else {
       ElMessage.error(res.message || '加载帖子详情失败')
       router.push('/community')
@@ -505,7 +505,45 @@ const loadPostDetail = async () => {
   }
 }
 
-// 加载点赞状态
+// 加载点赞状态和最新统计数据（从Redis）
+const loadLikeStatusAndStats = async (postId: number) => {
+  try {
+    // 并行获取点赞状态、点赞数和浏览数
+    const [likeStatusRes, likeCountRes, statsRes] = await Promise.all([
+      communityApi.checkLikeStatus(postId),
+      communityApi.getPostLikeCount(postId),
+      communityApi.getPostStats(postId)
+    ])
+    
+    // 更新点赞状态
+    if (likeStatusRes.code === 200) {
+      isLiked.value = likeStatusRes.data || false
+    }
+    
+    // 更新统计数据
+    if (post.value) {
+      if (likeCountRes.code === 200 && likeCountRes.data !== undefined) {
+        post.value.likes = Number(likeCountRes.data)
+      }
+      
+      if (statsRes.code === 200 && statsRes.data) {
+        if (statsRes.data.viewCount !== undefined) {
+          post.value.views = statsRes.data.viewCount
+        }
+        if (statsRes.data.likeCount !== undefined) {
+          post.value.likes = statsRes.data.likeCount
+        }
+      }
+    }
+    
+    console.log('Redis缓存命中 - 点赞状态和统计数据加载完成')
+  } catch (error) {
+    console.error('加载点赞状态和统计数据失败:', error)
+    isLiked.value = false
+  }
+}
+
+// 加载点赞状态（保留原函数以防其他地方使用）
 const loadLikeStatus = async (postId: number) => {
   try {
     const res = await communityApi.checkLikeStatus(postId)
@@ -825,17 +863,19 @@ const toggleLike = async () => {
   try {
     if (isLiked.value) {
       const res = await communityApi.unlikePost(Number(post.value.id))
-      if (res.code === 200) {
-        post.value.likes--
+      if (res.code === 200 && res.data) {
+        post.value.likes = res.data.likeCount || 0
         isLiked.value = false
         ElMessage.success('已取消点赞')
+        console.log('Redis缓存更新 - 取消点赞成功')
       }
     } else {
       const res = await communityApi.likePost(Number(post.value.id))
-      if (res.code === 200) {
-        post.value.likes++
+      if (res.code === 200 && res.data) {
+        post.value.likes = res.data.likeCount || 0
         isLiked.value = true
         ElMessage.success('点赞成功')
+        console.log('Redis缓存更新 - 点赞成功')
       }
     }
   } catch (error: any) {

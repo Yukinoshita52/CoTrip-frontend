@@ -164,13 +164,6 @@
               placeholder="描述一下这次旅行的亮点"
             />
           </el-form-item>
-          
-          <el-form-item label="公开设置">
-            <el-radio-group v-model="shareForm.isPublic">
-              <el-radio :label="true">公开 - 所有人可见</el-radio>
-              <el-radio :label="false">私密 - 仅通过链接访问</el-radio>
-            </el-radio-group>
-          </el-form-item>
         </el-form>
       </div>
       
@@ -212,20 +205,21 @@ const shareLoading = ref(false)
 const shareForm = reactive({
   tripId: '',
   title: '',
-  description: '',
-  isPublic: true
+  description: ''
 })
 
 // 我的行程（用于分享）
 const myTrips = ref<Trip[]>([])
 
-// 加载我的行程
+// 加载我的行程（只显示当前用户创建的行程）
 const loadMyTrips = async () => {
   try {
     const res = await tripApi.getTrips()
     if (res.code === 200 && res.data) {
       const tripsData = Array.isArray(res.data) ? res.data : []
-      myTrips.value = tripsData.map((trip: any) => {
+      // 只显示当前用户创建的行程（role=0表示创建者）
+      const myCreatedTrips = tripsData.filter((trip: any) => trip.role === 0)
+      myTrips.value = myCreatedTrips.map((trip: any) => {
         const startDate = trip.startDate || trip.start_date
         const endDate = trip.endDate || trip.end_date
         const now = dayjs()
@@ -337,24 +331,41 @@ const loadPosts = async () => {
   }
 }
 
-// 加载用户的点赞状态
+// 加载用户的点赞状态和统计数据
 const loadLikeStatuses = async () => {
   try {
     const likePromises = posts.value.map(async (post) => {
       try {
-        const res = await communityApi.checkLikeStatus(Number(post.id))
-        if (res.code === 200 && res.data) {
+        // 获取点赞状态
+        const likeStatusRes = await communityApi.checkLikeStatus(Number(post.id))
+        if (likeStatusRes.code === 200 && likeStatusRes.data) {
           likedPosts.value.add(Number(post.id))
         }
+        
+        // 获取最新的点赞数和浏览数（从Redis）
+        const [likeCountRes, viewCountRes] = await Promise.all([
+          communityApi.getPostLikeCount(Number(post.id)),
+          communityApi.getPostStats(Number(post.id))
+        ])
+        
+        if (likeCountRes.code === 200 && likeCountRes.data !== undefined) {
+          post.likes = Number(likeCountRes.data)
+        }
+        
+        if (viewCountRes.code === 200 && viewCountRes.data?.viewCount !== undefined) {
+          post.views = viewCountRes.data.viewCount
+        }
+        
       } catch (error) {
-        // 忽略单个帖子的点赞状态获取失败
-        console.warn(`获取帖子 ${post.id} 点赞状态失败:`, error)
+        // 忽略单个帖子的状态获取失败
+        console.warn(`获取帖子 ${post.id} 状态失败:`, error)
       }
     })
     
     await Promise.all(likePromises)
+    console.log('Redis缓存命中 - 点赞状态和统计数据加载完成')
   } catch (error) {
-    console.error('加载点赞状态失败:', error)
+    console.error('加载点赞状态和统计数据失败:', error)
   }
 }
 
@@ -430,17 +441,19 @@ const toggleLike = async (post: CommunityPost) => {
   try {
     if (isLiked(post)) {
       const res = await communityApi.unlikePost(postId)
-      if (res.code === 200) {
+      if (res.code === 200 && res.data) {
         likedPosts.value.delete(postId)
-        post.likes--
+        post.likes = res.data.likeCount || 0
         ElMessage.success('已取消点赞')
+        console.log('Redis缓存更新 - 取消点赞成功')
       }
     } else {
       const res = await communityApi.likePost(postId)
-      if (res.code === 200) {
+      if (res.code === 200 && res.data) {
         likedPosts.value.add(postId)
-        post.likes++
+        post.likes = res.data.likeCount || 0
         ElMessage.success('点赞成功')
+        console.log('Redis缓存更新 - 点赞成功')
       }
     }
   } catch (error: any) {
@@ -484,8 +497,7 @@ const handleShare = async () => {
       Object.assign(shareForm, {
         tripId: '',
         title: '',
-        description: '',
-        isPublic: true
+        description: ''
       })
       
       // 刷新列表

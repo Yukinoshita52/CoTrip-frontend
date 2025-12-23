@@ -11,6 +11,7 @@ export interface User {
   email?: string
   phone?: string
   avatarUrl?: string
+  role?: number // 用户角色：0-普通用户，1-管理员
 }
 
 export const useUserStore = defineStore('user', () => {
@@ -54,7 +55,8 @@ export const useUserStore = defineStore('user', () => {
           username: res.data.username,
           nickname: res.data.nickname,
           phone: res.data.phone,
-          avatarUrl: avatarUrl
+          avatarUrl: avatarUrl,
+          role: res.data.role
         }
         
         user.value = userData

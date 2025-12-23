@@ -14,6 +14,7 @@ export interface UserVO {
   nickname: string
   avatarUrl: string
   phone: string
+  role?: number // 用户角色：0-普通用户，1-管理员
 }
 
 export interface AuthLoginVO {

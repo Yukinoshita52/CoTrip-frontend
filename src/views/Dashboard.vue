@@ -3,65 +3,113 @@
     <div class="dashboard">
       <!-- 统计卡片 -->
       <el-row :gutter="24" class="stats-row">
-        <el-col :span="6">
-          <el-card class="stat-card">
-            <div class="stat-content">
-              <div class="stat-icon trips">
-                <el-icon><MapLocation /></el-icon>
+        <!-- 管理员统计 -->
+        <template v-if="isAdmin">
+          <el-col :span="8">
+            <el-card class="stat-card">
+              <div class="stat-content">
+                <div class="stat-icon users">
+                  <el-icon><User /></el-icon>
+                </div>
+                <div class="stat-info">
+                  <div class="stat-number">{{ adminStats.totalUsers }}</div>
+                  <div class="stat-label">用户总数</div>
+                </div>
               </div>
-              <div class="stat-info">
-                <div class="stat-number">{{ stats.totalTrips }}</div>
-                <div class="stat-label">总行程数</div>
+            </el-card>
+          </el-col>
+          
+          <el-col :span="8">
+            <el-card class="stat-card">
+              <div class="stat-content">
+                <div class="stat-icon trips">
+                  <el-icon><MapLocation /></el-icon>
+                </div>
+                <div class="stat-info">
+                  <div class="stat-number">{{ adminStats.totalTrips }}</div>
+                  <div class="stat-label">行程总数</div>
+                </div>
               </div>
-            </div>
-          </el-card>
-        </el-col>
+            </el-card>
+          </el-col>
+          
+          <el-col :span="8">
+            <el-card class="stat-card">
+              <div class="stat-content">
+                <div class="stat-icon posts">
+                  <el-icon><ChatDotSquare /></el-icon>
+                </div>
+                <div class="stat-info">
+                  <div class="stat-number">{{ adminStats.totalPosts }}</div>
+                  <div class="stat-label">社区帖子总数</div>
+                </div>
+              </div>
+            </el-card>
+          </el-col>
+        </template>
         
-        <el-col :span="6">
-          <el-card class="stat-card">
-            <div class="stat-content">
-              <div class="stat-icon expenses">
-                <el-icon><Money /></el-icon>
+        <!-- 普通用户统计 -->
+        <template v-else>
+          <el-col :span="6">
+            <el-card class="stat-card">
+              <div class="stat-content">
+                <div class="stat-icon trips">
+                  <el-icon><MapLocation /></el-icon>
+                </div>
+                <div class="stat-info">
+                  <div class="stat-number">{{ stats.totalTrips }}</div>
+                  <div class="stat-label">总行程数</div>
+                </div>
               </div>
-              <div class="stat-info">
-                <div class="stat-number">¥{{ stats.totalExpenses }}</div>
-                <div class="stat-label">总支出</div>
+            </el-card>
+          </el-col>
+          
+          <el-col :span="6">
+            <el-card class="stat-card">
+              <div class="stat-content">
+                <div class="stat-icon expenses">
+                  <el-icon><Money /></el-icon>
+                </div>
+                <div class="stat-info">
+                  <div class="stat-number">¥{{ stats.totalExpenses }}</div>
+                  <div class="stat-label">总支出</div>
+                </div>
               </div>
-            </div>
-          </el-card>
-        </el-col>
-        
-        <el-col :span="6">
-          <el-card class="stat-card">
-            <div class="stat-content">
-              <div class="stat-icon ongoing">
-                <el-icon><Timer /></el-icon>
+            </el-card>
+          </el-col>
+          
+          <el-col :span="6">
+            <el-card class="stat-card">
+              <div class="stat-content">
+                <div class="stat-icon ongoing">
+                  <el-icon><Timer /></el-icon>
+                </div>
+                <div class="stat-info">
+                  <div class="stat-number">{{ stats.ongoingTrips }}</div>
+                  <div class="stat-label">进行中</div>
+                </div>
               </div>
-              <div class="stat-info">
-                <div class="stat-number">{{ stats.ongoingTrips }}</div>
-                <div class="stat-label">进行中</div>
+            </el-card>
+          </el-col>
+          
+          <el-col :span="6">
+            <el-card class="stat-card">
+              <div class="stat-content">
+                <div class="stat-icon community">
+                  <el-icon><Share /></el-icon>
+                </div>
+                <div class="stat-info">
+                  <div class="stat-number">{{ stats.sharedTrips }}</div>
+                  <div class="stat-label">已分享</div>
+                </div>
               </div>
-            </div>
-          </el-card>
-        </el-col>
-        
-        <el-col :span="6">
-          <el-card class="stat-card">
-            <div class="stat-content">
-              <div class="stat-icon community">
-                <el-icon><Share /></el-icon>
-              </div>
-              <div class="stat-info">
-                <div class="stat-number">{{ stats.sharedTrips }}</div>
-                <div class="stat-label">已分享</div>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
+            </el-card>
+          </el-col>
+        </template>
       </el-row>
 
-      <!-- 快速操作 -->
-      <el-row :gutter="24" class="quick-actions">
+      <!-- 快速操作（仅普通用户显示） -->
+      <el-row :gutter="24" class="quick-actions" v-if="!isAdmin">
         <el-col :span="24">
           <el-card>
             <template #header>
@@ -109,8 +157,8 @@
         </el-col>
       </el-row>
 
-      <!-- 最近行程和账单 -->
-      <el-row :gutter="24" v-loading="loading">
+      <!-- 最近行程和账单（仅普通用户显示） -->
+      <el-row :gutter="24" v-loading="loading" v-if="!isAdmin">
         <el-col :span="12">
           <el-card>
             <template #header>
@@ -197,14 +245,25 @@ import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElDialog } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import type { Trip, Expense } from '@/types'
-import { tripApi, expenseApi, announcementApi, communityApi } from '@/api'
+import { tripApi, expenseApi, announcementApi, communityApi, adminApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import dayjs from 'dayjs'
 
 const loading = ref(false)
 const userStore = useUserStore()
+// 直接从userStore中的role字段判断是否是管理员
+const isAdmin = computed(() => {
+  return userStore.user?.role === 1
+})
 
-// 统计数据
+// 管理员统计数据
+const adminStats = ref({
+  totalUsers: 0,
+  totalTrips: 0,
+  totalPosts: 0
+})
+
+// 普通用户统计数据
 const stats = ref({
   totalTrips: 0,
   totalExpenses: 0,
@@ -247,10 +306,46 @@ const recentExpenses = computed(() => {
     .slice(0, 5)
 })
 
+// 加载管理员统计数据
+const loadAdminStats = async () => {
+  try {
+    const statsRes = await adminApi.getStatistics()
+    if (statsRes.code === 200 && statsRes.data) {
+      adminStats.value = {
+        totalUsers: statsRes.data.totalUsers || 0,
+        totalTrips: statsRes.data.totalTrips || 0,
+        totalPosts: statsRes.data.totalPosts || 0
+      }
+    }
+  } catch (error) {
+    console.error('加载管理员统计数据失败:', error)
+  }
+}
+
 // 加载数据
 const loadData = async () => {
   loading.value = true
   try {
+    // 如果用户信息不存在，先获取用户信息
+    if (!userStore.user && localStorage.getItem('token')) {
+      await userStore.fetchCurrentUser()
+    }
+    
+    // 如果是管理员，加载管理员统计数据和公告数据
+    if (isAdmin.value) {
+      await Promise.all([
+        loadAdminStats(),
+        announcementApi.getLatestAnnouncements(5).catch(() => ({ code: 200, data: [] }))
+      ]).then(([_, announcementsRes]) => {
+        if (announcementsRes.code === 200 && announcementsRes.data) {
+          announcements.value = Array.isArray(announcementsRes.data) ? announcementsRes.data : []
+        }
+      })
+      loading.value = false
+      return
+    }
+    
+    // 普通用户加载原有数据
     // 并行加载所有数据
     const [tripsRes, booksRes, announcementsRes] = await Promise.all([
       tripApi.getTrips().catch(() => ({ code: 200, data: [] })),
@@ -483,6 +578,14 @@ const viewAnnouncement = async (id: number) => {
 }
 
 .stat-icon.community {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.stat-icon.users {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.stat-icon.posts {
   background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
 }
 

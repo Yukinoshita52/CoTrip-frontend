@@ -454,6 +454,34 @@ export const announcementApi = {
     return request.get('/announcement/search', {
       params: { keyword }
     })
+  },
+
+  // 创建公告（管理员）
+  createAnnouncement(data: { title: string; content: string }) {
+    return request.post('/announcement', data)
+  },
+
+  // 更新公告（管理员）
+  updateAnnouncement(id: number, data: { title: string; content: string }) {
+    return request.put(`/announcement/${id}`, data)
+  },
+
+  // 删除公告（管理员）
+  deleteAnnouncement(id: number) {
+    return request.delete(`/announcement/${id}`)
+  }
+}
+
+// 管理员相关API
+export const adminApi = {
+  // 检查是否为管理员
+  checkAdmin() {
+    return request.get<boolean>('/admin/check')
+  },
+
+  // 获取系统统计数据
+  getStatistics() {
+    return request.get<{ totalUsers: number; totalTrips: number; totalPosts: number }>('/admin/statistics')
   }
 }
 

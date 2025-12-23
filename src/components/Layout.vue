@@ -20,25 +20,36 @@
           <span>仪表盘</span>
         </el-menu-item>
         
-        <el-menu-item index="/trips">
-          <el-icon><MapLocation /></el-icon>
-          <span>我的行程</span>
-        </el-menu-item>
+        <!-- 普通用户菜单 -->
+        <template v-if="!isAdmin">
+          <el-menu-item index="/trips">
+            <el-icon><MapLocation /></el-icon>
+            <span>我的行程</span>
+          </el-menu-item>
+          
+          <el-menu-item index="/expenses">
+            <el-icon><Money /></el-icon>
+            <span>记账管理</span>
+          </el-menu-item>
+          
+          <el-menu-item index="/community">
+            <el-icon><ChatDotSquare /></el-icon>
+            <span>旅行社区</span>
+          </el-menu-item>
+          
+          <el-menu-item index="/invitations">
+            <el-icon><Message /></el-icon>
+            <span>邀请信息</span>
+          </el-menu-item>
+        </template>
         
-        <el-menu-item index="/expenses">
-          <el-icon><Money /></el-icon>
-          <span>记账管理</span>
-        </el-menu-item>
-        
-        <el-menu-item index="/community">
-          <el-icon><ChatDotSquare /></el-icon>
-          <span>旅行社区</span>
-        </el-menu-item>
-        
-        <el-menu-item index="/invitations">
-          <el-icon><Message /></el-icon>
-          <span>邀请信息</span>
-        </el-menu-item>
+        <!-- 管理员菜单 -->
+        <template v-if="isAdmin">
+          <el-menu-item index="/admin/announcements">
+            <el-icon><Document /></el-icon>
+            <span>公告管理</span>
+          </el-menu-item>
+        </template>
         
         <el-menu-item index="/profile">
           <el-icon><User /></el-icon>
@@ -108,6 +119,11 @@ const username = computed(() => {
 
 const userAvatar = computed(() => {
   return formatAvatarUrl(userStore.user?.avatarUrl)
+})
+
+// 直接从userStore中的role字段判断是否是管理员
+const isAdmin = computed(() => {
+  return userStore.user?.role === 1
 })
 
 const handleLogout = async () => {

@@ -77,6 +77,12 @@ const routes: RouteRecordRaw[] = [
     name: 'Profile',
     component: () => import('@/views/Profile.vue'),
     meta: { title: '个人中心', requiresAuth: true }
+  },
+  {
+    path: '/admin/announcements',
+    name: 'AnnouncementManage',
+    component: () => import('@/views/admin/AnnouncementManage.vue'),
+    meta: { title: '公告管理', requiresAuth: true, requiresAdmin: true }
   }
 ]
 

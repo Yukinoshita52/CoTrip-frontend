@@ -18,7 +18,7 @@
       <!-- 筛选和搜索 -->
       <el-card class="filter-card">
         <el-row :gutter="16">
-          <el-col :span="6">
+          <el-col :span="8">
             <el-input
               v-model="filters.keyword"
               placeholder="搜索行程标题或目的地"
@@ -29,7 +29,7 @@
               </template>
             </el-input>
           </el-col>
-          <el-col :span="4">
+          <el-col :span="6">
             <el-select v-model="filters.sortBy" placeholder="排序方式">
               <el-option label="最新发布" value="latest" />
               <el-option label="最多点赞" value="likes" />
@@ -37,35 +37,10 @@
             </el-select>
           </el-col>
           <el-col :span="6">
-            <el-input
-              v-model="filters.tags"
-              placeholder="标签筛选，用逗号分隔"
-              clearable
-            />
-          </el-col>
-          <el-col :span="4">
             <el-button @click="handleSearch">搜索</el-button>
             <el-button @click="resetFilters">重置</el-button>
           </el-col>
         </el-row>
-      </el-card>
-
-      <!-- 热门标签 -->
-      <el-card class="tags-card">
-        <template #header>
-          <span>热门标签</span>
-        </template>
-        <div class="popular-tags">
-          <el-tag
-            v-for="tag in popularTags"
-            :key="tag.name"
-            :type="selectedTags.includes(tag.name) ? 'primary' : ''"
-            class="tag-item"
-            @click="toggleTag(tag.name)"
-          >
-            {{ tag.name }} ({{ tag.count }})
-          </el-tag>
-        </div>
       </el-card>
 
       <!-- 社区动态列表 -->
@@ -84,7 +59,7 @@
                     {{ post.views }}
                   </span>
                   <span class="stat-item">
-                    <el-icon><Star /></el-icon>
+                    <el-icon><Heart /></el-icon>
                     {{ post.likes }}
                   </span>
                 </div>
@@ -104,20 +79,6 @@
                     {{ getTripDuration(post.trip) }}天
                   </div>
                 </div>
-                
-                <div class="post-tags">
-                  <el-tag
-                    v-for="tag in post.tags.slice(0, 3)"
-                    :key="tag"
-                    size="small"
-                    class="post-tag"
-                  >
-                    {{ tag }}
-                  </el-tag>
-                  <span v-if="post.tags.length > 3" class="more-tags">
-                    +{{ post.tags.length - 3 }}
-                  </span>
-                </div>
               </div>
               
               <div class="post-footer">
@@ -133,8 +94,8 @@
               </div>
               
               <div class="post-actions" @click.stop>
-                <el-button text @click="toggleLike(post)">
-                  <el-icon :class="{ 'liked': isLiked(post) }"><Star /></el-icon>
+                <el-button text @click="toggleLike(post)" :class="{ 'liked-button': isLiked(post) }">
+                  <el-icon :class="{ 'liked': isLiked(post) }"><Heart /></el-icon>
                   {{ post.likes }}
                 </el-button>
                 <el-button text @click="sharePost(post)">
@@ -204,10 +165,6 @@
             />
           </el-form-item>
           
-          <el-form-item label="标签">
-            <el-input v-model="shareForm.tagsInput" placeholder="添加标签，用逗号分隔" />
-          </el-form-item>
-          
           <el-form-item label="公开设置">
             <el-radio-group v-model="shareForm.isPublic">
               <el-radio :label="true">公开 - 所有人可见</el-radio>
@@ -239,11 +196,8 @@ import dayjs from 'dayjs'
 // 筛选条件
 const filters = ref({
   keyword: '',
-  sortBy: 'latest',
-  tags: ''
+  sortBy: 'latest'
 })
-
-const selectedTags = ref<string[]>([])
 
 // 分页
 const pagination = ref({
@@ -259,12 +213,8 @@ const shareForm = reactive({
   tripId: '',
   title: '',
   description: '',
-  tagsInput: '',
   isPublic: true
 })
-
-// 热门标签
-const popularTags = ref<{ name: string; count: number }[]>([])
 
 // 我的行程（用于分享）
 const myTrips = ref<Trip[]>([])
@@ -375,12 +325,36 @@ const loadPosts = async () => {
       })
       
       pagination.value.total = feedData.total || list.length
+      
+      // 加载用户的点赞状态
+      await loadLikeStatuses()
     }
   } catch (error: any) {
     console.error('加载社区动态失败:', error)
     ElMessage.error(error.message || '加载社区动态失败')
   } finally {
     loading.value = false
+  }
+}
+
+// 加载用户的点赞状态
+const loadLikeStatuses = async () => {
+  try {
+    const likePromises = posts.value.map(async (post) => {
+      try {
+        const res = await communityApi.checkLikeStatus(Number(post.id))
+        if (res.code === 200 && res.data) {
+          likedPosts.value.add(Number(post.id))
+        }
+      } catch (error) {
+        // 忽略单个帖子的点赞状态获取失败
+        console.warn(`获取帖子 ${post.id} 点赞状态失败:`, error)
+      }
+    })
+    
+    await Promise.all(likePromises)
+  } catch (error) {
+    console.error('加载点赞状态失败:', error)
   }
 }
 
@@ -419,10 +393,8 @@ const handleSearch = async () => {
 const resetFilters = () => {
   filters.value = {
     keyword: '',
-    sortBy: 'latest',
-    tags: ''
+    sortBy: 'latest'
   }
-  selectedTags.value = []
   loadPosts()
 }
 
@@ -435,18 +407,6 @@ const handleSizeChange = (size: number) => {
 const handleCurrentChange = (page: number) => {
   pagination.value.page = page
   loadPosts()
-}
-
-const toggleTag = (tagName: string) => {
-  const index = selectedTags.value.indexOf(tagName)
-  if (index > -1) {
-    selectedTags.value.splice(index, 1)
-  } else {
-    selectedTags.value.push(tagName)
-  }
-  // 更新筛选条件
-  filters.value.tags = selectedTags.value.join(',')
-  handleSearch()
 }
 
 const formatDate = (date: string) => {
@@ -469,15 +429,19 @@ const toggleLike = async (post: CommunityPost) => {
   
   try {
     if (isLiked(post)) {
-      await communityApi.unlikePost(postId)
-      likedPosts.value.delete(postId)
-      post.likes--
-      ElMessage.success('已取消点赞')
+      const res = await communityApi.unlikePost(postId)
+      if (res.code === 200) {
+        likedPosts.value.delete(postId)
+        post.likes--
+        ElMessage.success('已取消点赞')
+      }
     } else {
-      await communityApi.likePost(postId)
-      likedPosts.value.add(postId)
-      post.likes++
-      ElMessage.success('点赞成功')
+      const res = await communityApi.likePost(postId)
+      if (res.code === 200) {
+        likedPosts.value.add(postId)
+        post.likes++
+        ElMessage.success('点赞成功')
+      }
     }
   } catch (error: any) {
     console.error('点赞操作失败:', error)
@@ -521,7 +485,6 @@ const handleShare = async () => {
         tripId: '',
         title: '',
         description: '',
-        tagsInput: '',
         isPublic: true
       })
       
@@ -560,23 +523,8 @@ const handleShare = async () => {
   font-size: 14px;
 }
 
-.filter-card, .tags-card {
+.filter-card {
   margin-bottom: 24px;
-}
-
-.popular-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.tag-item {
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.tag-item:hover {
-  transform: translateY(-1px);
 }
 
 .posts-grid {
@@ -677,22 +625,6 @@ const handleShare = async () => {
   gap: 4px;
 }
 
-.post-tags {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.post-tag {
-  font-size: 12px;
-}
-
-.more-tags {
-  font-size: 12px;
-  color: #999;
-}
-
 .post-footer {
   display: flex;
   justify-content: space-between;
@@ -726,6 +658,14 @@ const handleShare = async () => {
 
 .liked {
   color: #f56c6c;
+}
+
+.liked-button {
+  color: #f56c6c !important;
+}
+
+.liked-button:hover {
+  color: #f78989 !important;
 }
 
 .pagination {

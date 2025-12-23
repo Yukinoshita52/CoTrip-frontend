@@ -249,6 +249,11 @@ export const communityApi = {
     return request.get(`/community/post/${postId}/likes`)
   },
 
+  // 检查点赞状态
+  checkLikeStatus(postId: number) {
+    return request.get(`/community/post/${postId}/like/status`)
+  },
+
   // 获取用户主页
   getUserProfile(userId: number) {
     return request.get(`/community/user/${userId}`)

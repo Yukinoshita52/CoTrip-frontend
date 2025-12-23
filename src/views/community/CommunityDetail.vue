@@ -33,20 +33,15 @@
                   {{ post.views }} 浏览
                 </span>
                 <span class="stat-item">
-                  <el-icon><Star /></el-icon>
+                  <el-icon><Heart /></el-icon>
                   {{ post.likes }} 点赞
                 </span>
               </div>
             </div>
-            <div class="post-tags">
-              <el-tag v-for="tag in post.tags" :key="tag" class="tag-item">
-                {{ tag }}
-              </el-tag>
-            </div>
           </div>
           <div class="post-actions">
-            <el-button @click="toggleLike" :type="isLiked ? 'primary' : 'default'">
-              <el-icon><Star /></el-icon>
+            <el-button @click="toggleLike" :type="isLiked ? 'primary' : 'default'" :class="{ 'liked-button': isLiked }">
+              <el-icon :class="{ 'liked': isLiked }"><Heart /></el-icon>
               {{ isLiked ? '已点赞' : '点赞' }} ({{ post.likes }})
             </el-button>
             <el-button @click="handleShare">
@@ -79,10 +74,6 @@
             <div class="info-item">
               <label>行程天数：</label>
               <span>{{ getTripDuration(post.trip) }} 天</span>
-            </div>
-            <div class="info-item">
-              <label>参与人数：</label>
-              <span>{{ post.trip.members.length }} 人</span>
             </div>
           </div>
           <div class="trip-description">
@@ -177,7 +168,7 @@
       </el-card>
 
       <!-- 使用此行程 -->
-      <el-card class="use-trip">
+      <el-card class="use-trip" v-if="!isCurrentUserPost">
         <div class="use-trip-content">
           <div class="use-trip-info">
             <h3>喜欢这个行程？</h3>
@@ -188,35 +179,26 @@
               <el-icon><DocumentCopy /></el-icon>
               复制行程
             </el-button>
-            <el-button @click="handleContact">
-              <el-icon><ChatDotSquare /></el-icon>
-              联系作者
-            </el-button>
           </div>
         </div>
       </el-card>
 
-      <!-- 相关推荐 -->
-      <el-card class="related-posts">
-        <template #header>
-          <span>相关推荐</span>
-        </template>
-        <div class="related-list">
-          <div v-for="relatedPost in relatedPosts" :key="relatedPost.id" class="related-item">
-            <div class="related-cover">
-              <img v-if="relatedPost.trip.coverImage" :src="formatImageUrl(relatedPost.trip.coverImage)" alt="封面" />
-              <div v-else class="default-cover">
-                <el-icon><Picture /></el-icon>
-              </div>
-            </div>
-            <div class="related-content">
-              <h4 class="related-title">{{ relatedPost.title }}</h4>
-              <p class="related-destination">{{ relatedPost.trip.destination }}</p>
-              <div class="related-stats">
-                <span><el-icon><View /></el-icon> {{ relatedPost.views }}</span>
-                <span><el-icon><Star /></el-icon> {{ relatedPost.likes }}</span>
-              </div>
-            </div>
+      <!-- 编辑帖子 -->
+      <el-card class="edit-post" v-if="isCurrentUserPost">
+        <div class="edit-post-content">
+          <div class="edit-post-info">
+            <h3>这是你发布的行程</h3>
+            <p>你可以编辑或删除这个帖子</p>
+          </div>
+          <div class="edit-post-actions">
+            <el-button type="primary" @click="handleEditPost">
+              <el-icon><Edit /></el-icon>
+              编辑帖子
+            </el-button>
+            <el-button type="danger" @click="handleDeletePost">
+              <el-icon><Delete /></el-icon>
+              删除帖子
+            </el-button>
           </div>
         </div>
       </el-card>
@@ -227,22 +209,29 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import type { CommunityPost, ItineraryItem, Expense } from '@/types'
 import { formatAvatarUrl, formatImageUrl } from '@/utils/image'
 import dayjs from 'dayjs'
 import { communityApi, tripApi, expenseApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const isLiked = ref(false)
 const loading = ref(false)
 
 // 帖子数据
 const post = ref<CommunityPost | null>(null)
 const relatedExpenses = ref<Expense[]>([])
-const relatedPosts = ref<CommunityPost[]>([])
+
+// 计算属性
+const isCurrentUserPost = computed(() => {
+  if (!post.value || !userStore.user) return false
+  return String(post.value.authorId) === String(userStore.user.id)
+})
 
 // 加载帖子详情
 const loadPostDetail = async () => {
@@ -302,6 +291,9 @@ const loadPostDetail = async () => {
 
       // 加载相关费用
       await loadRelatedExpenses(data.tripId)
+      
+      // 加载点赞状态
+      await loadLikeStatus(postId)
     } else {
       ElMessage.error(res.message || '加载帖子详情失败')
       router.push('/community')
@@ -312,6 +304,19 @@ const loadPostDetail = async () => {
     router.push('/community')
   } finally {
     loading.value = false
+  }
+}
+
+// 加载点赞状态
+const loadLikeStatus = async (postId: number) => {
+  try {
+    const res = await communityApi.checkLikeStatus(postId)
+    if (res.code === 200) {
+      isLiked.value = res.data || false
+    }
+  } catch (error) {
+    console.error('加载点赞状态失败:', error)
+    isLiked.value = false
   }
 }
 
@@ -383,58 +388,6 @@ const loadRelatedExpenses = async (tripId: number) => {
   }
 }
 
-// 加载相关推荐
-const loadRelatedPosts = async () => {
-  try {
-    const res = await communityApi.getFeed(1, 5)
-    if (res.code === 200 && res.data) {
-      const list = res.data.list || res.data.items || []
-      const currentPostId = Number(route.params.id)
-      relatedPosts.value = list
-        .filter((item: any) => item.postId !== currentPostId)
-        .slice(0, 3)
-        .map((item: any) => ({
-          id: String(item.postId || item.id || ''),
-          title: item.tripName || item.title || '',
-          description: item.description || '',
-          tripId: String(item.tripId || ''),
-          authorId: String(item.author?.userId || item.authorId || ''),
-          author: {
-            id: String(item.author?.userId || item.authorId || ''),
-            username: item.author?.username || '',
-            email: item.author?.email || '',
-            nickname: item.author?.nickname || item.author?.username || '',
-            avatar: item.author?.avatarUrl || item.author?.avatar || '',
-            createdAt: ''
-          },
-          trip: {
-            id: String(item.tripId || ''),
-            title: item.tripName || '',
-            destination: item.region || '',
-            startDate: item.startDate ? dayjs(item.startDate).format('YYYY-MM-DD') : '',
-            endDate: item.endDate ? dayjs(item.endDate).format('YYYY-MM-DD') : '',
-            status: 'completed',
-            description: item.description || '',
-            coverImage: item.coverImages?.[0] || '',
-            createdBy: String(item.author?.userId || ''),
-            members: [],
-            itinerary: [],
-            createdAt: item.createTime ? dayjs(item.createTime).format('YYYY-MM-DD') : '',
-            updatedAt: item.createTime ? dayjs(item.createTime).format('YYYY-MM-DD') : ''
-          },
-          likes: item.stats?.likeCount || item.likes || 0,
-          views: item.stats?.viewCount || item.views || 0,
-          tags: item.tags || [],
-          isPublic: true,
-          createdAt: item.createTime ? dayjs(item.createTime).format('YYYY-MM-DD') : '',
-          updatedAt: item.createTime ? dayjs(item.createTime).format('YYYY-MM-DD') : ''
-        }))
-    }
-  } catch (error: any) {
-    console.error('加载相关推荐失败:', error)
-  }
-}
-
 // 计算属性
 const groupedItinerary = computed(() => {
   const groups: Record<string, ItineraryItem[]> = {}
@@ -466,7 +419,6 @@ const expenseSummary = computed(() => {
 
 onMounted(() => {
   loadPostDetail()
-  loadRelatedPosts()
 })
 
 // 工具函数
@@ -489,6 +441,7 @@ const formatTime = (time: string) => {
 }
 
 const getTripDuration = (trip: any) => {
+  if (!trip.startDate || !trip.endDate) return 0
   const start = dayjs(trip.startDate)
   const end = dayjs(trip.endDate)
   return end.diff(start, 'day') + 1
@@ -534,15 +487,19 @@ const toggleLike = async () => {
   
   try {
     if (isLiked.value) {
-      await communityApi.unlikePost(Number(post.value.id))
-      post.value.likes--
-      isLiked.value = false
-      ElMessage.success('已取消点赞')
+      const res = await communityApi.unlikePost(Number(post.value.id))
+      if (res.code === 200) {
+        post.value.likes--
+        isLiked.value = false
+        ElMessage.success('已取消点赞')
+      }
     } else {
-      await communityApi.likePost(Number(post.value.id))
-      post.value.likes++
-      isLiked.value = true
-      ElMessage.success('点赞成功')
+      const res = await communityApi.likePost(Number(post.value.id))
+      if (res.code === 200) {
+        post.value.likes++
+        isLiked.value = true
+        ElMessage.success('点赞成功')
+      }
     }
   } catch (error: any) {
     console.error('点赞操作失败:', error)
@@ -581,8 +538,34 @@ const handleCopyTrip = async () => {
   }
 }
 
-const handleContact = () => {
-  ElMessage.info('联系功能待开发')
+const handleEditPost = () => {
+  ElMessage.info('编辑帖子功能待开发')
+}
+
+const handleDeletePost = async () => {
+  if (!post.value) return
+  
+  try {
+    await ElMessageBox.confirm('确定要删除这个帖子吗？删除后无法恢复。', '确认删除', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+      confirmButtonClass: 'el-button--danger'
+    })
+    
+    const res = await communityApi.deletePost(Number(post.value.id))
+    if (res.code === 200) {
+      ElMessage.success('帖子已删除')
+      router.push('/community')
+    } else {
+      ElMessage.error(res.message || '删除失败')
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('删除帖子失败:', error)
+      ElMessage.error(error.message || '删除失败')
+    }
+  }
 }
 </script>
 
@@ -669,7 +652,7 @@ const handleContact = () => {
   flex-direction: column;
 }
 
-.trip-overview, .itinerary-detail, .expense-detail, .use-trip, .related-posts {
+.trip-overview, .itinerary-detail, .expense-detail, .use-trip, .edit-post {
   margin-bottom: 24px;
 }
 
@@ -779,98 +762,36 @@ const handleContact = () => {
   color: #333;
 }
 
-.use-trip-content {
+.use-trip-content, .edit-post-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.use-trip-info h3 {
+.use-trip-info h3, .edit-post-info h3 {
   margin: 0 0 8px 0;
   color: #333;
 }
 
-.use-trip-info p {
+.use-trip-info p, .edit-post-info p {
   margin: 0;
   color: #666;
 }
 
-.use-trip-actions {
+.use-trip-actions, .edit-post-actions {
   display: flex;
   gap: 12px;
 }
 
-.related-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
+.liked {
+  color: #f56c6c;
 }
 
-.related-item {
-  display: flex;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s;
+.liked-button {
+  color: #f56c6c !important;
 }
 
-.related-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.related-cover {
-  width: 80px;
-  height: 60px;
-  background: #f5f5f5;
-  border-radius: 4px;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.related-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.default-cover {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: #ccc;
-  font-size: 24px;
-}
-
-.related-content {
-  flex: 1;
-}
-
-.related-title {
-  margin: 0 0 4px 0;
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
-}
-
-.related-destination {
-  margin: 0 0 8px 0;
-  font-size: 12px;
-  color: #666;
-}
-
-.related-stats {
-  display: flex;
-  gap: 12px;
-  font-size: 12px;
-  color: #999;
-}
-
-.related-stats span {
-  display: flex;
-  align-items: center;
-  gap: 2px;
+.liked-button:hover {
+  color: #f78989 !important;
 }
 </style>

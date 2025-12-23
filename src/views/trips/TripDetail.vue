@@ -605,7 +605,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import Layout from '@/components/Layout.vue'
-import { tripApi, expenseApi, placeTypeApi, invitationApi, userApi, baiduRouteApi } from '@/api'
+import { tripApi, expenseApi, placeTypeApi, invitationApi, userApi, baiduRouteApi, transportInfoApi } from '@/api'
 import type { Trip, ItineraryItem, Expense, TripMember } from '@/types'
 import { formatAvatarUrl } from '@/utils/image'
 import dayjs from 'dayjs'
@@ -1150,16 +1150,7 @@ const handleLeaveTrip = async () => {
       return
     }
 
-    console.log('准备退出行程:', {
-      tripId,
-      currentUser: currentUser.value,
-      userRole: getUserRoleInTrip(),
-      isOwner: isOwner.value,
-      isParticipant: isParticipant.value
-    })
-
     const res = await tripApi.leaveTrip(tripId)
-    console.log('退出行程响应:', res)
 
     if (res.code === 200) {
       ElMessage.success('已退出行程')
@@ -1189,15 +1180,7 @@ const handleDeleteTrip = async () => {
       return
     }
 
-    console.log('准备删除行程:', {
-      tripId,
-      currentUser: currentUser.value,
-      userRole: getUserRoleInTrip(),
-      isOwner: isOwner.value
-    })
-
     const res = await tripApi.deleteTrip(tripId)
-    console.log('删除行程响应:', res)
 
     if (res.code === 200) {
       ElMessage.success('行程已删除')
@@ -1303,8 +1286,6 @@ const getRoute = async () => {
   routeLoading.value = true
 
   try {
-    console.log('开始路线规划，地点数量:', places.length)
-
     // 准备缓存检查的地点数据
     const cacheCheckPlaces = places.map(place => ({
       lng: place.lng,
@@ -1313,12 +1294,10 @@ const getRoute = async () => {
     }))
 
     // 1. 先检查缓存
-    console.log('检查路线规划缓存...')
     const cacheRes = await baiduRouteApi.checkRouteCache(cacheCheckPlaces)
     
     if (cacheRes.code === 200 && cacheRes.data) {
       // 缓存命中，直接使用缓存结果
-      console.log('路线规划缓存命中，使用缓存结果:', cacheRes.data)
       const cachedRoute = cacheRes.data
       
       // 清除之前的覆盖物
@@ -1338,10 +1317,8 @@ const getRoute = async () => {
       // 兼容新旧字段名：routePolyline (新) 或 routePoints (旧)
       const polylineData = cachedRoute.routePolyline || cachedRoute.routePoints
       if (polylineData && polylineData.length > 0) {
-        console.log('使用缓存的路线绘制数据，路径点数量:', polylineData.length)
         drawCachedRoute(polylineData, places)
       } else {
-        console.log('缓存中没有路线绘制数据，调用百度地图API绘制并更新缓存')
         // 如果缓存中没有绘制数据，调用API绘制并更新缓存
         callBaiduAPIForDrawing(places, true) // 改为 true，重新缓存完整数据
       }
@@ -1351,7 +1328,6 @@ const getRoute = async () => {
     }
 
     // 2. 缓存未命中，调用百度地图API
-    console.log('缓存未命中，调用百度地图API')
     callBaiduAPIForDrawing(places, true)
 
   } catch (error) {
@@ -1387,20 +1363,14 @@ const callBaiduAPIForDrawing = (places: any[], shouldCache: boolean) => {
       routeLoading.value = false
       const status = driving.getStatus()
 
-      console.log('百度地图路线规划完成，状态码:', status)
-
       // 使用数字比较，0 表示成功
       if (status === 0) {
         const plan = result.getPlan(0) // 获取第一条路线
-
-        console.log('获取到的路线规划:', plan)
 
         if (plan) {
           // 获取路线信息
           const distance = plan.getDistance(false) // 总距离（米）
           const duration = plan.getDuration(false) // 总时间（秒）
-
-          console.log('路线距离:', distance, '米，时间:', duration, '秒')
 
           // 提取路线绘制数据
           let routePolyline: Array<{lng: number, lat: number}> = []
@@ -1413,7 +1383,6 @@ const callBaiduAPIForDrawing = (places: any[], shouldCache: boolean) => {
                   lng: point.lng,
                   lat: point.lat
                 }))
-                console.log('提取到路线路径点数量:', routePolyline.length)
               }
             }
           } catch (e) {
@@ -1437,9 +1406,7 @@ const callBaiduAPIForDrawing = (places: any[], shouldCache: boolean) => {
           // 3. 保存到缓存（如果需要）
           if (shouldCache) {
             try {
-              console.log('保存完整路线规划结果到缓存（包含绘制数据）...')
               await baiduRouteApi.saveRouteCache(cacheCheckPlaces, routeData)
-              console.log('完整路线规划结果已保存到缓存')
             } catch (cacheError) {
               console.error('保存路线规划缓存失败:', cacheError)
               // 缓存失败不影响主要功能
@@ -1507,14 +1474,11 @@ const addPlaceMarkers = (places: any[]) => {
     marker.setLabel(label)
     mapInstance.value.addOverlay(marker)
   })
-  console.log('地点标记已添加')
 }
 
 // 绘制缓存的路线
 const drawCachedRoute = (routePolyline: Array<{lng: number, lat: number}>, places: any[]) => {
   try {
-    console.log('开始绘制缓存的路线，路径点数量:', routePolyline.length)
-    
     if (routePolyline.length < 2) {
       console.warn('缓存的路线路径点不足，无法绘制')
       return
@@ -1550,8 +1514,6 @@ const drawCachedRoute = (routePolyline: Array<{lng: number, lat: number}>, place
       mapInstance.value.setViewport(allPoints, {
         margins: [50, 50, 50, 50] // 设置边距
       })
-      
-      console.log('地图视野已调整，包含所有路线点和地点标记')
     } catch (viewportError) {
       console.warn('调整地图视野失败，使用默认视野:', viewportError)
       // 如果调整视野失败，至少确保能看到起点和终点
@@ -1562,12 +1524,9 @@ const drawCachedRoute = (routePolyline: Array<{lng: number, lat: number}>, place
         mapInstance.value.setViewport(bounds)
       }
     }
-
-    console.log('缓存路线绘制完成')
   } catch (error) {
     console.error('绘制缓存路线失败:', error)
     // 如果绘制失败，回退到调用百度地图API
-    console.log('绘制缓存路线失败，回退到百度地图API')
     callBaiduAPIForDrawing(places, false)
   }
 }
@@ -1603,7 +1562,6 @@ const adjustMapViewport = (plan: any, places: any[]) => {
 
     if (allPoints.length > 0) {
       mapInstance.value.setViewport(allPoints)
-      console.log('地图视野已调整')
     }
   } catch (error) {
     console.error('调整地图视野时出错:', error)
@@ -1739,7 +1697,7 @@ const isTransportInfoLoading = (itemId1: string, itemId2: string) => {
          (info.walking && info.walking.loading)
 }
 
-// 获取两个地点之间的路线信息（使用百度地图API）
+// 获取两个地点之间的路线信息（调用后端API，后端管理缓存和百度地图API调用）
 const fetchRouteBetweenPlaces = async (item1: any, item2: any, transportType: 'driving' | 'transit' | 'walking') => {
   if (!item1.lat || !item1.lng || !item2.lat || !item2.lng) {
     return
@@ -1752,6 +1710,7 @@ const fetchRouteBetweenPlaces = async (item1: any, item2: any, transportType: 'd
     transportInfo.value[key] = {}
   }
 
+  // 如果已经有数据且不在加载中，直接返回
   if (transportInfo.value[key][transportType] && !transportInfo.value[key][transportType].loading) {
     return
   }
@@ -1764,98 +1723,31 @@ const fetchRouteBetweenPlaces = async (item1: any, item2: any, transportType: 'd
   }
 
   try {
-    await loadBaiduMap()
+    // 调用后端API查询交通信息（后端会自动检查缓存、调用百度地图API、保存缓存）
+    const res = await transportInfoApi.queryTransportInfo(
+      item1.lng, item1.lat, item2.lng, item2.lat, transportType
+    )
     
-    const startPoint = new (window as any).BMap.Point(item1.lng, item1.lat)
-    const endPoint = new (window as any).BMap.Point(item2.lng, item2.lat)
-
-    return new Promise<void>((resolve) => {
-      let timeoutId: any = null
-      
-      timeoutId = setTimeout(() => {
-        if (transportInfo.value[key]) {
-          transportInfo.value[key][transportType] = {
-            distance: 0,
-            duration: 0,
-            loading: false
-          }
+    if (res.code === 200 && res.data) {
+      // 更新交通信息
+      transportInfo.value[key] = {
+        ...transportInfo.value[key],
+        [transportType]: {
+          distance: res.data.distance || 0,
+          duration: res.data.duration || 0,
+          loading: false
         }
-        resolve()
-      }, 30000)
-
-      const tempMapDiv = document.createElement('div')
-      tempMapDiv.style.cssText = 'width:1px;height:1px;position:absolute;left:-9999px'
-      document.body.appendChild(tempMapDiv)
-      
-      const tempMap = new (window as any).BMap.Map(tempMapDiv, {
-        enableMapClick: false
-      })
-
-      const handleRouteComplete = (result: any, route: any) => {
-        clearTimeout(timeoutId)
-        try {
-          const status = route.getStatus()
-          if (status === 0) {
-            const plan = result.getPlan(0)
-            if (plan) {
-              const distance = plan.getDistance(false)
-              const duration = plan.getDuration(false)
-              transportInfo.value[key] = {
-                ...transportInfo.value[key],
-                [transportType]: {
-                  distance,
-                  duration,
-                  loading: false
-                }
-              }
-            } else {
-              transportInfo.value[key][transportType] = {
-                distance: 0,
-                duration: 0,
-                loading: false
-              }
-            }
-          } else {
-            transportInfo.value[key][transportType] = {
-              distance: 0,
-              duration: 0,
-              loading: false
-            }
-          }
-        } catch (error) {
-          if (transportInfo.value[key]) {
-            transportInfo.value[key][transportType] = {
-              distance: 0,
-              duration: 0,
-              loading: false
-            }
-          }
-        }
-        document.body.removeChild(tempMapDiv)
-        resolve()
       }
-
-      let route: any = null
-      const routeOptions = {
-        renderOptions: {
-          map: null,
-          autoViewport: false,
-          panel: null
-        },
-        onSearchComplete: (result: any) => handleRouteComplete(result, route)
+    } else {
+      // 查询失败
+      transportInfo.value[key][transportType] = {
+        distance: 0,
+        duration: 0,
+        loading: false
       }
-
-      if (transportType === 'driving') {
-        route = new (window as any).BMap.DrivingRoute(tempMap, routeOptions)
-      } else if (transportType === 'transit') {
-        route = new (window as any).BMap.TransitRoute(tempMap, routeOptions)
-      } else if (transportType === 'walking') {
-        route = new (window as any).BMap.WalkingRoute(tempMap, routeOptions)
-      }
-
-      route.search(startPoint, endPoint)
-    })
+    }
   } catch (error) {
+    console.error('获取交通信息失败:', error)
     if (transportInfo.value[key]) {
       transportInfo.value[key][transportType] = {
         distance: 0,
@@ -2020,12 +1912,12 @@ const deleteItineraryItem = async (item: any) => {
   }
 }
 
-const changeRole = (member: TripMember) => {
-  console.log('更改角色:', member.userId)
+const changeRole = (_member: TripMember) => {
+  // TODO: 实现更改角色功能
 }
 
-const removeMember = (member: TripMember) => {
-  console.log('移除成员:', member.userId)
+const removeMember = (_member: TripMember) => {
+  // TODO: 实现移除成员功能
 }
 
 // 处理编辑行程安排
@@ -2080,7 +1972,6 @@ const handleInviteMember = async () => {
   try {
     await inviteFormRef.value.validate()
   } catch (error) {
-    console.log('表单验证失败:', error)
     return
   }
 

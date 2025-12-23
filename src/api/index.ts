@@ -478,3 +478,50 @@ export const baiduRouteApi = {
   }
 }
 
+// 交通信息API（两点之间的driving/transit/walking）
+export const transportInfoApi = {
+  // 查询交通信息（完整流程：检查缓存 -> 调用百度地图API -> 保存缓存）
+  queryTransportInfo(startLng: number, startLat: number, endLng: number, endLat: number, transportType: 'driving' | 'transit' | 'walking') {
+    return request.post('/transport-info/query', {
+      startLng,
+      startLat,
+      endLng,
+      endLat,
+      transportType
+    })
+  },
+
+  // 检查交通信息缓存（保留用于兼容）
+  checkTransportInfoCache(startLng: number, startLat: number, endLng: number, endLat: number, transportType: 'driving' | 'transit' | 'walking') {
+    return request.post('/transport-info/cache/check', {
+      startLng,
+      startLat,
+      endLng,
+      endLat,
+      transportType
+    })
+  },
+
+  // 保存交通信息到缓存（保留用于兼容）
+  saveTransportInfoCache(startLng: number, startLat: number, endLng: number, endLat: number, transportType: 'driving' | 'transit' | 'walking', transportData: { distance: number; duration: number }) {
+    return request.post('/transport-info/cache/save', {
+      startLng,
+      startLat,
+      endLng,
+      endLat,
+      transportType,
+      transportData
+    })
+  },
+
+  // 获取缓存统计信息
+  getCacheStats() {
+    return request.get('/transport-info/cache/stats')
+  },
+
+  // 清除所有缓存
+  clearAllCache() {
+    return request.delete('/transport-info/cache/all')
+  }
+}
+

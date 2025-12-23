@@ -723,9 +723,15 @@ const loadTripDetail = async () => {
   
   loading.value = true
   try {
-    const res = await tripApi.getTripById(Number(tripId))
-    if (res.code === 200 && res.data) {
-      const data = res.data
+    // 并行加载行程详情、相关账单和待接受邀请，提升加载速度
+    const [tripRes] = await Promise.allSettled([
+      tripApi.getTripById(Number(tripId)),
+      loadRelatedExpenses(Number(tripId)).catch(() => {}), // 忽略错误，不影响主流程
+      loadPendingInvitations(Number(tripId)).catch(() => {}) // 忽略错误，不影响主流程
+    ])
+    
+    if (tripRes.status === 'fulfilled' && tripRes.value.code === 200 && tripRes.value.data) {
+      const data = tripRes.value.data
       const places = data.places || []
       
       // 转换地点数据为itinerary格式
@@ -788,14 +794,11 @@ const loadTripDetail = async () => {
         createdAt: data.createdTime ? dayjs(data.createdTime).format('YYYY-MM-DD') : '',
         updatedAt: data.updatedTime ? dayjs(data.updatedTime).format('YYYY-MM-DD') : ''
       }
-      
-      // 加载相关账单
-      await loadRelatedExpenses(Number(tripId))
-      
-      // 加载待接受邀请的成员
-      await loadPendingInvitations(Number(tripId))
     } else {
-      ElMessage.error(res.message || '加载行程详情失败')
+      const errorMsg = tripRes.status === 'rejected' 
+        ? tripRes.reason?.message || '加载行程详情失败'
+        : tripRes.value?.message || '加载行程详情失败'
+      ElMessage.error(errorMsg)
       router.push('/trips')
     }
   } catch (error: any) {
@@ -2194,7 +2197,7 @@ const handleAutoPlanRoute = async () => {
   }
 
   // 检查是否有未规划的地点
-  const unplannedPlaces = trip.value?.places?.find(dayPlaces => dayPlaces.day === 0)?.places || []
+  const unplannedPlaces = trip.value?.itinerary?.filter(item => item.day === 0) || []
   if (unplannedPlaces.length === 0) {
     ElMessage.warning('没有未规划的地点，无需进行路线规划')
     return

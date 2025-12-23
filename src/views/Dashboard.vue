@@ -346,7 +346,7 @@ const loadData = async () => {
     }
     
     // 普通用户加载原有数据
-    // 并行加载所有数据
+    // 第一步：并行加载行程、账本、公告
     const [tripsRes, booksRes, announcementsRes] = await Promise.all([
       tripApi.getTrips().catch(() => ({ code: 200, data: [] })),
       expenseApi.getAllAccountBooks().catch(() => ({ code: 200, data: [] })),
@@ -390,20 +390,27 @@ const loadData = async () => {
       })
     }
     
-    // 处理账本数据
+    // 处理账本数据并准备账单查询
+    let expensePromises: Promise<any>[] = []
     if (booksRes.code === 200 && booksRes.data) {
       accountBooks.value = Array.isArray(booksRes.data) ? booksRes.data : []
       
-      // 加载每个账本的账单
-      const expensePromises = accountBooks.value.map((book: any) =>
+      // 准备所有账本的账单查询（保持100条记录）
+      expensePromises = accountBooks.value.map((book: any) =>
         expenseApi.getRecords(book.id || book.bookId, 1, 100).catch(() => ({ code: 200, data: { items: [] } }))
       )
-      
-      const expenseResults = await Promise.all(expensePromises)
-      
-      // 合并所有账单
+    }
+    
+    // 第二步：并行执行账单查询和社区查询
+    const [expenseResults, communityRes] = await Promise.allSettled([
+      Promise.all(expensePromises),
+      communityApi.getFeed(1, 100).catch(() => ({ code: 200, data: { list: [] } }))
+    ])
+    
+    // 处理账单数据
+    if (expenseResults.status === 'fulfilled') {
       allExpenses.value = []
-      expenseResults.forEach((res: any) => {
+      expenseResults.value.forEach((res: any) => {
         if (res.code === 200 && res.data) {
           const items = res.data.items || res.data.list || []
           items.forEach((record: any) => {
@@ -444,25 +451,21 @@ const loadData = async () => {
       })
     }
     
+    // 处理社区数据
+    if (communityRes.status === 'fulfilled' && communityRes.value.code === 200 && communityRes.value.data) {
+      const myPosts = (communityRes.value.data.list || []).filter((post: any) => 
+        post.author?.userId === userStore.user?.userId || post.author?.userId === userStore.user?.id
+      )
+      stats.value.sharedTrips = myPosts.length
+    } else {
+      stats.value.sharedTrips = 0
+    }
+    
     // 计算统计数据
     stats.value.totalTrips = allTrips.value.length
     stats.value.ongoingTrips = allTrips.value.filter(t => t.status === 'ongoing').length
     stats.value.totalExpenses = allExpenses.value
       .reduce((sum, e) => sum + e.amount, 0)
-    // 获取已分享的行程数量
-    try {
-      const communityRes = await communityApi.getFeed(1, 100).catch(() => ({ code: 200, data: { list: [] } }))
-      if (communityRes.code === 200 && communityRes.data) {
-        const myPosts = (communityRes.data.list || []).filter((post: any) => 
-          post.author?.userId === userStore.user?.userId || post.author?.userId === userStore.user?.id
-        )
-        stats.value.sharedTrips = myPosts.length
-      } else {
-        stats.value.sharedTrips = 0
-      }
-    } catch (error) {
-      stats.value.sharedTrips = 0
-    }
     
     // 处理公告数据
     if (announcementsRes.code === 200 && announcementsRes.data) {

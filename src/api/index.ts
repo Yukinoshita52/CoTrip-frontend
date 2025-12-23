@@ -254,6 +254,11 @@ export const communityApi = {
     return request.get(`/community/post/${postId}/like/status`)
   },
 
+  // 获取帖子统计信息
+  getPostStats(postId: number) {
+    return request.get(`/community/post/${postId}/stats`)
+  },
+
   // 获取用户主页
   getUserProfile(userId: number) {
     return request.get(`/community/user/${userId}`)

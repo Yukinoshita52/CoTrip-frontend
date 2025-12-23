@@ -52,11 +52,39 @@ export interface AuthorVO {
   userId: number
   nickname: string
   avatar?: string
+  username?: string
 }
 
 export interface SearchUserVO {
   keyword: string
   users: AuthorVO[]
+}
+
+// 评论相关类型
+export interface CommentVO {
+  commentId: number
+  user: AuthorVO
+  content: string
+  createTime: string
+  parentId?: number
+  children?: CommentVO[]
+}
+
+export interface CommentListVO {
+  postId: number
+  comments: CommentVO[]
+}
+
+export interface CommentDTO {
+  postId: number
+  content: string
+  parentId?: number
+}
+
+export interface CommentCreatedVO {
+  commentId: number
+  postId: number
+  createTime: string
 }
 
 // 请求参数类型

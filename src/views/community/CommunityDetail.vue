@@ -83,6 +83,28 @@
         </div>
       </el-card>
 
+      <!-- 行程图片展示 -->
+      <el-card class="trip-photos" v-if="post.trip.coverImage || (post.trip.images && post.trip.images.length > 0)">
+        <template #header>
+          <span>行程图片</span>
+        </template>
+        <div class="photo-gallery">
+          <div class="photo-grid">
+            <div 
+              v-for="(image, index) in allImages" 
+              :key="index" 
+              class="photo-item"
+              @click="previewImage(index)"
+            >
+              <img :src="formatImageUrl(image)" :alt="`行程图片${index + 1}`" />
+              <div class="photo-overlay">
+                <el-icon><ZoomIn /></el-icon>
+              </div>
+            </div>
+          </div>
+        </div>
+      </el-card>
+
       <!-- 详细行程 -->
       <el-card class="itinerary-detail">
         <template #header>
@@ -167,6 +189,88 @@
         </div>
       </el-card>
 
+      <!-- 评论区 -->
+      <el-card class="comments-section">
+        <template #header>
+          <div class="comments-header">
+            <span>评论 ({{ comments.length }})</span>
+            <el-button type="primary" size="small" @click="showCommentDialog = true">
+              <el-icon><ChatDotRound /></el-icon>
+              写评论
+            </el-button>
+          </div>
+        </template>
+        
+        <!-- 评论列表 -->
+        <div class="comments-list" v-if="comments.length > 0">
+          <div v-for="comment in comments" :key="comment.commentId" class="comment-item">
+            <div class="comment-avatar">
+              <el-avatar :src="getAvatarUrl(comment.user)">
+                {{ getAvatarFallback(comment.user) }}
+              </el-avatar>
+            </div>
+            <div class="comment-content">
+              <div class="comment-header">
+                <span class="comment-author">{{ comment.user.nickname || comment.user.username }}</span>
+                <span class="comment-time">{{ formatDate(comment.createTime) }}</span>
+              </div>
+              <div class="comment-text">{{ comment.content }}</div>
+              <div class="comment-actions">
+                <el-button text size="small" @click="replyToComment(comment)">
+                  <el-icon><ChatDotRound /></el-icon>
+                  回复
+                </el-button>
+                <el-button 
+                  text 
+                  size="small" 
+                  type="danger" 
+                  v-if="isCurrentUserComment(comment)"
+                  @click="deleteComment(comment.commentId)"
+                >
+                  <el-icon><Delete /></el-icon>
+                  删除
+                </el-button>
+              </div>
+              
+              <!-- 子评论 -->
+              <div v-if="comment.children && comment.children.length > 0" class="replies">
+                <div v-for="reply in comment.children" :key="reply.commentId" class="reply-item">
+                  <div class="reply-avatar">
+                    <el-avatar :size="32" :src="getAvatarUrl(reply.user)">
+                      {{ getAvatarFallback(reply.user) }}
+                    </el-avatar>
+                  </div>
+                  <div class="reply-content">
+                    <div class="reply-header">
+                      <span class="reply-author">{{ reply.user.nickname || reply.user.username }}</span>
+                      <span class="reply-time">{{ formatDate(reply.createTime) }}</span>
+                    </div>
+                    <div class="reply-text">{{ reply.content }}</div>
+                    <div class="reply-actions">
+                      <el-button 
+                        text 
+                        size="small" 
+                        type="danger" 
+                        v-if="isCurrentUserComment(reply)"
+                        @click="deleteComment(reply.commentId)"
+                      >
+                        <el-icon><Delete /></el-icon>
+                        删除
+                      </el-button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 空状态 -->
+        <div v-else class="empty-comments">
+          <el-empty description="暂无评论，快来抢沙发吧！" />
+        </div>
+      </el-card>
+
       <!-- 使用此行程 -->
       <el-card class="use-trip" v-if="!isCurrentUserPost">
         <div class="use-trip-content">
@@ -203,6 +307,44 @@
         </div>
       </el-card>
     </div>
+
+    <!-- 评论对话框 -->
+    <el-dialog 
+      v-model="showCommentDialog" 
+      :title="replyingTo ? '回复评论' : '写评论'" 
+      width="500px"
+      @close="resetCommentForm"
+    >
+      <el-form :model="commentForm" label-width="80px">
+        <el-form-item v-if="replyingTo" label="回复给">
+          <el-tag>{{ replyingTo.user.nickname || replyingTo.user.username }}</el-tag>
+        </el-form-item>
+        <el-form-item label="评论内容" required>
+          <el-input
+            v-model="commentForm.content"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入评论内容..."
+            maxlength="500"
+            show-word-limit
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showCommentDialog = false">取消</el-button>
+        <el-button type="primary" @click="submitComment" :loading="submittingComment">
+          {{ replyingTo ? '回复' : '发表评论' }}
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 图片预览 -->
+    <el-image-viewer
+      v-if="showImageViewer"
+      :url-list="allImages.map(img => formatImageUrl(img))"
+      :initial-index="currentImageIndex"
+      @close="showImageViewer = false"
+    />
   </Layout>
 </template>
 
@@ -226,11 +368,35 @@ const loading = ref(false)
 // 帖子数据
 const post = ref<CommunityPost | null>(null)
 const relatedExpenses = ref<Expense[]>([])
+const comments = ref<any[]>([])
+
+// 评论相关状态
+const showCommentDialog = ref(false)
+const submittingComment = ref(false)
+const replyingTo = ref<any>(null)
+const commentForm = ref({
+  content: ''
+})
+
+// 图片预览相关状态
+const showImageViewer = ref(false)
+const currentImageIndex = ref(0)
 
 // 计算属性
 const isCurrentUserPost = computed(() => {
   if (!post.value || !userStore.user) return false
   return String(post.value.authorId) === String(userStore.user.id)
+})
+
+const allImages = computed(() => {
+  const images = []
+  if (post.value?.trip.coverImage) {
+    images.push(post.value.trip.coverImage)
+  }
+  if (post.value?.trip.images && post.value.trip.images.length > 0) {
+    images.push(...post.value.trip.images)
+  }
+  return images
 })
 
 // 加载帖子详情
@@ -291,6 +457,9 @@ const loadPostDetail = async () => {
 
       // 加载相关费用
       await loadRelatedExpenses(data.tripId)
+      
+      // 加载评论
+      await loadComments(postId)
       
       // 加载点赞状态
       await loadLikeStatus(postId)
@@ -386,6 +555,126 @@ const loadRelatedExpenses = async (tripId: number) => {
   } catch (error: any) {
     console.error('加载相关费用失败:', error)
   }
+}
+
+// 加载评论
+const loadComments = async (postId: number) => {
+  try {
+    const res = await communityApi.getComments(postId)
+    if (res.code === 200 && res.data) {
+      comments.value = res.data.comments || []
+    }
+  } catch (error: any) {
+    console.error('加载评论失败:', error)
+  }
+}
+
+// 提交评论
+const submitComment = async () => {
+  if (!commentForm.value.content.trim()) {
+    ElMessage.warning('请输入评论内容')
+    return
+  }
+
+  submittingComment.value = true
+  try {
+    const commentData = {
+      postId: Number(route.params.id),
+      content: commentForm.value.content.trim(),
+      parentId: replyingTo.value?.commentId || null
+    }
+
+    const res = await communityApi.addComment(commentData)
+    if (res.code === 200) {
+      ElMessage.success(replyingTo.value ? '回复成功' : '评论成功')
+      showCommentDialog.value = false
+      resetCommentForm()
+      // 重新加载评论
+      await loadComments(Number(route.params.id))
+      // 更新评论数
+      if (post.value && post.value.stats) {
+        post.value.stats.commentCount = (post.value.stats.commentCount || 0) + 1
+      }
+    } else {
+      ElMessage.error(res.message || '评论失败')
+    }
+  } catch (error: any) {
+    console.error('提交评论失败:', error)
+    ElMessage.error(error.message || '评论失败')
+  } finally {
+    submittingComment.value = false
+  }
+}
+
+// 回复评论
+const replyToComment = (comment: any) => {
+  replyingTo.value = comment
+  showCommentDialog.value = true
+}
+
+// 删除评论
+const deleteComment = async (commentId: number) => {
+  try {
+    await ElMessageBox.confirm('确定要删除这条评论吗？', '确认删除', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+
+    const res = await communityApi.deleteComment(commentId)
+    if (res.code === 200) {
+      ElMessage.success('删除成功')
+      // 重新加载评论
+      await loadComments(Number(route.params.id))
+      // 更新评论数
+      if (post.value && post.value.stats) {
+        post.value.stats.commentCount = Math.max((post.value.stats.commentCount || 0) - 1, 0)
+      }
+    } else {
+      ElMessage.error(res.message || '删除失败')
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('删除评论失败:', error)
+      ElMessage.error(error.message || '删除失败')
+    }
+  }
+}
+
+// 重置评论表单
+const resetCommentForm = () => {
+  commentForm.value.content = ''
+  replyingTo.value = null
+}
+
+// 检查是否是当前用户的评论
+const isCurrentUserComment = (comment: any) => {
+  if (!userStore.user) return false
+  return String(comment.user.userId) === String(userStore.user.id)
+}
+
+// 图片预览
+const previewImage = (index: number) => {
+  currentImageIndex.value = index
+  showImageViewer.value = true
+}
+
+// 头像处理函数
+const getAvatarUrl = (user: any) => {
+  if (!user?.avatar || user.avatar.trim() === '') {
+    return ''
+  }
+  return formatAvatarUrl(user.avatar)
+}
+
+const getAvatarFallback = (user: any) => {
+  if (user?.nickname) {
+    return user.nickname.charAt(0)
+  }
+  if (user?.username) {
+    return user.username.charAt(0)
+  }
+  return '?'
 }
 
 // 计算属性
@@ -652,7 +941,7 @@ const handleDeletePost = async () => {
   flex-direction: column;
 }
 
-.trip-overview, .itinerary-detail, .expense-detail, .use-trip, .edit-post {
+.trip-overview, .itinerary-detail, .expense-detail, .trip-photos, .comments-section, .use-trip, .edit-post {
   margin-bottom: 24px;
 }
 
@@ -793,5 +1082,174 @@ const handleDeletePost = async () => {
 
 .liked-button:hover {
   color: #f78989 !important;
+}
+
+/* 行程图片样式 */
+.photo-gallery {
+  width: 100%;
+}
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.photo-item {
+  position: relative;
+  aspect-ratio: 4/3;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.photo-item:hover {
+  transform: scale(1.05);
+}
+
+.photo-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  color: white;
+  font-size: 24px;
+}
+
+.photo-item:hover .photo-overlay {
+  opacity: 1;
+}
+
+/* 评论区样式 */
+.comments-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.comments-list {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.comment-item {
+  display: flex;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.comment-item:last-child {
+  border-bottom: none;
+}
+
+.comment-avatar {
+  flex-shrink: 0;
+}
+
+.comment-content {
+  flex: 1;
+}
+
+.comment-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.comment-author {
+  font-weight: 500;
+  color: #333;
+}
+
+.comment-time {
+  font-size: 12px;
+  color: #999;
+}
+
+.comment-text {
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.comment-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.replies {
+  margin-top: 12px;
+  padding-left: 16px;
+  border-left: 2px solid #f0f0f0;
+}
+
+.reply-item {
+  display: flex;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f8f8f8;
+}
+
+.reply-item:last-child {
+  border-bottom: none;
+}
+
+.reply-avatar {
+  flex-shrink: 0;
+}
+
+.reply-content {
+  flex: 1;
+}
+
+.reply-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.reply-author {
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+}
+
+.reply-time {
+  font-size: 11px;
+  color: #999;
+}
+
+.reply-text {
+  color: #666;
+  line-height: 1.5;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.reply-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.empty-comments {
+  padding: 40px 0;
+  text-align: center;
 }
 </style>

@@ -149,13 +149,13 @@
                 </div>
                 <el-icon class="action-arrow"><ArrowRight /></el-icon>
               </div>
-              <div class="action-button-item" @click="$router.push('/expenses/create')">
+              <div class="action-button-item" @click="$router.push('/expenses')">
                 <div class="action-icon-wrapper success">
                   <el-icon><Money /></el-icon>
                 </div>
                 <div class="action-text">
-                  <div class="action-title">添加账单</div>
-                  <div class="action-desc">记录旅行支出</div>
+                  <div class="action-title">记账管理</div>
+                  <div class="action-desc">管理旅行支出</div>
                 </div>
                 <el-icon class="action-arrow"><ArrowRight /></el-icon>
               </div>

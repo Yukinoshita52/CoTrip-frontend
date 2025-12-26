@@ -19,8 +19,8 @@
             <h1 class="post-title-modern">{{ post.title }}</h1>
             <div class="post-meta-modern">
               <div class="author-info-modern">
-                <el-avatar :src="formatAvatarUrl(post.author.avatar)" :size="48" class="author-avatar-modern">
-                  {{ post.author.username.charAt(0) }}
+                <el-avatar :src="formatAvatarUrl(post.author.avatarUrl || post.author.avatar)" :size="48" class="author-avatar-modern">
+                  {{ (post.author.username || post.author.nickname || 'U').charAt(0) }}
                 </el-avatar>
                 <div class="author-details-modern">
                   <div class="author-name-modern">{{ post.author.username }}</div>
@@ -82,21 +82,21 @@
         <div class="overview-content">
           <div class="trip-basic-info">
             <div class="info-item">
-              <label>目的地：</label>
-              <span>{{ post.trip.destination }}</span>
-            </div>
-            <div class="info-item">
               <label>行程时间：</label>
               <span>{{ formatDateRange(post.trip.startDate, post.trip.endDate) }}</span>
             </div>
             <div class="info-item">
               <label>行程天数：</label>
-              <span>{{ getTripDuration(post.trip) }} 天</span>
+              <span>{{ getTripDuration(post.trip) || '待确定' }} {{ getTripDuration(post.trip) > 0 ? '天' : '' }}</span>
+            </div>
+            <div class="info-item" v-if="tripDestinations">
+              <label>目的地：</label>
+              <span>{{ tripDestinations }}</span>
             </div>
           </div>
           <div class="trip-description">
             <h4>行程描述</h4>
-            <p>{{ post.description }}</p>
+            <p>{{ getTripDescription() }}</p>
           </div>
         </div>
       </el-card>
@@ -142,12 +142,12 @@
           <div v-for="(dayItems, date) in groupedItinerary" :key="date" class="day-group">
             <div class="day-header">
               <h3>{{ formatDayTitle(date) }}</h3>
-              <span class="day-count">{{ dayItems.length }} 项安排</span>
+              <span class="day-count">{{ dayItems.length }} 个地点</span>
             </div>
             
             <div class="day-items">
-              <div v-for="item in dayItems" :key="item.id" class="itinerary-item-modern">
-                <div class="item-time-modern">{{ formatTime(item.startTime) }}</div>
+              <div v-for="(item, index) in dayItems" :key="item.id" class="itinerary-item-modern">
+                <div class="item-sequence">{{ index + 1 }}</div>
                 <div class="item-content">
                   <div class="item-header">
                     <span class="item-title">{{ item.title }}</span>
@@ -155,19 +155,29 @@
                       {{ getItemTypeText(item.type) }}
                     </el-tag>
                   </div>
-                  <div class="item-location">
+                  <div class="item-location" v-if="item.location">
                     <el-icon><Location /></el-icon>
                     {{ item.location }}
                   </div>
                   <div v-if="item.description" class="item-description">
                     {{ item.description }}
                   </div>
-                  <div v-if="item.cost" class="item-cost">
-                    预算：¥{{ item.cost }}
+                  <div v-if="item.telephone" class="item-contact">
+                    <el-icon><Phone /></el-icon>
+                    {{ item.telephone }}
                   </div>
                 </div>
               </div>
             </div>
+          </div>
+          
+          <!-- 如果没有详细行程安排，显示提示信息 -->
+          <div v-if="Object.keys(groupedItinerary).length === 0" class="no-itinerary">
+            <el-empty description="暂无详细行程安排" :image-size="100">
+              <template #description>
+                <p>该行程还没有添加具体的地点安排</p>
+              </template>
+            </el-empty>
           </div>
         </div>
       </el-card>
@@ -424,6 +434,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '@/components/Layout.vue'
@@ -476,6 +487,37 @@ const allImages = computed(() => {
   return images
 })
 
+// 计算目的地列表（从行程安排中提取不重复的地点）
+const tripDestinations = computed(() => {
+  if (!post.value?.trip.itinerary || post.value.trip.itinerary.length === 0) {
+    return post.value?.trip.destination || ''
+  }
+  
+  // 从行程安排中提取所有地点名称
+  const locations = new Set<string>()
+  post.value.trip.itinerary.forEach(item => {
+    if (item.location) {
+      // 提取地点名称，去掉详细地址，只保留主要地名
+      const locationParts = item.location.split(/[,，]/)
+      if (locationParts.length > 0) {
+        const mainLocation = locationParts[0].trim()
+        if (mainLocation) {
+          locations.add(mainLocation)
+        }
+      }
+    }
+  })
+  
+  // 如果没有从行程中提取到地点，使用原始目的地
+  if (locations.size === 0) {
+    return post.value?.trip.destination || ''
+  }
+  
+  // 转换为数组并限制显示数量（最多显示5个地点）
+  const locationArray = Array.from(locations).slice(0, 5)
+  return locationArray.join(', ')
+})
+
 // 加载帖子详情
 const loadPostDetail = async () => {
   const postId = Number(route.params.id)
@@ -490,50 +532,53 @@ const loadPostDetail = async () => {
     const res = await communityApi.getPostDetail(postId)
     if (res.code === 200 && res.data) {
       const data = res.data
+      
       post.value = {
         id: String(data.postId || data.id || postId),
-        title: data.tripName || data.title || '',
-        description: data.description || '',
-        tripId: String(data.tripId || ''),
+        title: data.trip?.name || data.title || '',
+        description: data.trip?.description || data.description || '',
+        tripId: String(data.trip?.tripId || data.tripId || ''),
         authorId: String(data.author?.userId || data.authorId || ''),
         author: {
           id: String(data.author?.userId || data.authorId || ''),
           username: data.author?.username || '',
           email: data.author?.email || '',
           nickname: data.author?.nickname || data.author?.username || '',
-          avatar: data.author?.avatarUrl || data.author?.avatar || '',
+          avatar: data.author?.avatar || '',
+          avatarUrl: data.author?.avatarUrl || data.author?.avatar || '',
           createdAt: ''
         },
         trip: {
-          id: String(data.tripId || ''),
-          title: data.tripName || '',
-          destination: data.region || '',
-          startDate: data.startDate ? dayjs(data.startDate).format('YYYY-MM-DD') : '',
-          endDate: data.endDate ? dayjs(data.endDate).format('YYYY-MM-DD') : '',
+          id: String(data.trip?.tripId || data.tripId || ''),
+          title: data.trip?.name || '',
+          destination: data.trip?.region || '',
+          startDate: data.trip?.startDate && dayjs(data.trip.startDate).isValid() ? dayjs(data.trip.startDate).format('YYYY-MM-DD') : '',
+          endDate: data.trip?.endDate && dayjs(data.trip.endDate).isValid() ? dayjs(data.trip.endDate).format('YYYY-MM-DD') : '',
           status: 'completed',
-          description: data.description || '',
-          coverImage: data.coverImages?.[0] || '',
+          description: data.trip?.description || '',
+          coverImage: data.trip?.images?.[0] || '',
           createdBy: String(data.author?.userId || ''),
           members: [],
           itinerary: [],
           createdAt: data.createTime ? dayjs(data.createTime).format('YYYY-MM-DD') : '',
           updatedAt: data.createTime ? dayjs(data.createTime).format('YYYY-MM-DD') : ''
         },
-        likes: data.stats?.likeCount || data.likes || 0,
-        views: data.stats?.viewCount || data.views || 0,
-        tags: data.tags || [],
+        likes: data.stats?.likeCount || 0,
+        views: data.stats?.viewCount || 0,
+        tags: [],
         isPublic: true,
+        stats: data.stats || { likeCount: 0, viewCount: 0, commentCount: 0 },
         createdAt: data.createTime ? dayjs(data.createTime).format('YYYY-MM-DD') : '',
         updatedAt: data.createTime ? dayjs(data.createTime).format('YYYY-MM-DD') : ''
       }
 
-      // 加载行程详情以获取 itinerary
-      if (data.tripId) {
-        await loadTripDetail(data.tripId)
+      // 加载行程详情以获取 itinerary (如果还没有日期信息，也会从这里获取)
+      if (data.trip?.tripId || data.tripId) {
+        await loadTripDetail(data.trip?.tripId || data.tripId)
       }
 
       // 加载相关费用
-      await loadRelatedExpenses(data.tripId)
+      await loadRelatedExpenses(data.trip?.tripId || data.tripId)
       
       // 加载评论
       await loadComments(postId)
@@ -610,31 +655,117 @@ const loadTripDetail = async (tripId: number) => {
     const res = await tripApi.getTripById(tripId)
     if (res.code === 200 && res.data && post.value) {
       const tripData = res.data
-      post.value.trip.itinerary = tripData.places?.flatMap((day: any) => 
-        day.places.map((place: any) => ({
-          id: String(place.id || place.placeId || ''),
-          tripId: String(tripId),
-          title: place.name || '',
-          description: place.description || '',
-          location: place.address || '',
-          startTime: day.date ? dayjs(day.date).format('YYYY-MM-DD') + 'T09:00:00' : '',
-          endTime: day.date ? dayjs(day.date).format('YYYY-MM-DD') + 'T17:00:00' : '',
-          type: 'activity',
-          cost: 0,
-          createdBy: '',
-          createdAt: ''
-        })) || []
-      ) || []
+      
+      // 更新行程基本信息
+      post.value.trip.title = tripData.name || tripData.title || post.value.trip.title
+      post.value.trip.description = tripData.description || post.value.trip.description
+      post.value.trip.destination = tripData.region || tripData.destination || post.value.trip.destination
+      
+      // 处理日期，只有在当前日期无效时才更新
+      if ((!post.value.trip.startDate || post.value.trip.startDate === '') && tripData.startDate) {
+        const startDate = dayjs(tripData.startDate)
+        if (startDate.isValid()) {
+          post.value.trip.startDate = startDate.format('YYYY-MM-DD')
+        }
+      }
+      
+      if ((!post.value.trip.endDate || post.value.trip.endDate === '') && tripData.endDate) {
+        const endDate = dayjs(tripData.endDate)
+        if (endDate.isValid()) {
+          post.value.trip.endDate = endDate.format('YYYY-MM-DD')
+        }
+      }
+      
+      post.value.trip.coverImage = tripData.coverImageUrl || tripData.coverImage || post.value.trip.coverImage
+      
+      // 处理行程安排 - 改进数据结构以显示更丰富的信息
+      if (tripData.places && Array.isArray(tripData.places)) {
+        post.value.trip.itinerary = tripData.places.flatMap((day: any, dayIndex: number) => {
+          if (!day.places || !Array.isArray(day.places)) return []
+          
+          // 计算当天的实际日期
+          let dayDate = ''
+          let startTime = ''
+          let endTime = ''
+          
+          // 使用行程开始日期和天数来计算实际日期
+          if (post.value?.trip.startDate && post.value.trip.startDate.trim() !== '') {
+            const tripStart = dayjs(post.value.trip.startDate)
+            if (tripStart.isValid()) {
+              // day.day 是从1开始的天数，所以要减1
+              const dayNumber = day.day || (dayIndex + 1)
+              const calculatedDate = tripStart.add(dayNumber - 1, 'day')
+              dayDate = calculatedDate.format('YYYY-MM-DD')
+              startTime = calculatedDate.format('YYYY-MM-DD') + 'T09:00:00'
+              endTime = calculatedDate.format('YYYY-MM-DD') + 'T17:00:00'
+            }
+          }
+          
+          // 如果还是没有有效日期，使用索引来生成相对日期
+          if (!dayDate) {
+            const dayNumber = day.day || (dayIndex + 1)
+            // 使用一个默认的基准日期
+            const baseDate = dayjs('2024-01-01').add(dayNumber - 1, 'day')
+            dayDate = baseDate.format('YYYY-MM-DD')
+            startTime = baseDate.format('YYYY-MM-DD') + 'T09:00:00'
+            endTime = baseDate.format('YYYY-MM-DD') + 'T17:00:00'
+          }
+          
+          return day.places.map((place: any, placeIndex: number) => ({
+            id: String(place.id || place.placeId || `${dayIndex}-${placeIndex}`),
+            tripId: String(tripId),
+            title: place.name || '未命名地点',
+            description: place.description || '',
+            location: place.address || place.location || '',
+            startTime: startTime,
+            endTime: endTime,
+            type: getPlaceTypeFromId(place.typeId) || 'activity',
+            typeId: place.typeId,
+            day: day.day || (dayIndex + 1),
+            dayDate: dayDate,
+            cost: 0,
+            createdBy: '',
+            createdAt: '',
+            // 添加额外信息
+            lat: place.lat,
+            lng: place.lng,
+            telephone: place.telephone,
+            uid: place.uid
+          }))
+        })
+      } else {
+        post.value.trip.itinerary = []
+      }
+      
+      // 处理成员信息
       post.value.trip.members = tripData.members?.map((m: any) => ({
         userId: String(m.userId || m.id || ''),
         username: m.username || '',
         role: m.role === 0 ? 'owner' : m.role === 1 ? 'admin' : 'member',
         joinedAt: m.joinedAt || ''
       })) || []
+      
+      // 处理行程图片（如果有的话）
+      if (tripData.images && Array.isArray(tripData.images)) {
+        post.value.trip.images = tripData.images
+      }
     }
   } catch (error: any) {
     console.error('加载行程详情失败:', error)
   }
+}
+
+// 根据地点类型ID获取类型名称
+const getPlaceTypeFromId = (typeId: number) => {
+  const typeMap: Record<number, string> = {
+    1: 'accommodation', // 住宿
+    2: 'dining',        // 餐饮
+    3: 'activity',      // 景点
+    4: 'transport',     // 交通
+    5: 'shopping',      // 购物
+    6: 'other'          // 其他
+  }
+  return typeMap[typeId] || 'activity'
 }
 
 // 加载相关费用
@@ -816,14 +947,59 @@ const groupedItinerary = computed(() => {
   const groups: Record<string, ItineraryItem[]> = {}
   if (post.value?.trip.itinerary) {
     post.value.trip.itinerary.forEach(item => {
-      const date = dayjs(item.startTime).format('YYYY-MM-DD')
+      // 使用 dayDate 或 startTime 来分组，确保日期有效
+      let date = ''
+      
+      if (item.dayDate && item.dayDate.trim() !== '') {
+        const parsedDate = dayjs(item.dayDate)
+        if (parsedDate.isValid()) {
+          date = parsedDate.format('YYYY-MM-DD')
+        }
+      }
+      
+      // 如果 dayDate 无效，尝试从 startTime 提取
+      if (!date && item.startTime && item.startTime.trim() !== '') {
+        const parsedStartTime = dayjs(item.startTime)
+        if (parsedStartTime.isValid()) {
+          date = parsedStartTime.format('YYYY-MM-DD')
+        }
+      }
+      
+      // 如果还是没有有效日期，使用天数作为分组键
+      if (!date) {
+        date = `day-${item.day || 1}`
+      }
+      
       if (!groups[date]) {
         groups[date] = []
       }
       groups[date].push(item)
     })
+    
+    // 按日期排序（对于 day-X 格式的键，按数字排序）
+    const sortedGroups: Record<string, ItineraryItem[]> = {}
+    Object.keys(groups)
+      .sort((a, b) => {
+        // 如果是 day-X 格式，按数字排序
+        if (a.startsWith('day-') && b.startsWith('day-')) {
+          const dayA = parseInt(a.replace('day-', ''))
+          const dayB = parseInt(b.replace('day-', ''))
+          return dayA - dayB
+        }
+        // 如果是日期格式，按日期排序
+        if (!a.startsWith('day-') && !b.startsWith('day-')) {
+          return dayjs(a).valueOf() - dayjs(b).valueOf()
+        }
+        // 混合情况，day-X 排在前面
+        return a.startsWith('day-') ? -1 : 1
+      })
+      .forEach(date => {
+        sortedGroups[date] = groups[date]
+      })
+    
+    return sortedGroups
   }
-  return groups
+  return {}
 })
 
 const expenseSummary = computed(() => {
@@ -850,13 +1026,51 @@ const formatDate = (date: string) => {
 }
 
 const formatDateRange = (startDate: string, endDate: string) => {
-  const start = dayjs(startDate).format('MM月DD日')
-  const end = dayjs(endDate).format('MM月DD日')
-  return `${start} - ${end}`
+  // 检查日期是否有效
+  if (!startDate || !endDate || startDate.trim() === '' || endDate.trim() === '') {
+    return '日期待确定'
+  }
+  
+  const start = dayjs(startDate)
+  const end = dayjs(endDate)
+  
+  // 检查 dayjs 对象是否有效
+  if (!start.isValid() || !end.isValid()) {
+    return '日期待确定'
+  }
+  
+  const startFormatted = start.format('MM月DD日')
+  const endFormatted = end.format('MM月DD日')
+  return `${startFormatted} - ${endFormatted}`
 }
 
 const formatDayTitle = (date: string) => {
-  return dayjs(date).format('MM月DD日 dddd')
+  // 处理 day-X 格式的键
+  if (date.startsWith('day-')) {
+    const dayNumber = parseInt(date.replace('day-', ''))
+    return `第${dayNumber}天`
+  }
+  
+  if (!date || date.trim() === '') {
+    return '日期待确定'
+  }
+  
+  const currentDate = dayjs(date)
+  if (!currentDate.isValid()) {
+    return '日期待确定'
+  }
+  
+  // 如果有行程开始日期，计算是第几天
+  if (post.value?.trip.startDate && post.value.trip.startDate.trim() !== '') {
+    const startDate = dayjs(post.value.trip.startDate)
+    if (startDate.isValid()) {
+      const dayNumber = currentDate.diff(startDate, 'day') + 1
+      return `第${dayNumber}天 ${currentDate.format('MM月DD日 dddd')}`
+    }
+  }
+  
+  // 如果没有行程开始日期，只显示日期
+  return currentDate.format('MM月DD日 dddd')
 }
 
 const formatTime = (time: string) => {
@@ -864,10 +1078,51 @@ const formatTime = (time: string) => {
 }
 
 const getTripDuration = (trip: any) => {
-  if (!trip.startDate || !trip.endDate) return 0
+  if (!trip || !trip.startDate || !trip.endDate || 
+      trip.startDate.trim() === '' || trip.endDate.trim() === '') {
+    return 0
+  }
+  
   const start = dayjs(trip.startDate)
   const end = dayjs(trip.endDate)
+  
+  // 检查 dayjs 对象是否有效
+  if (!start.isValid() || !end.isValid()) {
+    return 0
+  }
+  
   return end.diff(start, 'day') + 1
+}
+
+// 获取行程描述，确保不为空
+const getTripDescription = () => {
+  if (!post.value) return '这是一次精彩的旅行。'
+  
+  // 优先使用行程描述
+  if (post.value.trip.description && post.value.trip.description.trim()) {
+    return post.value.trip.description
+  }
+  
+  // 其次使用帖子描述
+  if (post.value.description && post.value.description.trim()) {
+    return post.value.description
+  }
+  
+  // 根据行程安排生成描述
+  if (post.value.trip.itinerary && post.value.trip.itinerary.length > 0) {
+    const dayCount = getTripDuration(post.value.trip)
+    const placeCount = post.value.trip.itinerary.length
+    const destinations = tripDestinations.value
+    
+    if (destinations) {
+      return `这是一次为期${dayCount}天的精彩旅行，行程包含${destinations}等${placeCount}个精选地点，涵盖了当地的特色景点、美食和文化体验。`
+    } else {
+      return `这是一次为期${dayCount}天的精彩旅行，包含${placeCount}个精心安排的地点，带您体验当地的独特魅力。`
+    }
+  }
+  
+  // 默认描述
+  return '这是一次精彩的旅行，包含了多个有趣的景点和活动安排。'
 }
 
 const getItemTypeColor = (type: string) => {
@@ -933,11 +1188,30 @@ const toggleLike = async () => {
 }
 
 const handleShare = () => {
-  ElMessage.success('分享链接已复制到剪贴板')
+  if (!post.value) return
+  
+  const shareUrl = `${window.location.origin}/community/${post.value.id}`
+  navigator.clipboard.writeText(shareUrl).then(() => {
+    ElMessage.success('分享链接已复制到剪贴板')
+  }).catch(() => {
+    ElMessage.error('复制失败，请手动复制链接')
+  })
 }
 
-const handleCollect = () => {
-  ElMessage.success('已收藏到我的行程')
+const handleCollect = async () => {
+  if (!post.value) return
+  
+  try {
+    const res = await communityApi.collectPost(Number(post.value.id))
+    if (res.code === 200) {
+      ElMessage.success('已收藏到我的行程')
+    } else {
+      ElMessage.error(res.message || '收藏失败')
+    }
+  } catch (error: any) {
+    console.error('收藏失败:', error)
+    ElMessage.error(error.message || '收藏失败')
+  }
 }
 
 const handleCopyTrip = async () => {
@@ -964,7 +1238,77 @@ const handleCopyTrip = async () => {
 }
 
 const handleEditPost = () => {
-  ElMessage.info('编辑帖子功能待开发')
+  if (!post.value) return
+  
+  // 创建编辑对话框的响应式数据
+  const editForm = ref({
+    title: post.value.title,
+    description: post.value.description
+  })
+  const showEditDialog = ref(true)
+  const editLoading = ref(false)
+  
+  // 创建编辑对话框
+  ElMessageBox({
+    title: '编辑帖子',
+    message: h('div', [
+      h('div', { style: 'margin-bottom: 16px' }, [
+        h('label', { style: 'display: block; margin-bottom: 8px; font-weight: 500' }, '帖子标题'),
+        h('input', {
+          value: editForm.value.title,
+          onInput: (e: any) => editForm.value.title = e.target.value,
+          style: 'width: 100%; padding: 8px 12px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 14px',
+          placeholder: '请输入帖子标题'
+        })
+      ]),
+      h('div', [
+        h('label', { style: 'display: block; margin-bottom: 8px; font-weight: 500' }, '帖子描述'),
+        h('textarea', {
+          value: editForm.value.description,
+          onInput: (e: any) => editForm.value.description = e.target.value,
+          style: 'width: 100%; padding: 8px 12px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 14px; resize: vertical; min-height: 80px',
+          placeholder: '请输入帖子描述',
+          rows: 4
+        })
+      ])
+    ]),
+    showCancelButton: true,
+    confirmButtonText: '保存修改',
+    cancelButtonText: '取消',
+    beforeClose: async (action, instance, done) => {
+      if (action === 'confirm') {
+        if (!editForm.value.title.trim()) {
+          ElMessage.warning('请填写帖子标题')
+          return
+        }
+        
+        editLoading.value = true
+        try {
+          const res = await communityApi.updatePost(Number(post.value!.id), {
+            name: editForm.value.title,
+            description: editForm.value.description
+          })
+          
+          if (res.code === 200) {
+            ElMessage.success('帖子修改成功!')
+            // 更新本地数据
+            post.value!.title = editForm.value.title
+            post.value!.description = editForm.value.description
+            done()
+          } else {
+            ElMessage.error(res.message || '编辑帖子失败')
+          }
+        } catch (error: any) {
+          console.error('编辑帖子失败:', error)
+          ElMessage.error(error.message || '编辑帖子失败')
+        } finally {
+          editLoading.value = false
+        }
+      } else {
+        done()
+      }
+    }
+  })
 }
 
 const handleDeletePost = async () => {
@@ -1376,18 +1720,19 @@ const handleDeletePost = async () => {
   opacity: 1;
 }
 
-.item-time-modern {
-  width: 70px;
+.item-sequence {
+  width: 40px;
+  height: 40px;
   font-weight: 700;
   color: #667eea;
   flex-shrink: 0;
-  font-size: 16px;
+  font-size: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
   background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-  border-radius: 10px;
+  border-radius: 50%;
+  border: 2px solid #667eea;
 }
 
 .item-content {
@@ -1430,6 +1775,25 @@ const handleDeletePost = async () => {
   color: #f56c6c;
   font-weight: 600;
   font-size: 15px;
+}
+
+.item-contact {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #409eff;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.item-contact .el-icon {
+  font-size: 16px;
+}
+
+.no-itinerary {
+  padding: 60px 20px;
+  text-align: center;
+  color: #666;
 }
 
 /* 费用明细 */

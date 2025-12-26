@@ -17,6 +17,7 @@ export interface Trip {
   startDate: string
   endDate: string
   coverImage?: string
+  images?: string[] // 行程图片列表
   status: 'planning' | 'ongoing' | 'completed'
   createdBy: string
   members: TripMember[]
@@ -39,6 +40,7 @@ export interface ItineraryItem {
   id: string
   placeId?: number // 真实的地点ID
   day?: number // 天数
+  dayDate?: string // 具体日期
   tripId: string
   title: string
   description?: string
@@ -53,6 +55,9 @@ export interface ItineraryItem {
   notes?: string
   createdBy: string
   createdAt: string
+  // 额外信息
+  telephone?: string
+  uid?: string
 }
 
 // 账单类型
@@ -94,6 +99,11 @@ export interface CommunityPost {
   views: number
   tags: string[]
   isPublic: boolean
+  stats?: {
+    likeCount: number
+    viewCount: number
+    commentCount: number
+  }
   createdAt: string
   updatedAt: string
 }

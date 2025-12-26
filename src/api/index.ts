@@ -291,6 +291,26 @@ export const communityApi = {
   // 获取当前用户已分享的行程ID列表
   getMySharedTripIds() {
     return request.get('/community/my-shared-trips')
+  },
+
+  // 更新帖子
+  updatePost(postId: number, data: any) {
+    return request.put(`/community/post/${postId}`, data)
+  },
+
+  // 收藏帖子
+  collectPost(postId: number) {
+    return request.post(`/community/post/${postId}/collect`)
+  },
+
+  // 取消收藏帖子
+  uncollectPost(postId: number) {
+    return request.delete(`/community/post/${postId}/collect`)
+  },
+
+  // 举报帖子
+  reportPost(postId: number, reason: string) {
+    return request.post(`/community/post/${postId}/report`, { reason })
   }
 }
 

@@ -96,8 +96,8 @@
               
               <div class="post-footer-modern">
                 <div class="author-info-modern">
-                  <el-avatar :size="32" :src="formatAvatarUrl(post.author.avatar)" class="author-avatar">
-                    {{ post.author.username?.charAt(0) || 'U' }}
+                  <el-avatar :size="32" :src="formatAvatarUrl(post.author.avatarUrl || post.author.avatar)" class="author-avatar">
+                    {{ (post.author.username || post.author.nickname || 'U').charAt(0) }}
                   </el-avatar>
                   <div class="author-details">
                     <div class="author-name-modern">{{ post.author.username || '未知用户' }}</div>
@@ -114,29 +114,30 @@
                   class="action-btn-modern"
                 >
                   <el-icon :class="{ 'liked-icon': isLiked(post) }"><Heart /></el-icon>
-                  <span>{{ post.likes }}</span>
+                  <span>喜欢</span>
+                </el-button>
+                <el-button text @click="collectPost(post)" class="action-btn-modern">
+                  <el-icon><Star /></el-icon>
+                  <span>收藏</span>
                 </el-button>
                 <el-button text @click="sharePost(post)" class="action-btn-modern">
                   <el-icon><Share /></el-icon>
                   <span>分享</span>
                 </el-button>
-                <el-dropdown trigger="click">
-                  <el-button text class="action-btn-modern">
-                    <el-icon><More /></el-icon>
-                  </el-button>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item @click="collectPost(post)">
-                        <el-icon><Star /></el-icon>
-                        收藏行程
-                      </el-dropdown-item>
-                      <el-dropdown-item @click="reportPost(post)" divided>
-                        <el-icon><Warning /></el-icon>
-                        举报内容
-                      </el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
+                <el-button text @click="reportPost(post)" class="action-btn-modern report-btn">
+                  <el-icon><Warning /></el-icon>
+                  <span>举报</span>
+                </el-button>
+                <!-- 编辑按钮（仅作者可见） -->
+                <el-button 
+                  v-if="isPostAuthor(post)" 
+                  text 
+                  @click="editPost(post)" 
+                  class="action-btn-modern edit-btn"
+                >
+                  <el-icon><Edit /></el-icon>
+                  <span>编辑</span>
+                </el-button>
               </div>
             </div>
           </el-col>
@@ -209,12 +210,42 @@
         </el-button>
       </template>
     </el-dialog>
+    <!-- 编辑帖子对话框 -->
+    <el-dialog v-model="showEditDialog" title="编辑帖子" width="600px">
+      <div class="edit-form">
+        <el-form :model="editForm" label-width="100px">
+          <el-form-item label="帖子标题">
+            <el-input v-model="editForm.title" placeholder="修改帖子标题" />
+          </el-form-item>
+          
+          <el-form-item label="帖子描述">
+            <el-input
+              v-model="editForm.description"
+              type="textarea"
+              :rows="4"
+              placeholder="修改帖子描述"
+            />
+          </el-form-item>
+        </el-form>
+      </div>
+      
+      <template #footer>
+        <el-button @click="showEditDialog = false">取消</el-button>
+        <el-button 
+          type="primary" 
+          @click="handleEditPost" 
+          :loading="editLoading"
+        >
+          保存修改
+        </el-button>
+      </template>
+    </el-dialog>
   </Layout>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch, computed } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import { communityApi, tripApi, userApi } from '@/api'
 import { useUserStore } from '@/stores/user'
@@ -243,6 +274,16 @@ const shareForm = reactive({
   title: '',
   description: ''
 })
+
+// 编辑帖子对话框
+const showEditDialog = ref(false)
+const editLoading = ref(false)
+const editForm = reactive({
+  postId: '',
+  title: '',
+  description: ''
+})
+const currentEditPost = ref<CommunityPost | null>(null)
 
 // 我的行程（用于分享）
 const myTrips = ref<Trip[]>([])
@@ -450,10 +491,11 @@ const loadPosts = async () => {
           authorId: String(author.userId || author.id || ''),
           author: {
             id: String(author.userId || author.id || ''),
-            username: author.username || '',
+            username: author.username || author.nickname || '',
             email: author.email || '',
             nickname: author.nickname || author.username || '',
-            avatar: author.avatar || author.avatarUrl || '',
+            avatar: author.avatar || '',
+            avatarUrl: author.avatarUrl || author.avatar || '',
             createdAt: author.createdAt || ''
           },
           trip: {
@@ -640,15 +682,122 @@ const toggleLike = async (post: CommunityPost) => {
 }
 
 const sharePost = (post: CommunityPost) => {
-  ElMessage.success('分享链接已复制到剪贴板')
+  // 复制分享链接到剪贴板
+  const shareUrl = `${window.location.origin}/community/${post.id}`
+  navigator.clipboard.writeText(shareUrl).then(() => {
+    ElMessage.success('分享链接已复制到剪贴板')
+  }).catch(() => {
+    ElMessage.error('复制失败，请手动复制链接')
+  })
 }
 
-const collectPost = (post: CommunityPost) => {
-  ElMessage.success('已收藏到我的行程')
+const collectPost = async (post: CommunityPost) => {
+  if (!isLoggedIn.value) {
+    ElMessage.warning('请先登录后再收藏')
+    return
+  }
+  
+  try {
+    const res = await communityApi.collectPost(Number(post.id))
+    if (res.code === 200) {
+      ElMessage.success('已收藏到我的行程')
+    } else {
+      ElMessage.error(res.message || '收藏失败')
+    }
+  } catch (error: any) {
+    console.error('收藏失败:', error)
+    ElMessage.error(error.message || '收藏失败')
+  }
 }
 
-const reportPost = (post: CommunityPost) => {
-  ElMessage.success('举报已提交，我们会尽快处理')
+const reportPost = async (post: CommunityPost) => {
+  if (!isLoggedIn.value) {
+    ElMessage.warning('请先登录后再举报')
+    return
+  }
+  
+  try {
+    await ElMessageBox.prompt('请输入举报原因', '举报帖子', {
+      confirmButtonText: '提交举报',
+      cancelButtonText: '取消',
+      inputPlaceholder: '请详细描述举报原因...',
+      inputType: 'textarea',
+      inputValidator: (value) => {
+        if (!value || value.trim().length === 0) {
+          return '请输入举报原因'
+        }
+        if (value.trim().length < 5) {
+          return '举报原因至少需要5个字符'
+        }
+        return true
+      }
+    }).then(async ({ value }) => {
+      const res = await communityApi.reportPost(Number(post.id), value.trim())
+      if (res.code === 200) {
+        ElMessage.success('举报已提交，我们会尽快处理')
+      } else {
+        ElMessage.error(res.message || '举报失败')
+      }
+    })
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('举报失败:', error)
+      ElMessage.error(error.message || '举报失败')
+    }
+  }
+}
+
+// 检查是否为帖子作者
+const isPostAuthor = (post: CommunityPost) => {
+  const userStore = useUserStore()
+  const currentUserId = userStore.user?.id || userStore.user?.userId
+  return currentUserId && String(currentUserId) === String(post.authorId)
+}
+
+// 编辑帖子
+const editPost = (post: CommunityPost) => {
+  currentEditPost.value = post
+  editForm.postId = post.id
+  editForm.title = post.title
+  editForm.description = post.description
+  showEditDialog.value = true
+}
+
+// 处理编辑帖子
+const handleEditPost = async () => {
+  if (!editForm.title.trim()) {
+    ElMessage.warning('请填写帖子标题')
+    return
+  }
+  
+  editLoading.value = true
+  
+  try {
+    // 调用编辑帖子API
+    const res = await communityApi.updatePost(Number(editForm.postId), {
+      name: editForm.title,
+      description: editForm.description
+    })
+    
+    if (res.code === 200) {
+      ElMessage.success('帖子修改成功!')
+      showEditDialog.value = false
+      
+      // 更新本地数据
+      if (currentEditPost.value) {
+        currentEditPost.value.title = editForm.title
+        currentEditPost.value.description = editForm.description
+      }
+      
+      // 重新加载帖子列表
+      await loadPosts()
+    }
+  } catch (error: any) {
+    console.error('编辑帖子失败:', error)
+    ElMessage.error(error.message || '编辑帖子失败')
+  } finally {
+    editLoading.value = false
+  }
 }
 
 const handleShareButtonClick = () => {

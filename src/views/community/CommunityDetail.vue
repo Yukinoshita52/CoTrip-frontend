@@ -5,50 +5,63 @@
     </div>
     <div class="community-detail" v-else-if="post">
       <!-- 返回按钮 -->
-      <div class="back-button">
-        <el-button @click="$router.back()">
+      <div class="back-button-modern">
+        <el-button @click="$router.back()" class="back-btn-modern">
           <el-icon><ArrowLeft /></el-icon>
           返回社区
         </el-button>
       </div>
 
       <!-- 文章头部 -->
-      <el-card class="post-header">
-        <div class="header-content">
-          <div class="post-info">
-            <h1>{{ post.title }}</h1>
-            <div class="post-meta">
-              <div class="author-info">
-                <el-avatar :src="formatAvatarUrl(post.author.avatar)">
+      <el-card class="post-header-modern" shadow="hover">
+        <div class="header-content-modern">
+          <div class="post-info-modern">
+            <h1 class="post-title-modern">{{ post.title }}</h1>
+            <div class="post-meta-modern">
+              <div class="author-info-modern">
+                <el-avatar :src="formatAvatarUrl(post.author.avatar)" :size="48" class="author-avatar-modern">
                   {{ post.author.username.charAt(0) }}
                 </el-avatar>
-                <div class="author-details">
-                  <div class="author-name">{{ post.author.username }}</div>
-                  <div class="post-date">{{ formatDate(post.createdAt) }} 发布</div>
+                <div class="author-details-modern">
+                  <div class="author-name-modern">{{ post.author.username }}</div>
+                  <div class="post-date-modern">
+                    <el-icon><Clock /></el-icon>
+                    {{ formatDate(post.createdAt) }} 发布
+                  </div>
                 </div>
               </div>
-              <div class="post-stats">
-                <span class="stat-item">
-                  <el-icon><View /></el-icon>
-                  {{ post.views }} 浏览
-                </span>
-                <span class="stat-item">
-                  <el-icon><Heart /></el-icon>
-                  {{ post.likes }} 点赞
-                </span>
+              <div class="post-stats-modern">
+                <div class="stat-item-modern">
+                  <div class="stat-icon-wrapper">
+                    <el-icon class="stat-icon"><View /></el-icon>
+                  </div>
+                  <div class="stat-content">
+                    <div class="stat-value">{{ post.views }}</div>
+                    <div class="stat-label">浏览</div>
+                  </div>
+                </div>
+                <div class="stat-item-modern">
+                  <div class="stat-icon-wrapper">
+                    <el-icon class="stat-icon"><Heart /></el-icon>
+                  </div>
+                  <div class="stat-content">
+                    <div class="stat-value">{{ post.likes }}</div>
+                    <div class="stat-label">点赞</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-          <div class="post-actions">
-            <el-button @click="toggleLike" :type="isLiked ? 'primary' : 'default'" :class="{ 'liked-button': isLiked }">
+          <div class="post-actions-modern">
+            <el-button @click="toggleLike" :type="isLiked ? 'primary' : 'default'" :class="{ 'liked-button-modern': isLiked }" class="action-btn-modern">
               <el-icon :class="{ 'liked': isLiked }"><Heart /></el-icon>
-              {{ isLiked ? '已点赞' : '点赞' }} ({{ post.likes }})
+              {{ isLiked ? '已点赞' : '点赞' }}
             </el-button>
-            <el-button @click="handleShare">
+            <el-button @click="handleShare" class="action-btn-modern">
               <el-icon><Share /></el-icon>
               分享
             </el-button>
-            <el-button @click="handleCollect">
+            <el-button @click="handleCollect" class="action-btn-modern">
               <el-icon><Collection /></el-icon>
               收藏
             </el-button>
@@ -57,9 +70,14 @@
       </el-card>
 
       <!-- 行程概览 -->
-      <el-card class="trip-overview">
+      <el-card class="trip-overview-modern" shadow="hover">
         <template #header>
-          <span>行程概览</span>
+          <div class="card-header-modern">
+            <div class="header-icon-wrapper">
+              <el-icon class="header-icon"><Document /></el-icon>
+            </div>
+            <span class="header-title">行程概览</span>
+          </div>
         </template>
         <div class="overview-content">
           <div class="trip-basic-info">
@@ -84,9 +102,14 @@
       </el-card>
 
       <!-- 行程图片展示 -->
-      <el-card class="trip-photos" v-if="post.trip.coverImage || (post.trip.images && post.trip.images.length > 0)">
+      <el-card class="trip-photos-modern" shadow="hover" v-if="post.trip.coverImage || (post.trip.images && post.trip.images.length > 0)">
         <template #header>
-          <span>行程图片</span>
+          <div class="card-header-modern">
+            <div class="header-icon-wrapper">
+              <el-icon class="header-icon"><Picture /></el-icon>
+            </div>
+            <span class="header-title">行程图片</span>
+          </div>
         </template>
         <div class="photo-gallery">
           <div class="photo-grid">
@@ -106,9 +129,14 @@
       </el-card>
 
       <!-- 详细行程 -->
-      <el-card class="itinerary-detail">
+      <el-card class="itinerary-detail-modern" shadow="hover">
         <template #header>
-          <span>详细行程安排</span>
+          <div class="card-header-modern">
+            <div class="header-icon-wrapper">
+              <el-icon class="header-icon"><List /></el-icon>
+            </div>
+            <span class="header-title">详细行程安排</span>
+          </div>
         </template>
         <div class="itinerary-timeline">
           <div v-for="(dayItems, date) in groupedItinerary" :key="date" class="day-group">
@@ -118,8 +146,8 @@
             </div>
             
             <div class="day-items">
-              <div v-for="item in dayItems" :key="item.id" class="itinerary-item">
-                <div class="item-time">{{ formatTime(item.startTime) }}</div>
+              <div v-for="item in dayItems" :key="item.id" class="itinerary-item-modern">
+                <div class="item-time-modern">{{ formatTime(item.startTime) }}</div>
                 <div class="item-content">
                   <div class="item-header">
                     <span class="item-title">{{ item.title }}</span>
@@ -145,9 +173,14 @@
       </el-card>
 
       <!-- 费用明细 -->
-      <el-card class="expense-detail" v-if="relatedExpenses.length > 0">
+      <el-card class="expense-detail-modern" shadow="hover" v-if="relatedExpenses.length > 0">
         <template #header>
-          <span>费用参考</span>
+          <div class="card-header-modern">
+            <div class="header-icon-wrapper">
+              <el-icon class="header-icon"><Money /></el-icon>
+            </div>
+            <span class="header-title">费用参考</span>
+          </div>
         </template>
         <div class="expense-summary">
           <el-row :gutter="16">
@@ -190,11 +223,16 @@
       </el-card>
 
       <!-- 评论区 -->
-      <el-card class="comments-section">
+      <el-card class="comments-section-modern" shadow="hover">
         <template #header>
-          <div class="comments-header">
-            <span>评论 ({{ comments.length }})</span>
-            <el-button type="primary" size="small" @click="showCommentDialog = true">
+          <div class="comments-header-modern">
+            <div class="comments-title-wrapper">
+              <div class="header-icon-wrapper">
+                <el-icon class="header-icon"><ChatDotRound /></el-icon>
+              </div>
+              <span class="header-title">评论 ({{ comments.length }})</span>
+            </div>
+            <el-button type="primary" @click="showCommentDialog = true" class="comment-btn-modern">
               <el-icon><ChatDotRound /></el-icon>
               写评论
             </el-button>
@@ -298,14 +336,19 @@
       </el-card>
 
       <!-- 使用此行程 -->
-      <el-card class="use-trip" v-if="!isCurrentUserPost">
-        <div class="use-trip-content">
-          <div class="use-trip-info">
-            <h3>喜欢这个行程？</h3>
-            <p>你可以复制这个行程到你的账户，并根据需要进行修改</p>
+      <el-card class="use-trip-modern" shadow="hover" v-if="!isCurrentUserPost">
+        <div class="use-trip-content-modern">
+          <div class="use-trip-info-modern">
+            <div class="use-trip-icon-wrapper">
+              <el-icon class="use-trip-icon"><DocumentCopy /></el-icon>
+            </div>
+            <div class="use-trip-text">
+              <h3 class="use-trip-title">喜欢这个行程？</h3>
+              <p class="use-trip-desc">你可以复制这个行程到你的账户，并根据需要进行修改</p>
+            </div>
           </div>
-          <div class="use-trip-actions">
-            <el-button type="primary" @click="handleCopyTrip">
+          <div class="use-trip-actions-modern">
+            <el-button type="primary" @click="handleCopyTrip" size="large" class="copy-btn-modern">
               <el-icon><DocumentCopy /></el-icon>
               复制行程
             </el-button>
@@ -314,18 +357,23 @@
       </el-card>
 
       <!-- 编辑帖子 -->
-      <el-card class="edit-post" v-if="isCurrentUserPost">
-        <div class="edit-post-content">
-          <div class="edit-post-info">
-            <h3>这是你发布的行程</h3>
-            <p>你可以编辑或删除这个帖子</p>
+      <el-card class="edit-post-modern" shadow="hover" v-if="isCurrentUserPost">
+        <div class="edit-post-content-modern">
+          <div class="edit-post-info-modern">
+            <div class="edit-post-icon-wrapper">
+              <el-icon class="edit-post-icon"><Edit /></el-icon>
+            </div>
+            <div class="edit-post-text">
+              <h3 class="edit-post-title">这是你发布的行程</h3>
+              <p class="edit-post-desc">你可以编辑或删除这个帖子</p>
+            </div>
           </div>
-          <div class="edit-post-actions">
-            <el-button type="primary" @click="handleEditPost">
+          <div class="edit-post-actions-modern">
+            <el-button type="primary" @click="handleEditPost" class="edit-btn-modern">
               <el-icon><Edit /></el-icon>
               编辑帖子
             </el-button>
-            <el-button type="danger" @click="handleDeletePost">
+            <el-button type="danger" @click="handleDeletePost" class="delete-btn-modern">
               <el-icon><Delete /></el-icon>
               删除帖子
             </el-button>
@@ -948,157 +996,398 @@ const handleDeletePost = async () => {
 
 <style scoped>
 .loading-container {
-  max-width: 1000px;
+  max-width: 1200px;
+  margin: 0 auto;
   padding: 24px;
 }
 
 .community-detail {
-  max-width: 1000px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-.back-button {
-  margin-bottom: 16px;
-}
-
-.post-header {
+/* 返回按钮 */
+.back-button-modern {
   margin-bottom: 24px;
 }
 
-.header-content {
+.back-btn-modern {
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.back-btn-modern:hover {
+  background: #f5f7fa;
+  transform: translateX(-2px);
+}
+
+/* 文章头部 */
+.post-header-modern {
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  margin-bottom: 32px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.post-header-modern::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+}
+
+.post-header-modern :deep(.el-card__body) {
+  padding: 32px;
+}
+
+.header-content-modern {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 24px;
 }
 
-.post-info h1 {
-  margin: 0 0 16px 0;
-  font-size: 28px;
-  color: #333;
+.post-info-modern {
+  flex: 1;
+}
+
+.post-title-modern {
+  margin: 0 0 20px 0;
+  font-size: 32px;
+  font-weight: 700;
+  color: #1a1d29;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #1a1d29 0%, #667eea 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   line-height: 1.3;
 }
 
-.post-meta {
+.post-meta-modern {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 24px;
 }
 
-.author-info {
+.author-info-modern {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.author-name {
-  font-weight: 500;
-  color: #333;
-}
-
-.post-date {
-  font-size: 14px;
-  color: #666;
-}
-
-.post-stats {
-  display: flex;
   gap: 16px;
 }
 
-.stat-item {
+.author-avatar-modern {
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-weight: 700;
+}
+
+.author-details-modern {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.author-name-modern {
+  font-weight: 600;
+  color: #1a1d29;
+  font-size: 16px;
+}
+
+.post-date-modern {
+  font-size: 14px;
+  color: #8c8c8c;
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 14px;
-  color: #666;
+  gap: 6px;
 }
 
-.post-tags {
+.post-stats-modern {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 20px;
 }
 
-.tag-item {
-  font-size: 14px;
-}
-
-.post-actions {
+.stat-item-modern {
   display: flex;
+  align-items: center;
   gap: 12px;
+  padding: 12px 16px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition: all 0.3s;
+}
+
+.stat-item-modern:hover {
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+  transform: translateY(-2px);
+}
+
+.stat-icon-wrapper {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-icon {
+  font-size: 20px;
+  color: #667eea;
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+.stat-icon-wrapper .el-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.stat-content {
+  display: flex;
   flex-direction: column;
 }
 
-.trip-overview, .itinerary-detail, .expense-detail, .trip-photos, .comments-section, .use-trip, .edit-post {
-  margin-bottom: 24px;
+.stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1d29;
 }
 
+.stat-label {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.post-actions-modern {
+  display: flex;
+  gap: 12px;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.action-btn-modern {
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 500;
+  transition: all 0.3s;
+  min-width: 120px;
+  width: 120px;
+}
+
+.action-btn-modern:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 卡片通用样式 */
+.trip-overview-modern,
+.itinerary-detail-modern,
+.expense-detail-modern,
+.trip-photos-modern,
+.comments-section-modern,
+.use-trip-modern,
+.edit-post-modern {
+  margin-bottom: 32px;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.trip-overview-modern :deep(.el-card__header),
+.itinerary-detail-modern :deep(.el-card__header),
+.expense-detail-modern :deep(.el-card__header),
+.trip-photos-modern :deep(.el-card__header),
+.comments-section-modern :deep(.el-card__header) {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 20px 24px;
+  background: transparent;
+}
+
+.card-header-modern {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-icon-wrapper {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-icon {
+  font-size: 20px;
+  color: #667eea;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1d29;
+  letter-spacing: 0.3px;
+}
+
+/* 行程概览 */
 .overview-content {
   display: grid;
   grid-template-columns: 1fr 2fr;
-  gap: 24px;
+  gap: 32px;
+}
+
+.trip-basic-info {
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .info-item {
   display: flex;
-  margin-bottom: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #ffffff;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.info-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .info-item label {
-  width: 80px;
-  color: #666;
+  width: 90px;
+  color: #667eea;
+  font-weight: 600;
   flex-shrink: 0;
 }
 
+.info-item span {
+  color: #1a1d29;
+  font-weight: 500;
+}
+
+.trip-description {
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
 .trip-description h4 {
-  margin: 0 0 8px 0;
-  color: #333;
+  margin: 0 0 12px 0;
+  color: #1a1d29;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .trip-description p {
   margin: 0;
   color: #666;
-  line-height: 1.6;
+  line-height: 1.8;
+  font-size: 15px;
 }
 
+/* 详细行程 */
 .day-group {
-  margin-bottom: 32px;
+  margin-bottom: 40px;
 }
 
 .day-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #f0f0f0;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+  border-radius: 12px;
+  border-left: 4px solid #667eea;
 }
 
 .day-header h3 {
   margin: 0;
   font-size: 18px;
-  color: #333;
+  font-weight: 600;
+  color: #1a1d29;
 }
 
 .day-count {
-  font-size: 14px;
-  color: #999;
+  font-size: 13px;
+  color: #8c8c8c;
+  padding: 4px 12px;
+  background: #ffffff;
+  border-radius: 12px;
+  font-weight: 500;
+  margin-left: auto;
 }
 
-.itinerary-item {
+.itinerary-item-modern {
   display: flex;
-  gap: 16px;
-  padding: 16px;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  margin-bottom: 12px;
+  gap: 20px;
+  padding: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  background: #ffffff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
 }
 
-.item-time {
-  width: 60px;
-  font-weight: bold;
-  color: #409eff;
+.itinerary-item-modern::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 2px 0 0 2px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.itinerary-item-modern:hover {
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
+  transform: translateY(-2px);
+  border-color: rgba(102, 126, 234, 0.3);
+}
+
+.itinerary-item-modern:hover::before {
+  opacity: 1;
+}
+
+.item-time-modern {
+  width: 70px;
+  font-weight: 700;
+  color: #667eea;
   flex-shrink: 0;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-radius: 10px;
 }
 
 .item-content {
@@ -1108,68 +1397,180 @@ const handleDeletePost = async () => {
 .item-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .item-title {
-  font-weight: 500;
-  color: #333;
+  font-weight: 600;
+  color: #1a1d29;
+  font-size: 16px;
 }
 
 .item-location, .item-description, .item-cost {
   font-size: 14px;
   color: #666;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  line-height: 1.6;
+}
+
+.item-location {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #667eea;
+  font-weight: 500;
 }
 
 .item-location .el-icon {
-  margin-right: 4px;
+  font-size: 16px;
 }
 
+.item-cost {
+  color: #f56c6c;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+/* 费用明细 */
 .expense-summary {
-  margin-bottom: 24px;
+  margin-bottom: 32px;
+  padding: 24px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.expense-summary :deep(.el-statistic) {
+  text-align: center;
   padding: 16px;
-  background: #f8f9fa;
-  border-radius: 8px;
+  background: #ffffff;
+  border-radius: 12px;
+  transition: all 0.3s;
+}
+
+.expense-summary :deep(.el-statistic):hover {
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+  transform: translateY(-2px);
+}
+
+.expense-summary :deep(.el-statistic__head) {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.expense-summary :deep(.el-statistic__number) {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1d29;
 }
 
 .expense-breakdown h4 {
-  margin: 0 0 16px 0;
-  color: #333;
+  margin: 0 0 20px 0;
+  color: #1a1d29;
+  font-size: 18px;
+  font-weight: 600;
+  padding-bottom: 12px;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.06);
 }
 
-.use-trip-content, .edit-post-content {
+/* 使用行程/编辑帖子 */
+.use-trip-content-modern,
+.edit-post-content-modern {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 24px;
+  padding: 24px;
 }
 
-.use-trip-info h3, .edit-post-info h3 {
+.use-trip-info-modern,
+.edit-post-info-modern {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+}
+
+.use-trip-icon-wrapper,
+.edit-post-icon-wrapper {
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.use-trip-icon,
+.edit-post-icon {
+  font-size: 28px;
+  color: #667eea;
+}
+
+.use-trip-text,
+.edit-post-text {
+  flex: 1;
+}
+
+.use-trip-title,
+.edit-post-title {
   margin: 0 0 8px 0;
-  color: #333;
+  color: #1a1d29;
+  font-size: 20px;
+  font-weight: 600;
 }
 
-.use-trip-info p, .edit-post-info p {
+.use-trip-desc,
+.edit-post-desc {
   margin: 0;
   color: #666;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
-.use-trip-actions, .edit-post-actions {
+.use-trip-actions-modern,
+.edit-post-actions-modern {
   display: flex;
   gap: 12px;
+  flex-shrink: 0;
+}
+
+.copy-btn-modern,
+.edit-btn-modern,
+.delete-btn-modern {
+  border-radius: 10px;
+  padding: 12px 24px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.copy-btn-modern:hover,
+.edit-btn-modern:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.delete-btn-modern:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(245, 108, 108, 0.4);
 }
 
 .liked {
   color: #f56c6c;
 }
 
-.liked-button {
+.liked-button-modern {
   color: #f56c6c !important;
+  border-color: #f56c6c !important;
 }
 
-.liked-button:hover {
+.liked-button-modern:hover {
   color: #f78989 !important;
+  border-color: #f78989 !important;
 }
 
 /* 行程图片样式 */
@@ -1179,27 +1580,35 @@ const handleDeletePost = async () => {
 
 .photo-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
 }
 
 .photo-item {
   position: relative;
   aspect-ratio: 4/3;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
-  transition: transform 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .photo-item:hover {
-  transform: scale(1.05);
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.2);
 }
 
 .photo-item img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.3s;
+}
+
+.photo-item:hover img {
+  transform: scale(1.1);
 }
 
 .photo-overlay {
@@ -1208,14 +1617,14 @@ const handleDeletePost = async () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.8) 0%, rgba(118, 75, 162, 0.8) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
   transition: opacity 0.3s ease;
   color: white;
-  font-size: 24px;
+  font-size: 32px;
 }
 
 .photo-item:hover .photo-overlay {
@@ -1223,30 +1632,82 @@ const handleDeletePost = async () => {
 }
 
 /* 评论区样式 */
-.comments-header {
+.comments-header-modern {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
+.comments-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.comment-btn-modern {
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.comment-btn-modern:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
 .comments-list {
   max-height: 600px;
   overflow-y: auto;
+  padding-right: 8px;
+}
+
+.comments-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.comments-list::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.comments-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.comments-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
 }
 
 .comment-item {
   display: flex;
-  gap: 12px;
-  padding: 16px 0;
-  border-bottom: 1px solid #f0f0f0;
+  gap: 16px;
+  padding: 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  margin-bottom: 12px;
+  background: #ffffff;
+  transition: all 0.3s;
+}
+
+.comment-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transform: translateX(4px);
 }
 
 .comment-item:last-child {
   border-bottom: none;
+  margin-bottom: 0;
 }
 
 .comment-avatar {
   flex-shrink: 0;
+}
+
+.comment-avatar :deep(.el-avatar) {
+  border: 2px solid #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .comment-content {
@@ -1257,65 +1718,71 @@ const handleDeletePost = async () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .comment-author {
-  font-weight: 500;
-  color: #333;
+  font-weight: 600;
+  color: #1a1d29;
+  font-size: 15px;
 }
 
 .comment-time {
   font-size: 12px;
-  color: #999;
+  color: #8c8c8c;
 }
 
 .comment-text {
   color: #666;
-  line-height: 1.6;
-  margin-bottom: 8px;
+  line-height: 1.8;
+  margin-bottom: 12px;
+  font-size: 14px;
 }
 
 .comment-actions {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
 }
 
 .reply-toggle-btn {
-  color: #409eff !important;
+  color: #667eea !important;
+  border-radius: 6px;
+  transition: all 0.2s;
 }
 
 .reply-toggle-btn:hover {
-  background-color: #ecf5ff !important;
+  background-color: rgba(102, 126, 234, 0.1) !important;
 }
 
 .replies-preview {
-  margin-top: 8px;
-  padding: 8px 12px;
-  background-color: #f8f9fa;
-  border-radius: 4px;
-  border-left: 3px solid #409eff;
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: all 0.3s ease;
 }
 
 .replies-preview:hover {
-  background-color: #ecf5ff;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  transform: translateX(4px);
 }
 
 .preview-text {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 13px;
-  color: #666;
+  color: #667eea;
+  font-weight: 500;
 }
 
 .replies {
-  margin-top: 12px;
-  padding-left: 16px;
-  border-left: 2px solid #f0f0f0;
+  margin-top: 16px;
+  padding-left: 20px;
+  border-left: 3px solid rgba(102, 126, 234, 0.2);
   animation: slideDown 0.3s ease-out;
 }
 
@@ -1334,17 +1801,32 @@ const handleDeletePost = async () => {
 
 .reply-item {
   display: flex;
-  gap: 8px;
-  padding: 12px 0;
-  border-bottom: 1px solid #f8f8f8;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: #f8f9fa;
+  transition: all 0.2s;
+}
+
+.reply-item:hover {
+  background: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .reply-item:last-child {
   border-bottom: none;
+  margin-bottom: 0;
 }
 
 .reply-avatar {
   flex-shrink: 0;
+}
+
+.reply-avatar :deep(.el-avatar) {
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .reply-content {
@@ -1354,35 +1836,72 @@ const handleDeletePost = async () => {
 .reply-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: 10px;
+  margin-bottom: 6px;
 }
 
 .reply-author {
-  font-weight: 500;
-  color: #333;
+  font-weight: 600;
+  color: #1a1d29;
   font-size: 14px;
 }
 
 .reply-time {
   font-size: 11px;
-  color: #999;
+  color: #8c8c8c;
 }
 
 .reply-text {
   color: #666;
-  line-height: 1.5;
+  line-height: 1.6;
   font-size: 14px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .reply-actions {
   display: flex;
-  gap: 4px;
+  gap: 8px;
 }
 
 .empty-comments {
-  padding: 40px 0;
+  padding: 60px 0;
   text-align: center;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .header-content-modern {
+    flex-direction: column;
+  }
+  
+  .post-actions-modern {
+    flex-direction: row;
+    width: 100%;
+  }
+  
+  .action-btn-modern {
+    flex: 1;
+  }
+  
+  .overview-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .use-trip-content-modern,
+  .edit-post-content-modern {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .use-trip-actions-modern,
+  .edit-post-actions-modern {
+    width: 100%;
+  }
+  
+  .copy-btn-modern,
+  .edit-btn-modern,
+  .delete-btn-modern {
+    flex: 1;
+  }
 }
 </style>

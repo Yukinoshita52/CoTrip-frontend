@@ -1,42 +1,52 @@
 <template>
   <Layout>
     <div class="edit-trip" v-loading="loading">
-      <div class="page-header">
-        <h2>编辑行程</h2>
-        <p>修改你的旅行计划</p>
-      </div>
-
       <el-form
         ref="formRef"
         :model="form"
         :rules="rules"
-        label-width="100px"
-        class="trip-form"
+        label-width="120px"
+        class="trip-form-modern"
         v-if="!loading"
       >
-        <el-card>
+        <el-card class="form-card-modern" shadow="hover">
           <template #header>
-            <span>基本信息</span>
+            <div class="card-header-modern">
+              <div class="header-icon-wrapper">
+                <el-icon class="header-icon"><EditPen /></el-icon>
+              </div>
+              <span class="header-title">基本信息</span>
+            </div>
           </template>
           
-          <el-form-item label="行程标题" prop="title">
+          <el-form-item label="行程标题" prop="title" class="form-item-modern">
             <el-input
               v-model="form.title"
               placeholder="给你的行程起个名字"
               maxlength="50"
               show-word-limit
-            />
+              class="form-input-modern"
+            >
+              <template #prefix>
+                <el-icon><EditPen /></el-icon>
+              </template>
+            </el-input>
           </el-form-item>
           
-          <el-form-item label="目的地" prop="destination">
+          <el-form-item label="目的地" prop="destination" class="form-item-modern">
             <el-input
               v-model="form.destination"
               placeholder="如：北京·上海·杭州"
               maxlength="100"
-            />
+              class="form-input-modern"
+            >
+              <template #prefix>
+                <el-icon><MapLocation /></el-icon>
+              </template>
+            </el-input>
           </el-form-item>
           
-          <el-form-item label="行程时间" prop="dateRange">
+          <el-form-item label="行程时间" prop="dateRange" class="form-item-modern">
             <el-date-picker
               v-model="form.dateRange"
               type="daterange"
@@ -45,43 +55,53 @@
               end-placeholder="结束日期"
               format="YYYY-MM-DD"
               value-format="YYYY-MM-DD"
-              style="width: 100%"
+              class="form-date-picker-modern"
             />
           </el-form-item>
           
-          <el-form-item label="行程描述">
+          <el-form-item label="行程描述" class="form-item-modern">
             <el-input
               v-model="form.description"
               type="textarea"
-              :rows="4"
+              :rows="5"
               placeholder="描述一下这次旅行的主题和亮点"
               maxlength="500"
               show-word-limit
+              class="form-textarea-modern"
             />
           </el-form-item>
           
-          <el-form-item label="封面图片">
-            <el-upload
-              class="cover-uploader"
-              :show-file-list="false"
-              :before-upload="beforeUpload"
-              :http-request="handleUpload"
-            >
-              <img v-if="form.coverImage" :src="formatImageUrl(form.coverImage)" class="cover-image" />
-              <div v-else class="upload-placeholder">
-                <el-icon><Plus /></el-icon>
-                <div class="upload-text">上传封面</div>
+          <el-form-item label="封面图片" class="form-item-modern">
+            <div class="cover-upload-section">
+              <el-upload
+                class="cover-uploader-modern"
+                :show-file-list="false"
+                :before-upload="beforeUpload"
+                :http-request="handleUpload"
+              >
+                <img v-if="form.coverImage" :src="formatImageUrl(form.coverImage)" class="cover-image-modern" />
+                <div v-else class="upload-placeholder-modern">
+                  <el-icon class="upload-icon"><Plus /></el-icon>
+                  <div class="upload-text-modern">上传封面图片</div>
+                  <div class="upload-hint">支持 JPG、PNG 格式，最大 5MB</div>
+                </div>
+              </el-upload>
+              <div v-if="form.coverImage" class="upload-actions-modern">
+                <el-button size="small" @click="removeCover" type="danger" text>
+                  <el-icon><Delete /></el-icon>
+                  移除封面
+                </el-button>
               </div>
-            </el-upload>
-            <div v-if="form.coverImage" class="upload-actions">
-              <el-button size="small" @click="removeCover">移除封面</el-button>
             </div>
           </el-form-item>
         </el-card>
 
-        <div class="form-actions">
-          <el-button @click="$router.back()">取消</el-button>
-          <el-button type="primary" @click="handleSubmit" :loading="submitting">
+        <div class="form-actions-modern">
+          <el-button @click="$router.back()" size="large" class="cancel-btn-modern">
+            取消
+          </el-button>
+          <el-button type="primary" @click="handleSubmit" :loading="submitting" size="large" class="submit-btn-modern">
+            <el-icon v-if="!submitting"><Check /></el-icon>
             保存修改
           </el-button>
         </div>
@@ -246,71 +266,222 @@ onMounted(() => {
 
 <style scoped>
 .edit-trip {
-  max-width: 800px;
+  max-width: 900px;
+  margin: 0 auto;
 }
 
-.page-header {
+/* 表单样式 */
+.trip-form-modern {
+  margin-bottom: 32px;
+}
+
+.form-card-modern {
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.02) 0%, rgba(118, 75, 162, 0.02) 100%);
+}
+
+.form-card-modern :deep(.el-card__header) {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 20px 24px;
+  background: transparent;
+}
+
+.form-card-modern :deep(.el-card__body) {
+  padding: 32px;
+}
+
+.card-header-modern {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-icon-wrapper {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-icon {
+  font-size: 20px;
+  color: #667eea;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1d29;
+  letter-spacing: 0.3px;
+}
+
+/* 表单项样式 */
+.form-item-modern {
   margin-bottom: 24px;
 }
 
-.page-header h2 {
-  margin: 0 0 4px 0;
-  font-size: 24px;
-  color: #333;
+.form-input-modern,
+.form-date-picker-modern {
+  width: 100%;
 }
 
-.page-header p {
-  margin: 0;
-  color: #666;
-  font-size: 14px;
+.form-input-modern :deep(.el-input__wrapper),
+.form-date-picker-modern :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 12px 16px;
 }
 
-.trip-form {
-  margin-bottom: 24px;
+.form-input-modern :deep(.el-input__wrapper:hover),
+.form-date-picker-modern :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: rgba(102, 126, 234, 0.3);
 }
 
-.cover-uploader {
+.form-input-modern :deep(.el-input__wrapper.is-focus),
+.form-date-picker-modern :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+  border-color: #667eea;
+}
+
+.form-textarea-modern :deep(.el-textarea__inner) {
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 12px 16px;
+}
+
+.form-textarea-modern :deep(.el-textarea__inner:hover) {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: rgba(102, 126, 234, 0.3);
+}
+
+.form-textarea-modern :deep(.el-textarea__inner:focus) {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+  border-color: #667eea;
+}
+
+/* 封面图片上传样式 */
+.cover-upload-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cover-uploader-modern {
   display: inline-block;
 }
 
-.cover-image {
-  width: 200px;
-  height: 120px;
+.cover-image-modern {
+  width: 100%;
+  max-width: 400px;
+  height: 240px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s;
 }
 
-.upload-placeholder {
-  width: 200px;
-  height: 120px;
-  border: 2px dashed #dcdfe6;
-  border-radius: 4px;
+.cover-image-modern:hover {
+  transform: scale(1.02);
+}
+
+.upload-placeholder-modern {
+  width: 100%;
+  max-width: 400px;
+  height: 240px;
+  border: 2px dashed rgba(102, 126, 234, 0.3);
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: border-color 0.3s;
+  transition: all 0.3s;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.02) 0%, rgba(118, 75, 162, 0.02) 100%);
 }
 
-.upload-placeholder:hover {
-  border-color: #409eff;
+.upload-placeholder-modern:hover {
+  border-color: #667eea;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
 }
 
-.upload-text {
+.upload-icon {
+  font-size: 48px;
+  color: #667eea;
+  margin-bottom: 12px;
+}
+
+.upload-text-modern {
+  font-size: 16px;
+  font-weight: 500;
+  color: #1a1d29;
+  margin-bottom: 4px;
+}
+
+.upload-hint {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.upload-actions-modern {
   margin-top: 8px;
-  font-size: 14px;
-  color: #666;
 }
 
-.upload-actions {
-  margin-top: 8px;
-}
-
-.form-actions {
+/* 表单操作按钮 */
+.form-actions-modern {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 32px;
+  gap: 16px;
+  margin-top: 40px;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.cancel-btn-modern {
+  border-radius: 10px;
+  padding: 12px 32px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.cancel-btn-modern:hover {
+  background: #f5f7fa;
+}
+
+.submit-btn-modern {
+  border-radius: 10px;
+  padding: 12px 32px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s;
+}
+
+.submit-btn-modern:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .form-actions-modern {
+    flex-direction: column;
+  }
+  
+  .cancel-btn-modern,
+  .submit-btn-modern {
+    width: 100%;
+  }
 }
 </style>

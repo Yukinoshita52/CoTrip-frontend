@@ -52,16 +52,13 @@
             <div class="section-header">
               <h3>行程安排</h3>
               <div class="section-actions" v-if="hasEditPermission">
-                <el-button @click="showAddItinerary = true">
+                <el-button @click="showAddItinerary = true" class="action-btn-modern">
                   <el-icon><Plus /></el-icon>
                   添加安排
                 </el-button>
-                <el-button type="primary" plain @click="showBatchImport = true">
+                <el-button type="primary" plain @click="showBatchImport = true" class="action-btn-modern">
+                  <el-icon><Upload /></el-icon>
                   批量导入
-                </el-button>
-                <el-button type="success" plain @click="handleAutoPlanRoute" :loading="autoPlanLoading">
-                  <el-icon><Guide /></el-icon>
-                  一键规划
                 </el-button>
               </div>
             </div>
@@ -104,14 +101,15 @@
               <div id="baidu-map" class="baidu-map"></div>
               <div v-if="routeInfo" class="route-info">
                 <el-row :gutter="16">
-                  <el-col :span="8">
-                    <span>总距离：{{ formatDistance(routeInfo.distance) }}</span>
+                  <el-col :span="12">
+                    <div class="route-info-item">
+                      <span>总距离：{{ formatDistance(routeInfo.distance) }}</span>
+                    </div>
                   </el-col>
-                  <el-col :span="8">
-                    <span>预计时间：{{ formatDuration(routeInfo.duration) }}</span>
-                  </el-col>
-                  <el-col :span="8">
-                    <span>过路费：¥{{ routeInfo.toll || 0 }}</span>
+                  <el-col :span="12">
+                    <div class="route-info-item">
+                      <span>预计时间：{{ formatDuration(routeInfo.duration) }}</span>
+                    </div>
                   </el-col>
                 </el-row>
               </div>
@@ -142,7 +140,9 @@
                   <div class="day-items">
                     <template v-for="(item, index) in dayItems" :key="item.id">
                       <div class="itinerary-item">
-                        <div class="item-time">{{ formatTime(item.startTime) }}</div>
+                        <div class="item-type-icon">
+                          <img :src="getPlaceTypeImage(item.type, item.typeId)" :alt="getItemTypeText(item.type)" class="type-image" />
+                        </div>
                         <div class="item-content">
                           <div class="item-header">
                             <span class="item-title clickable" @click="handleShowPlaceDetail(item)">{{ item.title }}</span>
@@ -180,7 +180,7 @@
                               <div class="transport-modes">
                                 <div v-if="getTransportInfo(item.id, dayItems[index + 1].id)?.driving && getTransportInfo(item.id, dayItems[index + 1].id)!.driving!.distance > 0" 
                                      class="transport-mode">
-                                  <el-icon><Car /></el-icon>
+                                  <el-icon><Van /></el-icon>
                                   <span>驾车：{{ formatDistance(getTransportInfo(item.id, dayItems[index + 1].id)!.driving!.distance) }}，{{ formatDuration(getTransportInfo(item.id, dayItems[index + 1].id)!.driving!.duration) }}</span>
                                 </div>
                                 <div v-if="getTransportInfo(item.id, dayItems[index + 1].id)?.transit && getTransportInfo(item.id, dayItems[index + 1].id)!.transit!.distance > 0" 
@@ -190,7 +190,7 @@
                                 </div>
                                 <div v-if="getTransportInfo(item.id, dayItems[index + 1].id)?.walking && getTransportInfo(item.id, dayItems[index + 1].id)!.walking!.distance > 0" 
                                      class="transport-mode">
-                                  <el-icon><Position /></el-icon>
+                                  <el-icon><Promotion /></el-icon>
                                   <span>步行：{{ formatDistance(getTransportInfo(item.id, dayItems[index + 1].id)!.walking!.distance) }}，{{ formatDuration(getTransportInfo(item.id, dayItems[index + 1].id)!.walking!.duration) }}</span>
                                 </div>
                               </div>
@@ -220,7 +220,9 @@
                   <div class="day-items">
                     <template v-for="(item, index) in selectedDayItems" :key="item.id">
                       <div class="itinerary-item">
-                        <div class="item-time">{{ formatTime(item.startTime) }}</div>
+                        <div class="item-type-icon">
+                          <img :src="getPlaceTypeImage(item.type, item.typeId)" :alt="getItemTypeText(item.type)" class="type-image" />
+                        </div>
                         <div class="item-content">
                           <div class="item-header">
                             <span class="item-title clickable" @click="handleShowPlaceDetail(item)">{{ item.title }}</span>
@@ -258,7 +260,7 @@
                               <div class="transport-modes">
                                 <div v-if="getTransportInfo(item.id, selectedDayItems[index + 1].id)?.driving && getTransportInfo(item.id, selectedDayItems[index + 1].id)!.driving!.distance > 0" 
                                      class="transport-mode">
-                                  <el-icon><Car /></el-icon>
+                                  <el-icon><Van /></el-icon>
                                   <span>驾车：{{ formatDistance(getTransportInfo(item.id, selectedDayItems[index + 1].id)!.driving!.distance) }}，{{ formatDuration(getTransportInfo(item.id, selectedDayItems[index + 1].id)!.driving!.duration) }}</span>
                                 </div>
                                 <div v-if="getTransportInfo(item.id, selectedDayItems[index + 1].id)?.transit && getTransportInfo(item.id, selectedDayItems[index + 1].id)!.transit!.distance > 0" 
@@ -268,7 +270,7 @@
                                 </div>
                                 <div v-if="getTransportInfo(item.id, selectedDayItems[index + 1].id)?.walking && getTransportInfo(item.id, selectedDayItems[index + 1].id)!.walking!.distance > 0" 
                                      class="transport-mode">
-                                  <el-icon><Position /></el-icon>
+                                  <el-icon><Promotion /></el-icon>
                                   <span>步行：{{ formatDistance(getTransportInfo(item.id, selectedDayItems[index + 1].id)!.walking!.distance) }}，{{ formatDuration(getTransportInfo(item.id, selectedDayItems[index + 1].id)!.walking!.duration) }}</span>
                                 </div>
                               </div>
@@ -399,10 +401,28 @@
     </div>
 
     <!-- 添加行程安排对话框 -->
-    <el-dialog v-model="showAddItinerary" title="添加行程安排" width="600px">
-      <el-form :model="itineraryForm" :rules="itineraryRules" ref="itineraryFormRef" label-width="80px">
+    <el-dialog 
+      v-model="showAddItinerary" 
+      title="添加行程安排" 
+      width="700px"
+      class="add-itinerary-dialog-modern"
+    >
+      <template #header>
+        <div class="dialog-header-modern">
+          <div class="header-icon-wrapper">
+            <el-icon class="header-icon"><Plus /></el-icon>
+          </div>
+          <span class="header-title">添加行程安排</span>
+        </div>
+      </template>
+      <el-form :model="itineraryForm" :rules="itineraryRules" ref="itineraryFormRef" label-width="100px" class="itinerary-form-modern">
         <el-form-item label="选择天数" prop="day">
-          <el-select v-model="itineraryForm.day" placeholder="请选择第几天" style="width: 100%">
+          <el-select 
+            v-model="itineraryForm.day" 
+            placeholder="请选择第几天" 
+            style="width: 100%"
+            class="form-select-modern"
+          >
             <el-option label="未规划" :value="0" />
             <el-option
               v-for="day in availableDays" 
@@ -421,9 +441,14 @@
             style="width: 100%"
             @select="handlePlaceSelect"
             clearable
+            class="form-autocomplete-modern"
           >
+            <template #prefix>
+              <el-icon class="input-icon"><Search /></el-icon>
+            </template>
             <template #default="{ item }">
-              <div class="suggestion-item">
+              <div class="suggestion-item-modern">
+                <el-icon class="suggestion-icon"><Location /></el-icon>
                 <span class="suggestion-name">{{ item.name }}</span>
               </div>
             </template>
@@ -431,7 +456,12 @@
         </el-form-item>
         
         <el-form-item label="地点类型" prop="placeType" v-if="selectedPlace">
-          <el-select v-model="itineraryForm.placeType" placeholder="请选择地点类型" style="width: 100%">
+          <el-select 
+            v-model="itineraryForm.placeType" 
+            placeholder="请选择地点类型" 
+            style="width: 100%"
+            class="form-select-modern"
+          >
             <el-option
               v-for="type in placeTypes"
               :key="type.id"
@@ -441,21 +471,36 @@
           </el-select>
         </el-form-item>
         
-        <div v-if="selectedPlace" class="selected-place">
-          <h4>已选择地点：</h4>
-          <div class="place-info">
-            <p><strong>名称：</strong>{{ selectedPlace.name }}</p>
-            <p><strong>类型：</strong>{{ getSelectedTypeName() }}</p>
-            <p v-if="selectedPlace.address"><strong>地址：</strong>{{ selectedPlace.address }}</p>
+        <div v-if="selectedPlace" class="selected-place-modern">
+          <div class="selected-place-header">
+            <el-icon class="selected-icon"><Check /></el-icon>
+            <h4>已选择地点</h4>
+          </div>
+          <div class="place-info-modern">
+            <div class="info-row">
+              <span class="info-label">名称：</span>
+              <span class="info-value">{{ selectedPlace.name }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">类型：</span>
+              <span class="info-value">{{ getSelectedTypeName() }}</span>
+            </div>
+            <div class="info-row" v-if="selectedPlace.address">
+              <span class="info-label">地址：</span>
+              <span class="info-value">{{ selectedPlace.address }}</span>
+            </div>
           </div>
         </div>
       </el-form>
       
       <template #footer>
-        <el-button @click="showAddItinerary = false">取消</el-button>
-        <el-button type="primary" @click="handleAddItinerary" :loading="addingItinerary">
-          添加到行程
-        </el-button>
+        <div class="dialog-footer-modern">
+          <el-button @click="showAddItinerary = false" class="cancel-btn-modern">取消</el-button>
+          <el-button type="primary" @click="handleAddItinerary" :loading="addingItinerary" class="submit-btn-modern">
+            <el-icon><Check /></el-icon>
+            添加到行程
+          </el-button>
+        </div>
       </template>
     </el-dialog>
 
@@ -519,27 +564,47 @@
     </el-dialog>
 
     <!-- 批量导入地点对话框 -->
-    <el-dialog v-model="showBatchImport" title="批量导入地点" width="600px">
-      <el-form label-width="120px">
+    <el-dialog 
+      v-model="showBatchImport" 
+      title="批量导入地点" 
+      width="700px"
+      class="batch-import-dialog-modern"
+    >
+      <template #header>
+        <div class="dialog-header-modern">
+          <div class="header-icon-wrapper">
+            <el-icon class="header-icon"><Upload /></el-icon>
+          </div>
+          <span class="header-title">批量导入地点</span>
+        </div>
+      </template>
+      <el-form label-width="100px" class="batch-import-form-modern">
         <el-form-item label="地点列表">
-          <el-input
-            v-model="batchImportText"
-            type="textarea"
-            :rows="8"
-            placeholder="请输入你想去的地点"
-            maxlength="5000"
-            show-word-limit
-          />
-          <div class="form-tip">
-            导入的地点将全部进入“未规划”。
+          <div class="textarea-wrapper-modern">
+            <el-input
+              v-model="batchImportText"
+              type="textarea"
+              :rows="10"
+              placeholder="请输入你想去的地点，每行一个地点名称&#10;例如：&#10;北京天安门&#10;故宫博物院&#10;颐和园"
+              maxlength="5000"
+              show-word-limit
+              class="form-textarea-modern"
+            />
+          </div>
+          <div class="form-tip-modern">
+            <el-icon class="tip-icon"><InfoFilled /></el-icon>
+            <span>导入的地点将全部进入"未规划"，你可以稍后分配到具体日期</span>
           </div>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showBatchImport = false">取消</el-button>
-        <el-button type="primary" @click="handleBatchImport" :loading="batchImporting">
-          开始导入
-        </el-button>
+        <div class="dialog-footer-modern">
+          <el-button @click="showBatchImport = false" class="cancel-btn-modern">取消</el-button>
+          <el-button type="primary" @click="handleBatchImport" :loading="batchImporting" class="submit-btn-modern">
+            <el-icon><Upload /></el-icon>
+            开始导入
+          </el-button>
+        </div>
       </template>
     </el-dialog>
 
@@ -678,9 +743,6 @@ const inviteForm = ref({
 const batchImportText = ref('')
 const batchImporting = ref(false)
 
-// 一键规划状态
-const autoPlanLoading = ref(false)
-
 // 行程安排表单验证规则
 const itineraryRules: FormRules = {
   day: [
@@ -744,6 +806,10 @@ const loadTripDetail = async () => {
         const itemDate = day > 0 ? startDate.add(day - 1, 'day').format('YYYY-MM-DD') : startDate.format('YYYY-MM-DD')
         placesList.forEach((place: any, index: number) => {
           const placeId = place.placeId || place.id
+          // 调试：打印地点数据
+          if (import.meta.env.DEV) {
+            console.log('地点数据:', { name: place.name, type: place.type, typeId: place.typeId })
+          }
           itinerary.push({
             id: String(placeId || `${day}-${index}`),
             placeId: placeId, // 添加真实的placeId
@@ -756,7 +822,7 @@ const loadTripDetail = async () => {
             lng: place.lng, // 添加经度
             startTime: `${itemDate}T09:00:00`,
             endTime: `${itemDate}T18:00:00`,
-            type: place.type || 'activity',
+            type: place.type || '', // 保留原始 type，不设置默认值
             typeId: place.typeId, // 添加类型ID
             cost: 0,
             createdBy: String(data.createdBy || ''),
@@ -1005,8 +1071,9 @@ onMounted(async () => {
     console.error('获取用户信息失败:', error)
   }
 
+  // 先加载地点类型，再加载行程详情，确保类型数据可用
+  await loadPlaceTypes()
   loadTripDetail()
-  loadPlaceTypes()
 })
 
 // 监听选择的天数变化，自动加载地图和路线
@@ -1115,6 +1182,55 @@ const getItemTypeText = (type: string) => {
     other: '其他'
   }
   return texts[type] || type
+}
+
+// 根据地点类型获取对应的图片
+const getPlaceTypeImage = (type: string, typeId?: number) => {
+  let typeCode = type || ''
+  
+  // 如果 type 为空或无效，尝试从 placeTypes 中根据 typeId 查找
+  if (!typeCode && typeId && placeTypes.value.length > 0) {
+    const placeType = placeTypes.value.find(pt => pt.id === typeId)
+    if (placeType && placeType.code) {
+      typeCode = placeType.code
+    }
+  }
+  
+  // 类型编码到图片的映射（支持多种可能的编码格式）
+  const imageMap: Record<string, string> = {
+    // 住宿相关编码
+    'accommodation': '/住宿.png',
+    'hotel': '/住宿.png',
+    '住宿': '/住宿.png',
+    // 餐饮相关编码
+    'dining': '/餐饮.png',
+    'restaurant': '/餐饮.png',
+    'food': '/餐饮.png',
+    '餐饮': '/餐饮.png',
+    // 景点/活动相关编码
+    'activity': '/景点.png',
+    'sight': '/景点.png',
+    'attraction': '/景点.png',
+    '景点': '/景点.png',
+    '活动': '/景点.png',
+    // 交通相关编码
+    'transport': '/景点.png',
+    '交通': '/景点.png',
+    // 其他类型
+    'other': '/景点.png',
+    '其他': '/景点.png'
+  }
+  
+  // 转换为小写进行匹配
+  const lowerType = typeCode.toLowerCase()
+  const imagePath = imageMap[lowerType] || '/景点.png'
+  
+  // 调试信息（开发环境）
+  if (import.meta.env.DEV && !imageMap[lowerType]) {
+    console.log('未匹配到图片类型:', { type, typeCode, typeId, lowerType, imagePath })
+  }
+  
+  return imagePath
 }
 
 const getRoleText = (role: string) => {
@@ -2188,45 +2304,6 @@ const handleBatchImport = async () => {
   }
 }
 
-// 一键规划行程路线
-const handleAutoPlanRoute = async () => {
-  const tripId = Number(route.params.id)
-  if (!tripId) {
-    ElMessage.error('行程ID无效')
-    return
-  }
-
-  // 检查是否有未规划的地点
-  const unplannedPlaces = trip.value?.itinerary?.filter(item => item.day === 0) || []
-  if (unplannedPlaces.length === 0) {
-    ElMessage.warning('没有未规划的地点，无需进行路线规划')
-    return
-  }
-
-  try {
-    autoPlanLoading.value = true
-    
-    const res = await tripApi.autoPlanRoute(tripId)
-    if (res.code !== 200) {
-      ElMessage.error(res.message || '路线规划失败')
-      return
-    }
-
-    ElMessage.success(res.data || '路线规划完成')
-    
-    // 重新加载行程详情以显示规划结果
-    await loadTripDetail()
-    
-    // 切换到总览模式显示规划结果
-    selectedDay.value = null
-    
-  } catch (error: any) {
-    console.error('一键规划失败:', error)
-    ElMessage.error(error.message || '路线规划失败，请稍后再试')
-  } finally {
-    autoPlanLoading.value = false
-  }
-}
 
 // 查看地点详情
 const handleShowPlaceDetail = async (item: any) => {
@@ -2260,58 +2337,135 @@ const handleShowPlaceDetail = async (item: any) => {
 
 <style scoped>
 .trip-detail {
-  max-width: 1200px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
+/* 行程头部样式 */
 .trip-header {
-  background: #fff;
-  border-radius: 8px;
-  padding: 24px;
-  margin-bottom: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  border-radius: 16px;
+  padding: 32px;
+  margin-bottom: 32px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.trip-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
 }
 
 .header-content {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 24px;
+}
+
+.trip-info {
+  flex: 1;
 }
 
 .trip-info h1 {
-  margin: 0 0 12px 0;
-  font-size: 28px;
-  color: #333;
+  margin: 0 0 16px 0;
+  font-size: 32px;
+  font-weight: 700;
+  color: #1a1d29;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #1a1d29 0%, #667eea 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .trip-meta {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 16px;
   font-size: 14px;
   color: #666;
 }
 
 .trip-meta .el-icon {
-  margin-right: 4px;
+  margin-right: 6px;
+  color: #667eea;
+  font-size: 16px;
+}
+
+.trip-meta .destination,
+.trip-meta .date-range {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-weight: 500;
 }
 
 .trip-description {
   margin: 0;
   color: #666;
-  line-height: 1.6;
+  line-height: 1.8;
+  font-size: 15px;
+  padding: 16px;
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .trip-actions {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
+.trip-actions .el-button {
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.trip-actions .el-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* 标签页样式 */
 .trip-tabs {
-  background: #fff;
-  border-radius: 8px;
+  background: #ffffff;
+  border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.trip-tabs :deep(.el-tabs__header) {
+  margin-bottom: 24px;
+}
+
+.trip-tabs :deep(.el-tabs__item) {
+  font-size: 16px;
+  font-weight: 500;
+  padding: 0 24px;
+  height: 48px;
+  line-height: 48px;
+}
+
+.trip-tabs :deep(.el-tabs__active-bar) {
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  height: 3px;
 }
 
 .section-header {
@@ -2319,73 +2473,148 @@ const handleShowPlaceDetail = async (item: any) => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.06);
 }
 
 .section-header h3 {
   margin: 0;
-  font-size: 18px;
-  color: #333;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1d29;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-header h3::before {
+  content: '';
+  width: 4px;
+  height: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 2px;
 }
 
 .date-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 24px;
-  padding: 16px;
-  background: #f8f9fa;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.03) 0%, rgba(118, 75, 162, 0.03) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.date-buttons .el-button {
   border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.date-buttons .el-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
 }
 
 .day-group {
-  margin-bottom: 32px;
+  margin-bottom: 40px;
 }
 
 .day-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #f0f0f0;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+  border-radius: 12px;
+  border-left: 4px solid #667eea;
 }
 
 .day-header h4 {
   margin: 0;
-  font-size: 16px;
-  color: #333;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1d29;
 }
 
 .day-count {
-  font-size: 12px;
-  color: #999;
+  font-size: 13px;
+  color: #8c8c8c;
+  padding: 4px 12px;
+  background: #ffffff;
+  border-radius: 12px;
+  font-weight: 500;
 }
 
 .day-date {
   font-size: 14px;
-  color: #666;
-  margin-left: 8px;
+  color: #667eea;
+  font-weight: 500;
+  margin-left: auto;
 }
 
 .itinerary-item {
   display: flex;
-  gap: 16px;
-  padding: 16px;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  transition: all 0.3s;
+  gap: 20px;
+  padding: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  background: #ffffff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.itinerary-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 2px 0 0 2px;
+  opacity: 0;
+  transition: opacity 0.3s;
 }
 
 .itinerary-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
+  transform: translateY(-2px);
+  border-color: rgba(102, 126, 234, 0.3);
 }
 
-.item-time {
-  width: 60px;
-  font-weight: bold;
-  color: #409eff;
+.itinerary-item:hover::before {
+  opacity: 1;
+}
+
+.item-type-icon {
+  width: 70px;
+  height: 70px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s;
+}
+
+.item-type-icon:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.type-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
 }
 
 .item-content {
@@ -2395,44 +2624,104 @@ const handleShowPlaceDetail = async (item: any) => {
 .item-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .item-title {
-  font-weight: 500;
-  color: #333;
+  font-weight: 600;
+  color: #1a1d29;
+  font-size: 16px;
 }
 
 .item-location, .item-description, .item-cost {
   font-size: 14px;
   color: #666;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  line-height: 1.6;
+}
+
+.item-location {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #667eea;
+  font-weight: 500;
 }
 
 .item-location .el-icon {
-  margin-right: 4px;
+  font-size: 16px;
+}
+
+.item-cost {
+  color: #f56c6c;
+  font-weight: 600;
+  font-size: 15px;
 }
 
 .item-actions {
   display: flex;
   gap: 8px;
   flex-shrink: 0;
+  align-items: flex-start;
+}
+
+.item-actions .el-button {
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.item-actions .el-button:hover {
+  transform: scale(1.1);
 }
 
 .members-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
 }
 
 .member-card {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  background: #ffffff;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.member-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.member-card:hover {
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
+  transform: translateY(-2px);
+  border-color: rgba(102, 126, 234, 0.3);
+}
+
+.member-card:hover::before {
+  opacity: 1;
+}
+
+.member-card :deep(.el-avatar) {
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-weight: 700;
 }
 
 .member-info {
@@ -2440,19 +2729,34 @@ const handleShowPlaceDetail = async (item: any) => {
 }
 
 .member-name {
-  font-weight: 500;
-  margin-bottom: 4px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #1a1d29;
+  font-size: 16px;
 }
 
 .member-joined {
   font-size: 12px;
-  color: #999;
-  margin-top: 4px;
+  color: #8c8c8c;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.member-joined::before {
+  content: '🕐';
+  font-size: 12px;
 }
 
 .pending-invitation {
-  opacity: 0.8;
+  opacity: 0.9;
   border-color: #e6a23c;
+  background: linear-gradient(135deg, rgba(230, 162, 60, 0.05) 0%, rgba(230, 162, 60, 0.05) 100%);
+}
+
+.pending-invitation::before {
+  background: linear-gradient(135deg, #e6a23c 0%, #f39c12 100%);
 }
 
 .form-tip {
@@ -2462,71 +2766,366 @@ const handleShowPlaceDetail = async (item: any) => {
 }
 
 .expense-summary {
-  margin-bottom: 24px;
-  padding: 16px;
-  background: #f8f9fa;
-  border-radius: 8px;
+  margin-bottom: 32px;
+  padding: 24px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.expense-summary :deep(.el-statistic) {
+  text-align: center;
+}
+
+.expense-summary :deep(.el-statistic__head) {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.expense-summary :deep(.el-statistic__number) {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1d29;
+}
+
+.expense-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .expense-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 16px 20px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  background: #ffffff;
+  transition: all 0.3s;
 }
 
-.expense-item:last-child {
-  border-bottom: none;
+.expense-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transform: translateX(4px);
+  border-color: rgba(102, 126, 234, 0.3);
+}
+
+.expense-info {
+  flex: 1;
+}
+
+.expense-title {
+  font-weight: 600;
+  color: #1a1d29;
+  margin-bottom: 8px;
+  font-size: 15px;
 }
 
 .expense-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   margin-top: 4px;
+}
+
+.expense-meta .el-tag {
+  border-radius: 6px;
+  font-weight: 500;
 }
 
 .expense-date {
   font-size: 12px;
-  color: #999;
+  color: #8c8c8c;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.expense-date::before {
+  content: '📅';
+  font-size: 12px;
 }
 
 .expense-amount {
-  font-weight: bold;
+  font-weight: 700;
   color: #f56c6c;
+  font-size: 20px;
+  padding-left: 16px;
 }
 
 /* 添加行程安排对话框样式 */
-.suggestion-item {
+.add-itinerary-dialog-modern :deep(.el-dialog),
+.batch-import-dialog-modern :deep(.el-dialog) {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.add-itinerary-dialog-modern :deep(.el-dialog__header),
+.batch-import-dialog-modern :deep(.el-dialog__header) {
+  padding: 24px 28px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  margin: 0;
+}
+
+.add-itinerary-dialog-modern :deep(.el-dialog__body),
+.batch-import-dialog-modern :deep(.el-dialog__body) {
+  padding: 28px;
+}
+
+.add-itinerary-dialog-modern :deep(.el-dialog__footer),
+.batch-import-dialog-modern :deep(.el-dialog__footer) {
+  padding: 20px 28px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background: #fafbfc;
+}
+
+.dialog-header-modern {
   display: flex;
   align-items: center;
-  padding: 8px 0;
+  gap: 12px;
+}
+
+.dialog-header-modern .header-icon-wrapper {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialog-header-modern .header-icon {
+  font-size: 20px;
+  color: #667eea;
+}
+
+.dialog-header-modern .header-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1d29;
+  letter-spacing: 0.3px;
+}
+
+/* 表单样式 */
+.itinerary-form-modern :deep(.el-form-item__label),
+.batch-import-form-modern :deep(.el-form-item__label) {
+  font-weight: 600;
+  color: #1a1d29;
+  font-size: 14px;
+}
+
+.itinerary-form-modern :deep(.el-input__wrapper),
+.batch-import-form-modern :deep(.el-input__wrapper),
+.form-select-modern :deep(.el-input__wrapper),
+.form-autocomplete-modern :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1) inset;
+  transition: all 0.3s;
+  padding: 8px 12px;
+}
+
+.itinerary-form-modern :deep(.el-input__wrapper):hover,
+.batch-import-form-modern :deep(.el-input__wrapper):hover,
+.form-select-modern :deep(.el-input__wrapper):hover,
+.form-autocomplete-modern :deep(.el-input__wrapper):hover {
+  box-shadow: 0 0 0 1px rgba(102, 126, 234, 0.3) inset;
+}
+
+.itinerary-form-modern :deep(.el-input__wrapper.is-focus),
+.batch-import-form-modern :deep(.el-input__wrapper.is-focus),
+.form-select-modern :deep(.el-input__wrapper.is-focus),
+.form-autocomplete-modern :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2) inset;
+}
+
+.form-select-modern :deep(.el-select__wrapper),
+.form-autocomplete-modern :deep(.el-autocomplete__wrapper) {
+  border-radius: 10px;
+}
+
+.input-icon {
+  color: #667eea;
+  font-size: 16px;
+}
+
+/* 建议项样式 */
+.suggestion-item-modern {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  transition: all 0.2s;
+}
+
+.suggestion-item-modern:hover {
+  background: rgba(102, 126, 234, 0.05);
+  border-radius: 6px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.suggestion-icon {
+  color: #667eea;
+  font-size: 16px;
+  flex-shrink: 0;
 }
 
 .suggestion-name {
   font-weight: 500;
-  color: #333;
+  color: #1a1d29;
+  font-size: 14px;
 }
 
-.selected-place {
-  margin-top: 16px;
-  padding: 16px;
-  background: #f8f9fa;
+/* 已选择地点样式 */
+.selected-place-modern {
+  margin-top: 24px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(103, 194, 58, 0.05) 0%, rgba(76, 175, 80, 0.05) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(103, 194, 58, 0.2);
+  border-left: 4px solid #67c23a;
+}
+
+.selected-place-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(103, 194, 58, 0.2);
+}
+
+.selected-icon {
+  color: #67c23a;
+  font-size: 20px;
+}
+
+.selected-place-header h4 {
+  margin: 0;
+  color: #1a1d29;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.place-info-modern {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #ffffff;
   border-radius: 8px;
-  border: 1px solid #e9ecef;
 }
 
-.selected-place h4 {
-  margin: 0 0 12px 0;
-  color: #333;
-  font-size: 14px;
+.info-label {
+  font-weight: 600;
+  color: #667eea;
+  min-width: 60px;
+  flex-shrink: 0;
 }
 
-.place-info p {
-  margin: 4px 0;
+.info-value {
+  color: #1a1d29;
+  flex: 1;
+  word-break: break-word;
+}
+
+/* 文本域样式 */
+.textarea-wrapper-modern {
+  position: relative;
+}
+
+.form-textarea-modern :deep(.el-textarea__inner) {
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 12px 16px;
   font-size: 14px;
+  line-height: 1.6;
+  transition: all 0.3s;
+  font-family: inherit;
+}
+
+.form-textarea-modern :deep(.el-textarea__inner):hover {
+  border-color: rgba(102, 126, 234, 0.3);
+}
+
+.form-textarea-modern :deep(.el-textarea__inner):focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.form-tip-modern {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  border-radius: 8px;
+  border-left: 3px solid #667eea;
+  font-size: 13px;
   color: #666;
+}
+
+.tip-icon {
+  color: #667eea;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* 对话框底部按钮 */
+.dialog-footer-modern {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.cancel-btn-modern,
+.submit-btn-modern {
+  border-radius: 10px;
+  padding: 10px 24px;
+  font-weight: 500;
+  transition: all 0.3s;
+  min-width: 100px;
+}
+
+.cancel-btn-modern:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.submit-btn-modern {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+}
+
+.submit-btn-modern:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* 操作按钮样式 */
+.action-btn-modern {
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.action-btn-modern:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .place-info strong {
@@ -2536,75 +3135,141 @@ const handleShowPlaceDetail = async (item: any) => {
 /* 地图相关样式 */
 .route-map-container {
   margin-top: 24px;
-  padding: 16px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
 .map-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.06);
 }
 
 .map-header h4 {
   margin: 0;
-  font-size: 16px;
-  color: #333;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1d29;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.map-header h4::before {
+  content: '🗺️';
+  font-size: 20px;
+}
+
+.map-header .el-button {
+  border-radius: 8px;
+  font-weight: 500;
 }
 
 .baidu-map {
   width: 100%;
   height: 500px;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
-  border: 1px solid #e0e0e0;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .route-info {
-  margin-top: 16px;
-  padding: 12px;
-  background: #f8f9fa;
-  border-radius: 8px;
+  margin-top: 20px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  border-radius: 12px;
   font-size: 14px;
   color: #666;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.route-info .el-row {
+  display: flex;
+  gap: 24px;
+}
+
+.route-info .el-col {
+  flex: 1;
+}
+
+.route-info-item {
+  padding: 12px 16px;
+  background: #ffffff;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: 500;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .section-actions {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.section-actions .el-button {
+  border-radius: 10px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.section-actions .el-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .clickable {
   cursor: pointer;
+  transition: color 0.2s;
 }
 
 .clickable:hover {
-  color: #409eff;
+  color: #667eea;
 }
 
 /* 交通信息样式 */
 .transport-info-item {
-  margin: 12px 0;
-  padding: 12px 16px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  border-left: 3px solid #409eff;
+  margin: 16px 0;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  border-radius: 12px;
+  border-left: 4px solid #667eea;
+  transition: all 0.3s;
+}
+
+.transport-info-item:hover {
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+  transform: translateX(4px);
 }
 
 .transport-info-content {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
 .transport-icon {
-  color: #409eff;
-  font-size: 18px;
+  color: #667eea;
+  font-size: 24px;
   flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 10px;
 }
 
 .transport-details {
@@ -2614,31 +3279,39 @@ const handleShowPlaceDetail = async (item: any) => {
 .transport-modes {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .transport-mode {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-size: 14px;
   color: #666;
+  padding: 8px 12px;
+  background: #ffffff;
+  border-radius: 8px;
+  font-weight: 500;
 }
 
 .transport-mode .el-icon {
-  color: #409eff;
-  font-size: 16px;
+  color: #667eea;
+  font-size: 18px;
 }
 
 .transport-loading {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-size: 14px;
-  color: #999;
+  color: #8c8c8c;
+  padding: 8px 12px;
+  background: #ffffff;
+  border-radius: 8px;
 }
 
 .transport-loading .el-icon {
-  font-size: 16px;
+  font-size: 18px;
+  color: #667eea;
 }
 </style>

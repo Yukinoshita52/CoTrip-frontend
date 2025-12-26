@@ -1,39 +1,44 @@
 <template>
   <Layout>
     <div class="create-trip">
-      <div class="page-header">
-        <h2>创建新行程</h2>
-        <p>开始规划你的下一次旅行</p>
-      </div>
-
       <el-form
         ref="formRef"
         :model="form"
         :rules="rules"
-        label-width="100px"
-        class="trip-form"
+        label-width="120px"
+        class="trip-form-modern"
       >
-        <el-card>
+        <el-card class="form-card-modern" shadow="hover">
           <template #header>
-            <span>基本信息</span>
+            <div class="card-header-modern">
+              <div class="header-icon-wrapper">
+                <el-icon class="header-icon"><Document /></el-icon>
+              </div>
+              <span class="header-title">基本信息</span>
+            </div>
           </template>
           
-          <el-form-item label="行程标题" prop="title">
+          <el-form-item label="行程标题" prop="title" class="form-item-modern">
             <el-input
               v-model="form.title"
               placeholder="给你的行程起个名字"
               maxlength="50"
               show-word-limit
-            />
+              class="form-input-modern"
+            >
+              <template #prefix>
+                <el-icon><EditPen /></el-icon>
+              </template>
+            </el-input>
           </el-form-item>
           
-          <el-form-item label="目的地" prop="destination">
+          <el-form-item label="目的地" prop="destination" class="form-item-modern">
             <el-select
               v-model="form.destination"
               placeholder="请选择目的地"
               filterable
               allow-create
-              style="width: 100%"
+              class="form-select-modern"
             >
               <el-option-group label="热门城市">
                 <el-option
@@ -54,7 +59,7 @@
             </el-select>
           </el-form-item>
           
-          <el-form-item label="行程时间" prop="dateRange">
+          <el-form-item label="行程时间" prop="dateRange" class="form-item-modern">
             <el-date-picker
               v-model="form.dateRange"
               type="daterange"
@@ -63,60 +68,81 @@
               end-placeholder="结束日期"
               format="YYYY-MM-DD"
               value-format="YYYY-MM-DD"
-              style="width: 100%"
+              class="form-date-picker-modern"
             />
           </el-form-item>
           
-          <el-form-item label="行程描述">
+          <el-form-item label="行程描述" class="form-item-modern">
             <el-input
               v-model="form.description"
               type="textarea"
-              :rows="4"
+              :rows="5"
               placeholder="描述一下这次旅行的主题和亮点"
               maxlength="500"
               show-word-limit
+              class="form-textarea-modern"
             />
           </el-form-item>
           
-          <el-form-item label="封面图片">
-            <el-upload
-              class="cover-uploader"
-              :show-file-list="false"
-              :before-upload="beforeUpload"
-              :http-request="handleUpload"
-            >
-              <img v-if="form.coverImage" :src="formatImageUrl(form.coverImage)" class="cover-image" />
-              <div v-else class="upload-placeholder">
-                <el-icon><Plus /></el-icon>
-                <div class="upload-text">上传封面</div>
+          <el-form-item label="封面图片" class="form-item-modern">
+            <div class="cover-upload-section">
+              <el-upload
+                class="cover-uploader-modern"
+                :show-file-list="false"
+                :before-upload="beforeUpload"
+                :http-request="handleUpload"
+              >
+                <img v-if="form.coverImage" :src="formatImageUrl(form.coverImage)" class="cover-image-modern" />
+                <div v-else class="upload-placeholder-modern">
+                  <el-icon class="upload-icon"><Plus /></el-icon>
+                  <div class="upload-text-modern">上传封面图片</div>
+                  <div class="upload-hint">支持 JPG、PNG 格式，最大 5MB</div>
+                </div>
+              </el-upload>
+              <div v-if="form.coverImage" class="upload-actions-modern">
+                <el-button size="small" @click="removeCover" type="danger" text>
+                  <el-icon><Delete /></el-icon>
+                  移除封面
+                </el-button>
               </div>
-            </el-upload>
-            <div v-if="form.coverImage" class="upload-actions">
-              <el-button size="small" @click="removeCover">移除封面</el-button>
             </div>
           </el-form-item>
         </el-card>
 
-        <el-card style="margin-top: 24px;">
+        <el-card class="form-card-modern" shadow="hover" style="margin-top: 24px;">
           <template #header>
-            <span>成员管理</span>
+            <div class="card-header-modern">
+              <div class="header-icon-wrapper">
+                <el-icon class="header-icon"><UserFilled /></el-icon>
+              </div>
+              <span class="header-title">成员管理</span>
+            </div>
           </template>
           
-          <div class="member-section">
-            <div class="add-member">
+          <div class="member-section-modern">
+            <div class="add-member-modern">
               <el-input
                 v-model="newMemberEmail"
                 placeholder="输入邮箱邀请成员"
-                style="width: 300px; margin-right: 12px;"
-              />
-              <el-button @click="addMember">邀请成员</el-button>
+                class="member-input-modern"
+              >
+                <template #prefix>
+                  <el-icon><Message /></el-icon>
+                </template>
+              </el-input>
+              <el-button @click="addMember" type="primary" class="invite-btn-modern">
+                <el-icon><Plus /></el-icon>
+                邀请成员
+              </el-button>
             </div>
             
-            <div class="member-list" v-if="form.members.length > 0">
-              <div v-for="member in form.members" :key="member.userId" class="member-item">
-                <el-avatar size="small">{{ member.username.charAt(0) }}</el-avatar>
-                <span class="member-name">{{ member.username }}</span>
-                <el-tag size="small" :type="member.role === 'owner' ? 'success' : ''">
+            <div class="member-list-modern" v-if="form.members.length > 0">
+              <div v-for="member in form.members" :key="member.userId" class="member-item-modern">
+                <el-avatar :size="36" class="member-avatar-modern">
+                  {{ member.username.charAt(0) }}
+                </el-avatar>
+                <span class="member-name-modern">{{ member.username }}</span>
+                <el-tag size="small" :type="member.role === 'owner' ? 'success' : ''" class="role-tag-modern">
                   {{ getRoleText(member.role) }}
                 </el-tag>
                 <el-button
@@ -124,17 +150,26 @@
                   text
                   type="danger"
                   @click="removeMember(member.userId)"
+                  class="remove-btn-modern"
+                  size="small"
                 >
+                  <el-icon><Delete /></el-icon>
                   移除
                 </el-button>
               </div>
             </div>
+            <div v-else class="empty-members">
+              <el-empty description="暂无成员" :image-size="80" />
+            </div>
           </div>
         </el-card>
 
-        <div class="form-actions">
-          <el-button @click="$router.back()">取消</el-button>
-          <el-button type="primary" @click="handleSubmit" :loading="loading">
+        <div class="form-actions-modern">
+          <el-button @click="$router.back()" size="large" class="cancel-btn-modern">
+            取消
+          </el-button>
+          <el-button type="primary" @click="handleSubmit" :loading="loading" size="large" class="submit-btn-modern">
+            <el-icon v-if="!loading"><Check /></el-icon>
             创建行程
           </el-button>
         </div>
@@ -329,104 +364,338 @@ const handleSubmit = async () => {
 
 <style scoped>
 .create-trip {
-  max-width: 800px;
+  max-width: 900px;
+  margin: 0 auto;
 }
 
-.page-header {
+/* 表单样式 */
+.trip-form-modern {
+  margin-bottom: 32px;
+}
+
+.form-card-modern {
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.02) 0%, rgba(118, 75, 162, 0.02) 100%);
+}
+
+.form-card-modern :deep(.el-card__header) {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 20px 24px;
+  background: transparent;
+}
+
+.form-card-modern :deep(.el-card__body) {
+  padding: 32px;
+}
+
+.card-header-modern {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-icon-wrapper {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-icon {
+  font-size: 20px;
+  color: #667eea;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1d29;
+  letter-spacing: 0.3px;
+}
+
+/* 表单项样式 */
+.form-item-modern {
   margin-bottom: 24px;
 }
 
-.page-header h2 {
-  margin: 0 0 4px 0;
-  font-size: 24px;
-  color: #333;
+.form-input-modern,
+.form-select-modern,
+.form-date-picker-modern {
+  width: 100%;
 }
 
-.page-header p {
-  margin: 0;
-  color: #666;
-  font-size: 14px;
+.form-input-modern :deep(.el-input__wrapper),
+.form-select-modern :deep(.el-input__wrapper),
+.form-date-picker-modern :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 12px 16px;
 }
 
-.trip-form {
-  margin-bottom: 24px;
+.form-input-modern :deep(.el-input__wrapper:hover),
+.form-select-modern :deep(.el-input__wrapper:hover),
+.form-date-picker-modern :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: rgba(102, 126, 234, 0.3);
 }
 
-.cover-uploader {
+.form-input-modern :deep(.el-input__wrapper.is-focus),
+.form-select-modern :deep(.el-input__wrapper.is-focus),
+.form-date-picker-modern :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+  border-color: #667eea;
+}
+
+.form-textarea-modern :deep(.el-textarea__inner) {
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 12px 16px;
+}
+
+.form-textarea-modern :deep(.el-textarea__inner:hover) {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: rgba(102, 126, 234, 0.3);
+}
+
+.form-textarea-modern :deep(.el-textarea__inner:focus) {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+  border-color: #667eea;
+}
+
+/* 封面图片上传样式 */
+.cover-upload-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cover-uploader-modern {
   display: inline-block;
 }
 
-.cover-image {
-  width: 200px;
-  height: 120px;
+.cover-image-modern {
+  width: 100%;
+  max-width: 400px;
+  height: 240px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s;
 }
 
-.upload-placeholder {
-  width: 200px;
-  height: 120px;
-  border: 2px dashed #dcdfe6;
-  border-radius: 4px;
+.cover-image-modern:hover {
+  transform: scale(1.02);
+}
+
+.upload-placeholder-modern {
+  width: 100%;
+  max-width: 400px;
+  height: 240px;
+  border: 2px dashed rgba(102, 126, 234, 0.3);
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: border-color 0.3s;
+  transition: all 0.3s;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.02) 0%, rgba(118, 75, 162, 0.02) 100%);
 }
 
-.upload-placeholder:hover {
-  border-color: #409eff;
+.upload-placeholder-modern:hover {
+  border-color: #667eea;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
 }
 
-.upload-text {
+.upload-icon {
+  font-size: 48px;
+  color: #667eea;
+  margin-bottom: 12px;
+}
+
+.upload-text-modern {
+  font-size: 16px;
+  font-weight: 500;
+  color: #1a1d29;
+  margin-bottom: 4px;
+}
+
+.upload-hint {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.upload-actions-modern {
   margin-top: 8px;
-  font-size: 14px;
-  color: #666;
 }
 
-.upload-actions {
+/* 成员管理样式 */
+.member-section-modern {
   margin-top: 8px;
 }
 
-.member-section {
-  margin-top: 16px;
-}
-
-.add-member {
-  display: flex;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.member-list {
-  border: 1px solid #ebeef5;
-  border-radius: 4px;
-  padding: 16px;
-}
-
-.member-item {
+.add-member-modern {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-.member-item:last-child {
+.member-input-modern {
+  flex: 1;
+  max-width: 400px;
+}
+
+.member-input-modern :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.invite-btn-modern {
+  border-radius: 10px;
+  padding: 10px 24px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s;
+}
+
+.invite-btn-modern:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.member-list-modern {
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  padding: 16px;
+  background: #ffffff;
+}
+
+.member-item-modern {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.member-item-modern:hover {
+  background: #f8f9fa;
+}
+
+.member-item-modern:last-child {
   border-bottom: none;
 }
 
-.member-name {
-  flex: 1;
-  font-size: 14px;
+.member-avatar-modern {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-weight: 600;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.form-actions {
+.member-name-modern {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 500;
+  color: #1a1d29;
+}
+
+.role-tag-modern {
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+.remove-btn-modern {
+  border-radius: 6px;
+  padding: 6px 12px;
+  transition: all 0.2s;
+}
+
+.remove-btn-modern:hover {
+  background: rgba(245, 87, 108, 0.1);
+}
+
+.empty-members {
+  padding: 40px 20px;
+}
+
+/* 表单操作按钮 */
+.form-actions-modern {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 32px;
+  gap: 16px;
+  margin-top: 40px;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.cancel-btn-modern {
+  border-radius: 10px;
+  padding: 12px 32px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.cancel-btn-modern:hover {
+  background: #f5f7fa;
+}
+
+.submit-btn-modern {
+  border-radius: 10px;
+  padding: 12px 32px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s;
+}
+
+.submit-btn-modern:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .add-member-modern {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .member-input-modern {
+    max-width: 100%;
+  }
+  
+  .invite-btn-modern {
+    width: 100%;
+  }
+  
+  .form-actions-modern {
+    flex-direction: column;
+  }
+  
+  .cancel-btn-modern,
+  .submit-btn-modern {
+    width: 100%;
+  }
 }
 </style>

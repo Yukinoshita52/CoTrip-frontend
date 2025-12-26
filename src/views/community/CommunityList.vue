@@ -1,124 +1,144 @@
 <template>
   <Layout>
     <div class="community-list">
-      <!-- 页面头部 -->
-      <div class="page-header">
-        <div class="header-left">
-          <h2>旅行社区</h2>
-          <p>发现精彩行程，分享旅行体验</p>
-        </div>
-        <div class="header-right">
-          <el-button type="primary" @click="handleShareButtonClick">
-            <el-icon><Share /></el-icon>
-            分享我的行程
-          </el-button>
-        </div>
-      </div>
-
       <!-- 筛选和搜索 -->
-      <el-card class="filter-card">
+      <el-card class="filter-card-modern" shadow="hover">
         <el-row :gutter="16">
+          <el-col :span="10">
+            <div class="filter-item">
+              <label class="filter-label">搜索</label>
+              <el-input
+                v-model="filters.keyword"
+                placeholder="搜索行程标题或目的地"
+                clearable
+                class="filter-input"
+                @keyup.enter="handleSearch"
+              >
+                <template #prefix>
+                  <el-icon><Search /></el-icon>
+                </template>
+              </el-input>
+            </div>
+          </el-col>
+          <el-col :span="6">
+            <div class="filter-item">
+              <label class="filter-label">排序</label>
+              <el-select v-model="filters.sortBy" placeholder="排序方式" class="filter-select">
+                <el-option label="最新发布" value="latest" />
+                <el-option label="最多点赞" value="likes" />
+                <el-option label="最多浏览" value="views" />
+              </el-select>
+            </div>
+          </el-col>
           <el-col :span="8">
-            <el-input
-              v-model="filters.keyword"
-              placeholder="搜索行程标题或目的地"
-              clearable
-            >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
-          </el-col>
-          <el-col :span="6">
-            <el-select v-model="filters.sortBy" placeholder="排序方式">
-              <el-option label="最新发布" value="latest" />
-              <el-option label="最多点赞" value="likes" />
-              <el-option label="最多浏览" value="views" />
-            </el-select>
-          </el-col>
-          <el-col :span="6">
-            <el-button @click="handleSearch">搜索</el-button>
-            <el-button @click="resetFilters">重置</el-button>
+            <div class="filter-item">
+              <label class="filter-label">&nbsp;</label>
+              <div class="filter-actions">
+                <el-button type="primary" @click="handleSearch" class="action-btn">
+                  <el-icon><Search /></el-icon>
+                  搜索
+                </el-button>
+                <el-button @click="resetFilters" class="action-btn">
+                  重置
+                </el-button>
+                <el-button type="primary" @click="handleShareButtonClick" class="share-btn">
+                  <el-icon><Share /></el-icon>
+                  分享行程
+                </el-button>
+              </div>
+            </div>
           </el-col>
         </el-row>
       </el-card>
 
       <!-- 社区动态列表 -->
-      <div class="posts-grid">
-        <el-row :gutter="24">
+      <div class="posts-grid" v-loading="loading">
+        <el-empty v-if="!loading && posts.length === 0" description="暂无社区动态" :image-size="120" />
+        <el-row :gutter="24" v-else>
           <el-col :span="8" v-for="post in posts" :key="post.id">
-            <el-card class="post-card" @click="$router.push(`/community/${post.id}`)">
-              <div class="post-cover">
-                <img v-if="post.trip.coverImage" :src="formatImageUrl(post.trip.coverImage)" alt="行程封面" />
-                <div v-else class="default-cover">
+            <div class="post-card-modern" @click="$router.push(`/community/${post.id}`)">
+              <div class="post-cover-modern">
+                <img v-if="post.trip.coverImage" :src="formatImageUrl(post.trip.coverImage)" alt="行程封面" class="cover-image" />
+                <div v-else class="default-cover-modern">
                   <el-icon><Picture /></el-icon>
+                  <span>暂无封面</span>
                 </div>
-                <div class="post-stats">
-                  <span class="stat-item">
-                    <el-icon><View /></el-icon>
-                    {{ post.views }}
-                  </span>
-                  <span class="stat-item">
-                    <el-icon><Heart /></el-icon>
-                    {{ post.likes }}
-                  </span>
+                <div class="post-overlay">
+                  <div class="post-stats-modern">
+                    <span class="stat-item-modern">
+                      <el-icon><View /></el-icon>
+                      {{ post.views }}
+                    </span>
+                    <span class="stat-item-modern">
+                      <el-icon><Heart /></el-icon>
+                      {{ post.likes }}
+                    </span>
+                  </div>
                 </div>
+                <div class="post-gradient"></div>
               </div>
               
-              <div class="post-content">
-                <h3 class="post-title">{{ post.title }}</h3>
-                <p class="post-description">{{ post.description }}</p>
+              <div class="post-content-modern">
+                <h3 class="post-title-modern">{{ post.title }}</h3>
+                <p class="post-description-modern">{{ post.description || '暂无描述' }}</p>
                 
-                <div class="trip-info">
-                  <div class="trip-destination">
-                    <el-icon><MapLocation /></el-icon>
-                    {{ post.trip.destination }}
+                <div class="trip-info-modern">
+                  <div class="trip-info-item">
+                    <el-icon class="info-icon"><MapLocation /></el-icon>
+                    <span class="info-text">{{ post.trip.destination || '未设置目的地' }}</span>
                   </div>
-                  <div class="trip-duration">
-                    <el-icon><Calendar /></el-icon>
-                    {{ getTripDuration(post.trip) }}天
+                  <div class="trip-info-item">
+                    <el-icon class="info-icon"><Calendar /></el-icon>
+                    <span class="info-text">{{ getTripDuration(post.trip) }}天</span>
                   </div>
                 </div>
               </div>
               
-              <div class="post-footer">
-                <div class="author-info">
-                  <el-avatar :size="24" :src="formatAvatarUrl(post.author.avatar)">
-                    {{ post.author.username.charAt(0) }}
+              <div class="post-footer-modern">
+                <div class="author-info-modern">
+                  <el-avatar :size="32" :src="formatAvatarUrl(post.author.avatar)" class="author-avatar">
+                    {{ post.author.username?.charAt(0) || 'U' }}
                   </el-avatar>
-                  <span class="author-name">{{ post.author.username }}</span>
-                </div>
-                <div class="post-date">
-                  {{ formatDate(post.createdAt) }}
+                  <div class="author-details">
+                    <div class="author-name-modern">{{ post.author.username || '未知用户' }}</div>
+                    <div class="post-date-modern">{{ formatDate(post.createdAt) }}</div>
+                  </div>
                 </div>
               </div>
               
-              <div class="post-actions" @click.stop>
-                <el-button text @click="toggleLike(post)" :class="{ 'liked-button': isLiked(post) }">
-                  <el-icon :class="{ 'liked': isLiked(post) }"><Heart /></el-icon>
-                  {{ post.likes }}
+              <div class="post-actions-modern" @click.stop>
+                <el-button 
+                  text 
+                  @click="toggleLike(post)" 
+                  :class="{ 'liked-button-modern': isLiked(post) }"
+                  class="action-btn-modern"
+                >
+                  <el-icon :class="{ 'liked-icon': isLiked(post) }"><Heart /></el-icon>
+                  <span>{{ post.likes }}</span>
                 </el-button>
-                <el-button text @click="sharePost(post)">
+                <el-button text @click="sharePost(post)" class="action-btn-modern">
                   <el-icon><Share /></el-icon>
-                  分享
+                  <span>分享</span>
                 </el-button>
-                <el-dropdown>
-                  <el-button text>
+                <el-dropdown trigger="click">
+                  <el-button text class="action-btn-modern">
                     <el-icon><More /></el-icon>
                   </el-button>
                   <template #dropdown>
                     <el-dropdown-menu>
                       <el-dropdown-item @click="collectPost(post)">
+                        <el-icon><Star /></el-icon>
                         收藏行程
                       </el-dropdown-item>
                       <el-dropdown-item @click="reportPost(post)" divided>
+                        <el-icon><Warning /></el-icon>
                         举报内容
                       </el-dropdown-item>
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
               </div>
-            </el-card>
+            </div>
           </el-col>
         </el-row>
       </div>
@@ -681,188 +701,359 @@ const handleShare = async () => {
 
 <style scoped>
 .community-list {
-  max-width: 1200px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-bottom: 24px;
+/* 筛选器样式 */
+.filter-card-modern {
+  margin-bottom: 32px;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.02) 0%, rgba(118, 75, 162, 0.02) 100%);
 }
 
-.header-left h2 {
-  margin: 0 0 4px 0;
-  font-size: 24px;
-  color: #333;
+.filter-card-modern :deep(.el-card__body) {
+  padding: 24px;
 }
 
-.header-left p {
-  margin: 0;
-  color: #666;
-  font-size: 14px;
-}
-
-.filter-card {
-  margin-bottom: 24px;
-}
-
-.posts-grid {
-  margin-bottom: 24px;
-}
-
-.post-card {
-  cursor: pointer;
-  transition: all 0.3s;
-  height: 100%;
+.filter-item {
   display: flex;
   flex-direction: column;
-}
-
-.post-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-}
-
-.post-cover {
-  position: relative;
-  height: 180px;
-  background: #f5f5f5;
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 16px;
-}
-
-.post-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.default-cover {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: #ccc;
-  font-size: 48px;
-}
-
-.post-stats {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: flex;
   gap: 8px;
 }
 
-.stat-item {
+.filter-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  letter-spacing: 0.3px;
+}
+
+.filter-select, .filter-input {
+  width: 100%;
+}
+
+.filter-select :deep(.el-input__wrapper),
+.filter-input :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s;
+}
+
+.filter-select :deep(.el-input__wrapper:hover),
+.filter-input :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.action-btn {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.share-btn {
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 10px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s;
+}
+
+.share-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* 帖子卡片样式 */
+.posts-grid {
+  margin-bottom: 32px;
+}
+
+.post-card-modern {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.post-card-modern:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  border-color: rgba(102, 126, 234, 0.3);
+}
+
+.post-cover-modern {
+  position: relative;
+  height: 220px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  overflow: hidden;
+}
+
+.cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s;
+}
+
+.post-card-modern:hover .cover-image {
+  transform: scale(1.1);
+}
+
+.default-cover-modern {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 48px;
+  gap: 12px;
+}
+
+.default-cover-modern span {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.post-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.3) 100%);
+  pointer-events: none;
+}
+
+.post-stats-modern {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+
+.stat-item-modern {
   display: flex;
   align-items: center;
-  gap: 2px;
-  background: rgba(0, 0, 0, 0.6);
-  color: white;
-  padding: 2px 6px;
-  border-radius: 12px;
-  font-size: 12px;
-}
-
-.post-content {
-  flex: 1;
-  margin-bottom: 16px;
-}
-
-.post-title {
-  margin: 0 0 8px 0;
-  font-size: 16px;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  color: #1a1d29;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 13px;
   font-weight: 500;
-  color: #333;
-  line-height: 1.4;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.post-description {
-  margin: 0 0 12px 0;
+.post-gradient {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.4) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.post-content-modern {
+  padding: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.post-title-modern {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1d29;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  letter-spacing: -0.2px;
+}
+
+.post-description-modern {
+  margin: 0;
   font-size: 14px;
   color: #666;
-  line-height: 1.5;
+  line-height: 1.6;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.trip-info {
+.trip-info-modern {
   display: flex;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  font-size: 12px;
-  color: #999;
+  gap: 16px;
+  margin-top: 4px;
 }
 
-.trip-destination, .trip-duration {
+.trip-info-item {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  color: #666;
+  font-size: 13px;
 }
 
-.post-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
-  margin-bottom: 12px;
-}
-
-.author-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.author-name {
+.info-icon {
   font-size: 14px;
+  color: #8c8c8c;
+}
+
+.info-text {
   color: #666;
 }
 
-.post-date {
-  font-size: 12px;
-  color: #999;
+.post-footer-modern {
+  padding: 16px 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background: #f8f9fa;
 }
 
-.post-actions {
+.author-info-modern {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 
-.liked {
-  color: #f56c6c;
+.author-avatar {
+  border: 2px solid #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-weight: 600;
 }
 
-.liked-button {
-  color: #f56c6c !important;
+.author-details {
+  flex: 1;
 }
 
-.liked-button:hover {
-  color: #f78989 !important;
+.author-name-modern {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1d29;
+  margin-bottom: 2px;
 }
 
+.post-date-modern {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.post-actions-modern {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 12px 20px;
+  background: #ffffff;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.action-btn-modern {
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.action-btn-modern:hover {
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+}
+
+.liked-button-modern {
+  color: #f5576c !important;
+}
+
+.liked-button-modern:hover {
+  background: rgba(245, 87, 108, 0.1) !important;
+}
+
+.liked-icon {
+  color: #f5576c;
+  animation: heartBeat 0.3s;
+}
+
+@keyframes heartBeat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+/* 分页样式 */
 .pagination {
   display: flex;
   justify-content: center;
-  margin-top: 32px;
+  margin-top: 40px;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
+.pagination :deep(.el-pagination) {
+  justify-content: center;
+}
+
+/* 对话框样式 */
 .share-form {
   padding: 16px 0;
 }
 
 .no-trips-hint {
   margin-top: 8px;
-  padding: 8px 12px;
-  background-color: #f5f7fa;
-  border-radius: 4px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.05) 0%, rgba(102, 126, 234, 0.05) 100%);
+  border-radius: 8px;
   border-left: 3px solid #409eff;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .post-card-modern {
+    margin-bottom: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .filter-actions {
+    flex-direction: column;
+  }
+  
+  .action-btn, .share-btn {
+    width: 100%;
+  }
+  
+  .post-cover-modern {
+    height: 180px;
+  }
 }
 </style>

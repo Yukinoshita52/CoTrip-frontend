@@ -2,23 +2,40 @@
   <Layout>
     <div class="profile">
       <!-- 个人信息卡片 -->
-      <el-card class="profile-card">
-        <div class="profile-header">
-          <div class="avatar-section">
-            <el-avatar :size="80" :src="formatAvatarUrl(userInfo.avatarUrl)">
-              {{ userInfo.username.charAt(0) }}
-            </el-avatar>
-            <el-button class="upload-btn" @click="handleAvatarUpload">
-              <el-icon>
-                <Camera />
-              </el-icon>
+      <el-card class="profile-card-modern" shadow="hover">
+        <div class="profile-header-modern">
+          <div class="avatar-section-modern">
+            <div class="avatar-wrapper-modern">
+              <el-avatar :size="120" :src="formatAvatarUrl(userInfo.avatarUrl)" class="user-avatar-modern">
+                {{ userInfo.username?.charAt(0) || 'U' }}
+              </el-avatar>
+              <div class="avatar-overlay-modern" @click="handleAvatarUpload">
+                <el-icon class="camera-icon"><Camera /></el-icon>
+                <span class="overlay-text">更换头像</span>
+              </div>
+            </div>
+            <el-button class="upload-btn-modern" @click="handleAvatarUpload" type="primary">
+              <el-icon><Camera /></el-icon>
               更换头像
             </el-button>
           </div>
-          <div class="user-info">
-            <h2>{{ userInfo.nickname }}</h2>
-            <p class="username">@{{ userInfo.username }}</p>
-            <p class="user-contact">{{ userInfo.email || userInfo.phone || '未设置联系方式' }}</p>
+          <div class="user-info-modern">
+            <h1 class="user-name-modern">{{ userInfo.nickname || userInfo.username }}</h1>
+            <p class="username-modern">@{{ userInfo.username }}</p>
+            <div class="user-contact-modern">
+              <div class="contact-item" v-if="userInfo.email">
+                <el-icon class="contact-icon"><Message /></el-icon>
+                <span>{{ userInfo.email }}</span>
+              </div>
+              <div class="contact-item" v-if="userInfo.phone">
+                <el-icon class="contact-icon"><Phone /></el-icon>
+                <span>{{ userInfo.phone }}</span>
+              </div>
+              <div class="contact-item no-contact" v-if="!userInfo.email && !userInfo.phone">
+                <el-icon class="contact-icon"><InfoFilled /></el-icon>
+                <span>未设置联系方式</span>
+              </div>
+            </div>
           </div>
         </div>
       </el-card>
@@ -28,72 +45,94 @@
         <el-row :gutter="24">
           <!-- 账户设置 -->
           <el-col :span="24">
-            <el-card class="settings-card">
+            <el-card class="settings-card-modern" shadow="hover">
               <template #header>
-                <div class="card-header">
-                  <el-icon>
-                    <Setting />
-                  </el-icon>
-                  <span>账户设置</span>
+                <div class="card-header-modern">
+                  <div class="header-icon-wrapper">
+                    <el-icon class="header-icon"><Setting /></el-icon>
+                  </div>
+                  <span class="header-title">账户设置</span>
                 </div>
               </template>
 
               <!-- 基本设置 -->
-              <div class="settings-section">
-                <h4>基本信息</h4>
-                <el-form :model="settingsForm" label-width="100px">
+              <div class="settings-section-modern">
+                <div class="section-header-modern">
+                  <el-icon class="section-icon"><User /></el-icon>
+                  <h4 class="section-title">基本信息</h4>
+                </div>
+                <el-form :model="settingsForm" label-width="120px" class="settings-form-modern">
                   <el-form-item label="用户名">
-                    <el-input v-model="settingsForm.username" placeholder="请输入用户名" disabled />
+                    <el-input v-model="settingsForm.username" placeholder="请输入用户名" disabled class="form-input-modern" />
                   </el-form-item>
 
                   <el-form-item label="昵称">
-                    <el-input v-model="settingsForm.nickname" placeholder="请输入昵称" />
+                    <el-input v-model="settingsForm.nickname" placeholder="请输入昵称" class="form-input-modern" />
                   </el-form-item>
 
                   <el-form-item label="邮箱">
-                    <el-input v-model="settingsForm.email" placeholder="请输入邮箱" />
+                    <el-input v-model="settingsForm.email" placeholder="请输入邮箱" class="form-input-modern" />
                   </el-form-item>
 
                   <el-form-item label="手机号">
-                    <el-input v-model="settingsForm.phone" placeholder="请输入手机号" />
+                    <el-input v-model="settingsForm.phone" placeholder="请输入手机号" class="form-input-modern" />
                   </el-form-item>
 
                   <el-form-item label="个人简介">
-                    <el-input v-model="settingsForm.bio" type="textarea" :rows="3" placeholder="介绍一下自己" />
+                    <el-input v-model="settingsForm.bio" type="textarea" :rows="4" placeholder="介绍一下自己" class="form-textarea-modern" />
                   </el-form-item>
 
                   <el-form-item>
-                    <el-button type="primary" @click="saveSettings">保存基本信息</el-button>
+                    <el-button type="primary" @click="saveSettings" class="save-btn-modern" size="large">
+                      <el-icon><Check /></el-icon>
+                      保存基本信息
+                    </el-button>
                   </el-form-item>
                 </el-form>
               </div>
 
               <!-- 安全设置 -->
-              <div class="settings-section" style="margin-top: 32px;">
-                <h4>安全设置</h4>
-                <el-form label-width="100px">
+              <div class="settings-section-modern">
+                <div class="section-header-modern">
+                  <el-icon class="section-icon"><Lock /></el-icon>
+                  <h4 class="section-title">安全设置</h4>
+                </div>
+                <el-form label-width="120px" class="settings-form-modern">
                   <el-form-item label="修改密码">
-                    <el-button @click="showChangePassword = true">修改密码</el-button>
+                    <el-button @click="showChangePassword = true" class="action-btn-modern">
+                      <el-icon><Key /></el-icon>
+                      修改密码
+                    </el-button>
                   </el-form-item>
                 </el-form>
               </div>
 
               <!-- 隐私设置 -->
-              <div class="settings-section" style="margin-top: 32px;">
-                <h4>隐私设置</h4>
-                <el-form label-width="100px">
+              <div class="settings-section-modern">
+                <div class="section-header-modern">
+                  <el-icon class="section-icon"><Hide /></el-icon>
+                  <h4 class="section-title">隐私设置</h4>
+                </div>
+                <el-form label-width="120px" class="settings-form-modern">
                   <el-form-item label="允许邀请">
-                    <el-switch v-model="privacySettings.allowInvite" />
-                    <span style="margin-left: 8px; color: #666;">允许其他用户邀请你加入行程</span>
+                    <div class="switch-item-modern">
+                      <el-switch v-model="privacySettings.allowInvite" />
+                      <span class="switch-desc">允许其他用户邀请你加入行程</span>
+                    </div>
                   </el-form-item>
 
                   <el-form-item label="邮件通知">
-                    <el-switch v-model="privacySettings.emailNotification" />
-                    <span style="margin-left: 8px; color: #666;">接收行程更新和邀请邮件</span>
+                    <div class="switch-item-modern">
+                      <el-switch v-model="privacySettings.emailNotification" />
+                      <span class="switch-desc">接收行程更新和邀请邮件</span>
+                    </div>
                   </el-form-item>
 
                   <el-form-item>
-                    <el-button type="primary" @click="savePrivacySettings">保存隐私设置</el-button>
+                    <el-button type="primary" @click="savePrivacySettings" class="save-btn-modern" size="large">
+                      <el-icon><Check /></el-icon>
+                      保存隐私设置
+                    </el-button>
                   </el-form-item>
                 </el-form>
               </div>
@@ -104,21 +143,73 @@
     </div>
 
     <!-- 修改密码对话框 -->
-    <el-dialog v-model="showChangePassword" title="修改密码" width="400px">
-      <el-form :model="passwordForm" label-width="100px">
+    <el-dialog 
+      v-model="showChangePassword" 
+      title="修改密码" 
+      width="500px"
+      class="change-password-dialog-modern"
+    >
+      <template #header>
+        <div class="dialog-header-modern">
+          <div class="header-icon-wrapper">
+            <el-icon class="header-icon"><Key /></el-icon>
+          </div>
+          <span class="header-title">修改密码</span>
+        </div>
+      </template>
+      <el-form :model="passwordForm" label-width="100px" class="password-form-modern">
         <el-form-item label="当前密码">
-          <el-input v-model="passwordForm.currentPassword" type="password" />
+          <el-input 
+            v-model="passwordForm.currentPassword" 
+            type="password" 
+            placeholder="请输入当前密码"
+            show-password
+            class="password-input-modern"
+          >
+            <template #prefix>
+              <el-icon class="input-icon"><Lock /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
         <el-form-item label="新密码">
-          <el-input v-model="passwordForm.newPassword" type="password" />
+          <el-input 
+            v-model="passwordForm.newPassword" 
+            type="password" 
+            placeholder="请输入新密码（至少6位）"
+            show-password
+            class="password-input-modern"
+          >
+            <template #prefix>
+              <el-icon class="input-icon"><Lock /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
         <el-form-item label="确认密码">
-          <el-input v-model="passwordForm.confirmPassword" type="password" />
+          <el-input 
+            v-model="passwordForm.confirmPassword" 
+            type="password" 
+            placeholder="请再次输入新密码"
+            show-password
+            class="password-input-modern"
+          >
+            <template #prefix>
+              <el-icon class="input-icon"><Lock /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
+        <div class="password-tip-modern">
+          <el-icon class="tip-icon"><InfoFilled /></el-icon>
+          <span>密码长度至少6位，建议包含字母和数字</span>
+        </div>
       </el-form>
       <template #footer>
-        <el-button @click="showChangePassword = false">取消</el-button>
-        <el-button type="primary" @click="changePassword">确认修改</el-button>
+        <div class="dialog-footer-modern">
+          <el-button @click="showChangePassword = false" class="cancel-btn-modern">取消</el-button>
+          <el-button type="primary" @click="changePassword" class="submit-btn-modern">
+            <el-icon><Check /></el-icon>
+            确认修改
+          </el-button>
+        </div>
       </template>
     </el-dialog>
   </Layout>
@@ -364,135 +455,438 @@ onMounted(async () => {
 
 <style scoped>
 .profile {
-  max-width: 1200px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-.profile-card {
-  margin-bottom: 24px;
+/* 个人信息卡片样式 */
+.profile-card-modern {
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  margin-bottom: 32px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.02) 0%, rgba(118, 75, 162, 0.02) 100%);
 }
 
-.profile-header {
+.profile-card-modern :deep(.el-card__body) {
+  padding: 40px;
+}
+
+.profile-header-modern {
   display: flex;
-  align-items: center;
-  gap: 24px;
+  align-items: flex-start;
+  gap: 40px;
 }
 
-.avatar-section {
+.avatar-section-modern {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
-.upload-btn {
-  font-size: 12px;
+.avatar-wrapper-modern {
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.3s;
 }
 
-.user-info h2 {
-  margin: 0 0 8px 0;
+.avatar-wrapper-modern:hover {
+  transform: scale(1.05);
+}
+
+.user-avatar-modern {
+  border: 4px solid #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-weight: 700;
+  font-size: 48px;
+}
+
+.avatar-overlay-modern {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+  color: #fff;
+}
+
+.avatar-wrapper-modern:hover .avatar-overlay-modern {
+  opacity: 1;
+}
+
+.camera-icon {
   font-size: 24px;
-  color: #333;
+  margin-bottom: 4px;
 }
 
-.username {
-  margin: 0 0 8px 0;
-  color: #409eff;
-  font-size: 16px;
+.overlay-text {
+  font-size: 12px;
   font-weight: 500;
 }
 
-.user-contact {
-  margin: 0;
-  color: #666;
-  font-size: 14px;
-}
-
-.profile-content {
-  margin-top: 24px;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.upload-btn-modern {
+  border-radius: 10px;
+  padding: 10px 20px;
   font-weight: 500;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s;
 }
 
-.invitation-card,
-.settings-card {
-  height: fit-content;
+.upload-btn-modern:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
-.invitation-section h4,
-.settings-section h4 {
-  margin: 0 0 16px 0;
-  color: #333;
-  font-size: 16px;
-  font-weight: 500;
-  border-bottom: 1px solid #f0f0f0;
-  padding-bottom: 8px;
-}
-
-.invitations-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.invitation-item {
-  padding: 16px;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  background: #fafafa;
-}
-
-.invitation-info {
-  margin-bottom: 12px;
-}
-
-.invitation-inviter {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.inviter-details {
+.user-info-modern {
   flex: 1;
 }
 
-.inviter-name {
-  font-weight: 500;
-  color: #333;
-  margin-bottom: 4px;
+.user-name-modern {
+  margin: 0 0 8px 0;
+  font-size: 32px;
+  font-weight: 700;
+  color: #1a1d29;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #1a1d29 0%, #667eea 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-.invitation-trip,
-.invitation-invitee,
-.invitation-time {
+.username-modern {
+  margin: 0 0 20px 0;
+  color: #8c8c8c;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.user-contact-modern {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.contact-item {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: #666;
-  margin-bottom: 4px;
-}
-
-.invitation-status {
-  margin-bottom: 4px;
-}
-
-.invitation-actions {
-  display: flex;
   gap: 8px;
-  justify-content: flex-end;
+  color: #666;
+  font-size: 14px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-.settings-section {
+.contact-item.no-contact {
+  color: #8c8c8c;
+  background: #f8f9fa;
+}
+
+.contact-icon {
+  font-size: 16px;
+  color: #667eea;
+}
+
+.contact-item.no-contact .contact-icon {
+  color: #8c8c8c;
+}
+
+/* 设置卡片样式 */
+.profile-content {
+  margin-top: 0;
+}
+
+.settings-card-modern {
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.settings-card-modern :deep(.el-card__header) {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 20px 24px;
+  background: transparent;
+}
+
+.settings-card-modern :deep(.el-card__body) {
+  padding: 32px;
+}
+
+.card-header-modern {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-icon-wrapper {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-icon {
+  font-size: 20px;
+  color: #667eea;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1d29;
+  letter-spacing: 0.3px;
+}
+
+.settings-section-modern {
+  margin-bottom: 40px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.settings-section-modern:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.section-header-modern {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 24px;
 }
 
-.settings-section:last-child {
-  margin-bottom: 0;
+.section-icon {
+  font-size: 20px;
+  color: #667eea;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1d29;
+  letter-spacing: 0.3px;
+}
+
+.settings-form-modern {
+  padding-left: 32px;
+}
+
+.form-input-modern :deep(.el-input__wrapper),
+.form-textarea-modern :deep(.el-textarea__inner) {
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.form-input-modern :deep(.el-input__wrapper:hover),
+.form-textarea-modern :deep(.el-textarea__inner:hover) {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: rgba(102, 126, 234, 0.3);
+}
+
+.form-input-modern :deep(.el-input__wrapper.is-focus),
+.form-textarea-modern :deep(.el-textarea__inner:focus) {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+  border-color: #667eea;
+}
+
+.save-btn-modern {
+  border-radius: 10px;
+  padding: 12px 32px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s;
+}
+
+.save-btn-modern:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.action-btn-modern {
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.action-btn-modern:hover {
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+}
+
+.switch-item-modern {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.switch-desc {
+  color: #666;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .profile-header-modern {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .settings-form-modern {
+    padding-left: 0;
+  }
+}
+
+/* 修改密码对话框样式 */
+.change-password-dialog-modern :deep(.el-dialog) {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.change-password-dialog-modern :deep(.el-dialog__header) {
+  padding: 24px 28px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  margin: 0;
+}
+
+.change-password-dialog-modern :deep(.el-dialog__body) {
+  padding: 28px;
+}
+
+.change-password-dialog-modern :deep(.el-dialog__footer) {
+  padding: 20px 28px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background: #fafbfc;
+}
+
+.change-password-dialog-modern .dialog-header-modern {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.change-password-dialog-modern .header-icon-wrapper {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.change-password-dialog-modern .header-icon {
+  font-size: 20px;
+  color: #667eea;
+}
+
+.change-password-dialog-modern .header-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1d29;
+  letter-spacing: 0.3px;
+}
+
+/* 密码表单样式 */
+.password-form-modern :deep(.el-form-item__label) {
+  font-weight: 600;
+  color: #1a1d29;
+  font-size: 14px;
+}
+
+.password-input-modern :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1) inset;
+  transition: all 0.3s;
+  padding: 10px 12px 10px 40px;
+}
+
+.password-input-modern :deep(.el-input__wrapper):hover {
+  box-shadow: 0 0 0 1px rgba(102, 126, 234, 0.3) inset;
+}
+
+.password-input-modern :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2) inset;
+}
+
+.password-input-modern .input-icon {
+  color: #667eea;
+  font-size: 16px;
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
+.password-tip-modern {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  border-radius: 8px;
+  border-left: 3px solid #667eea;
+  font-size: 13px;
+  color: #666;
+}
+
+.password-tip-modern .tip-icon {
+  color: #667eea;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* 对话框底部按钮 */
+.change-password-dialog-modern .dialog-footer-modern {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.change-password-dialog-modern .cancel-btn-modern,
+.change-password-dialog-modern .submit-btn-modern {
+  border-radius: 10px;
+  padding: 10px 24px;
+  font-weight: 500;
+  transition: all 0.3s;
+  min-width: 100px;
+}
+
+.change-password-dialog-modern .cancel-btn-modern:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.change-password-dialog-modern .submit-btn-modern {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+}
+
+.change-password-dialog-modern .submit-btn-modern:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 </style>

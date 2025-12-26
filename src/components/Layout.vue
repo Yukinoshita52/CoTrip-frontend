@@ -1,19 +1,21 @@
 <template>
   <el-container class="layout-container">
     <!-- 侧边栏 -->
-    <el-aside width="250px" class="sidebar">
+    <el-aside width="260px" class="sidebar">
       <div class="logo">
-        <el-icon><Compass /></el-icon>
-        <span>协同旅行</span>
+        <div class="logo-icon">
+          <img src="/logo.png" alt="协同旅行" class="logo-img" />
+        </div>
+        <span class="logo-text">多人协同旅行系统</span>
       </div>
       
       <el-menu
         :default-active="$route.path"
         router
         class="sidebar-menu"
-        background-color="#001529"
-        text-color="#fff"
-        active-text-color="#1890ff"
+        background-color="transparent"
+        text-color="rgba(255, 255, 255, 0.85)"
+        active-text-color="#ffffff"
       >
         <el-menu-item index="/dashboard">
           <el-icon><Odometer /></el-icon>
@@ -63,26 +65,29 @@
       <!-- 顶部导航 -->
       <el-header class="header">
         <div class="header-left">
-          <el-breadcrumb separator="/">
-            <el-breadcrumb-item>{{ currentPageTitle }}</el-breadcrumb-item>
-          </el-breadcrumb>
+          <h2 class="page-title">{{ currentPageTitle }}</h2>
         </div>
         
         <div class="header-right">
-          <el-dropdown>
+          <el-dropdown trigger="click" placement="bottom-end">
             <div class="user-info">
-              <el-avatar :size="32" :src="userAvatar">
+              <el-avatar :size="36" :src="userAvatar" class="user-avatar">
                 <el-icon><User /></el-icon>
               </el-avatar>
-              <span class="username">{{ username }}</span>
+              <div class="user-details">
+                <span class="username">{{ username }}</span>
+                <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
+              </div>
             </div>
             <template #dropdown>
-              <el-dropdown-menu>
+              <el-dropdown-menu class="user-dropdown">
                 <el-dropdown-item @click="$router.push('/profile')">
-                  个人设置
+                  <el-icon><UserFilled /></el-icon>
+                  <span>个人设置</span>
                 </el-dropdown-item>
                 <el-dropdown-item divided @click="handleLogout">
-                  退出登录
+                  <el-icon><SwitchButton /></el-icon>
+                  <span>退出登录</span>
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -102,6 +107,18 @@
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
+import { 
+  Odometer, 
+  MapLocation, 
+  Money, 
+  ChatDotSquare, 
+  Message, 
+  Document, 
+  User,
+  UserFilled,
+  SwitchButton,
+  ArrowDown
+} from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { formatAvatarUrl } from '@/utils/image'
 
@@ -149,39 +166,143 @@ onMounted(() => {
 <style scoped>
 .layout-container {
   height: 100vh;
+  background: #f5f7fa;
 }
 
+/* 侧边栏样式 */
 .sidebar {
-  background-color: #001529;
+  background: linear-gradient(180deg, #1a1d29 0%, #161922 100%);
   overflow: hidden;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.08);
+  position: relative;
+}
+
+.sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
+  pointer-events: none;
 }
 
 .logo {
   display: flex;
   align-items: center;
-  padding: 16px 20px;
+  padding: 24px 20px;
   color: #fff;
-  font-size: 18px;
-  font-weight: bold;
-  border-bottom: 1px solid #1f1f1f;
+  position: relative;
+  z-index: 1;
 }
 
-.logo .el-icon {
-  margin-right: 8px;
-  font-size: 24px;
+.logo-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  margin-right: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.logo-text {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, #ffffff 0%, rgba(255, 255, 255, 0.8) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .sidebar-menu {
   border: none;
+  padding: 8px 12px;
+  margin-top: 8px;
 }
 
+.sidebar-menu :deep(.el-menu-item) {
+  height: 48px;
+  line-height: 48px;
+  margin-bottom: 4px;
+  border-radius: 10px;
+  padding-left: 16px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.sidebar-menu :deep(.el-menu-item:hover) {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  transform: translateX(2px);
+}
+
+.sidebar-menu :deep(.el-menu-item.is-active) {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%) !important;
+  color: #ffffff !important;
+  font-weight: 500;
+}
+
+.sidebar-menu :deep(.el-menu-item.is-active::before) {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 24px;
+  background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+  border-radius: 0 2px 2px 0;
+}
+
+.sidebar-menu :deep(.el-menu-item .el-icon) {
+  margin-right: 12px;
+  font-size: 18px;
+  width: 20px;
+}
+
+.sidebar-menu :deep(.el-menu-item span) {
+  font-size: 14px;
+  letter-spacing: 0.3px;
+}
+
+/* 顶部栏样式 */
 .header {
-  background: #fff;
+  background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
-  box-shadow: 0 1px 4px rgba(0,21,41,.08);
+  padding: 0 32px;
+  height: 72px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  position: relative;
+  z-index: 10;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1d29;
+  letter-spacing: 0.3px;
 }
 
 .header-right {
@@ -193,22 +314,96 @@ onMounted(() => {
   display: flex;
   align-items: center;
   cursor: pointer;
-  padding: 8px;
-  border-radius: 4px;
-  transition: background-color 0.3s;
+  padding: 6px 12px 6px 6px;
+  border-radius: 24px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: transparent;
+  gap: 10px;
 }
 
 .user-info:hover {
-  background-color: #f5f5f5;
+  background: #f5f7fa;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.user-avatar {
+  border: 2px solid rgba(102, 126, 234, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.user-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .username {
-  margin-left: 8px;
   font-size: 14px;
+  font-weight: 500;
+  color: #1a1d29;
+  letter-spacing: 0.2px;
+}
+
+.dropdown-icon {
+  font-size: 12px;
+  color: #8c8c8c;
+  transition: transform 0.3s;
+}
+
+.user-info:hover .dropdown-icon {
+  transform: translateY(2px);
+}
+
+.user-dropdown {
+  margin-top: 8px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 8px;
+}
+
+.user-dropdown :deep(.el-dropdown-menu__item) {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.2s;
+}
+
+.user-dropdown :deep(.el-dropdown-menu__item:hover) {
+  background: #f5f7fa;
+  transform: translateX(2px);
+}
+
+.user-dropdown :deep(.el-dropdown-menu__item .el-icon) {
+  font-size: 16px;
+  color: #667eea;
 }
 
 .main-content {
   background: #f5f7fa;
-  padding: 24px;
+  padding: 32px;
+  overflow-y: auto;
+}
+
+/* 滚动条样式 */
+.main-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.main-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.main-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.main-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
 }
 </style>

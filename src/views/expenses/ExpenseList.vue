@@ -1,94 +1,128 @@
 <template>
   <Layout>
     <div class="expense-list">
-      <!-- 页面头部 -->
-      <div class="page-header">
-        <div class="header-left">
-          <h2>记账管理</h2>
-          <p>管理你的旅行支出和账单分摊</p>
-        </div>
-        <div class="header-right">
-          <!-- 移除账本管理按钮，其他按钮移到搜索栏 -->
-        </div>
-      </div>
-
       <!-- 统计卡片 -->
       <el-row :gutter="24" class="stats-row">
         <el-col :span="6">
-          <el-card class="stat-card">
-            <el-statistic title="总支出" :value="stats.totalAmount" prefix="¥" />
-          </el-card>
+          <div class="stat-card-modern total">
+            <div class="stat-icon">
+              <el-icon><Money /></el-icon>
+            </div>
+            <div class="stat-content">
+              <div class="stat-label">总支出</div>
+              <div class="stat-value">¥{{ stats.totalAmount.toFixed(2) }}</div>
+            </div>
+          </div>
         </el-col>
         <el-col :span="6">
-          <el-card class="stat-card">
-            <el-statistic title="我的支出" :value="stats.myAmount" prefix="¥" />
-          </el-card>
+          <div class="stat-card-modern my-expense">
+            <div class="stat-icon">
+              <el-icon><User /></el-icon>
+            </div>
+            <div class="stat-content">
+              <div class="stat-label">我的支出</div>
+              <div class="stat-value">¥{{ stats.myAmount.toFixed(2) }}</div>
+            </div>
+          </div>
         </el-col>
         <el-col :span="6">
-          <el-card class="stat-card">
-            <el-statistic title="总账单数" :value="stats.totalCount" suffix="笔" />
-          </el-card>
+          <div class="stat-card-modern total-count">
+            <div class="stat-icon">
+              <el-icon><Document /></el-icon>
+            </div>
+            <div class="stat-content">
+              <div class="stat-label">总账单数</div>
+              <div class="stat-value">{{ stats.totalCount }}<span class="stat-unit">笔</span></div>
+            </div>
+          </div>
         </el-col>
         <el-col :span="6">
-          <el-card class="stat-card">
-            <el-statistic title="我的账单数" :value="stats.myCount" suffix="笔" />
-          </el-card>
+          <div class="stat-card-modern my-count">
+            <div class="stat-icon">
+              <el-icon><List /></el-icon>
+            </div>
+            <div class="stat-content">
+              <div class="stat-label">我的账单数</div>
+              <div class="stat-value">{{ stats.myCount }}<span class="stat-unit">笔</span></div>
+            </div>
+          </div>
         </el-col>
       </el-row>
 
-      <!-- 账本选择 -->
-      <el-card class="book-selector" style="margin-bottom: 16px;">
-        <template #header>
-          <div class="book-selector-header">
-            <span>选择行程账本</span>
-            <el-tooltip content="每个行程对应一个账本" placement="top">
-              <el-icon><QuestionFilled /></el-icon>
-            </el-tooltip>
-          </div>
-        </template>
-        <el-select v-model="selectedBookId" @change="handleBookChange" placeholder="请选择行程账本" style="width: 100%;">
-          <el-option
-            v-for="book in accountBooks"
-            :key="book.bookId || book.id"
-            :label="`${getTripName(book.tripId)} - ${book.name}`"
-            :value="book.bookId || book.id"
-          />
-        </el-select>
-      </el-card>
-      
-      <!-- 当前账本信息 -->
-      <el-card v-if="currentBook" class="current-book-info" style="margin-bottom: 16px;">
-        <div class="book-info">
-          <h3>{{ currentBook.name }}</h3>
-          <p>关联行程：{{ getTripName(currentBook.tripId) }}</p>
-        </div>
-      </el-card>
-
-      <!-- 筛选器 -->
-      <el-card class="filter-card">
+      <!-- 账本选择和筛选器 -->
+      <el-card class="filter-card-modern" shadow="hover">
         <el-row :gutter="16">
-          <el-col :span="12">
-            <el-input
-              v-model="filters.keyword"
-              placeholder="搜索账单"
-              clearable
-            >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
+          <el-col :span="8">
+            <div class="filter-item">
+              <label class="filter-label">选择账本</label>
+              <el-select 
+                v-model="selectedBookId" 
+                @change="handleBookChange" 
+                placeholder="请选择行程账本" 
+                class="filter-select"
+                clearable
+              >
+                <el-option
+                  v-for="book in accountBooks"
+                  :key="book.bookId || book.id"
+                  :label="`${getTripName(book.tripId)} - ${book.name}`"
+                  :value="book.bookId || book.id"
+                />
+              </el-select>
+            </div>
           </el-col>
-          <el-col :span="12">
-            <div class="filter-actions">
-              <el-button @click="handleSearch">搜索</el-button>
-              <el-button @click="resetFilters">重置</el-button>
-              <el-button @click="handleSplitCalculation">
-                <el-icon><Calculator /></el-icon>
-                分摊计算
-              </el-button>
-              <el-button type="primary" @click="handleAddExpenseClick">
+          <el-col :span="10">
+            <div class="filter-item">
+              <label class="filter-label">搜索</label>
+              <el-input
+                v-model="filters.keyword"
+                placeholder="搜索账单描述或类别"
+                clearable
+                class="filter-input"
+                @keyup.enter="handleSearch"
+              >
+                <template #prefix>
+                  <el-icon><Search /></el-icon>
+                </template>
+              </el-input>
+            </div>
+          </el-col>
+          <el-col :span="6">
+            <div class="filter-item">
+              <label class="filter-label">&nbsp;</label>
+              <div class="filter-actions">
+                <el-button type="primary" @click="handleSearch" class="action-btn">
+                  <el-icon><Search /></el-icon>
+                  搜索
+                </el-button>
+                <el-button @click="resetFilters" class="action-btn">
+                  重置
+                </el-button>
+              </div>
+            </div>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16" style="margin-top: 16px;" v-if="currentBook">
+          <el-col :span="24">
+            <div class="current-book-info-modern">
+              <el-icon class="book-icon"><Notebook /></el-icon>
+              <div class="book-info">
+                <div class="book-name">{{ currentBook.name }}</div>
+                <div class="book-trip">关联行程：{{ getTripName(currentBook.tripId) }}</div>
+              </div>
+            </div>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16" style="margin-top: 16px;">
+          <el-col :span="24">
+            <div class="action-buttons-row">
+              <el-button type="primary" @click="handleAddExpenseClick" class="primary-action-btn">
                 <el-icon><Plus /></el-icon>
                 添加账单
+              </el-button>
+              <el-button @click="handleSplitCalculation" class="secondary-action-btn">
+                <el-icon><Calculator /></el-icon>
+                分摊计算
               </el-button>
             </div>
           </el-col>
@@ -125,64 +159,71 @@
         </el-empty>
         
         <!-- 账单表格 -->
-        <el-table :data="expenses" style="width: 100%" v-else-if="selectedBookId && expenses.length > 0">
-          <el-table-column prop="category" label="类别" width="200" align="">
+        <el-table 
+          :data="expenses" 
+          style="width: 100%" 
+          v-else-if="selectedBookId && expenses.length > 0"
+          class="expense-table-modern"
+          stripe
+        >
+          <el-table-column prop="category" label="类别" width="140" align="center">
             <template #default="{ row }">
-              <el-tag size="small" :type="getCategoryColor(row.category)">
+              <el-tag size="small" :type="getCategoryColor(row.category)" class="category-tag-modern">
                 {{ getCategoryText(row.category) }}
               </el-tag>
             </template>
           </el-table-column>
           
-          <el-table-column prop="amount" label="金额" width="200" align="">
+          <el-table-column prop="amount" label="金额" width="150" align="right">
             <template #default="{ row }">
-              <span class="expense-amount">¥{{ row.amount }}</span>
+              <span class="expense-amount-modern">¥{{ Number(row.amount).toFixed(2) }}</span>
             </template>
           </el-table-column>
           
-          <el-table-column prop="paidBy" label="付款人" width="200" align="left">
+          <el-table-column prop="paidBy" label="付款人" width="140" align="center">
             <template #default="{ row }">
-              <span>{{ getUserName(row.paidBy) }}</span>
+              <div class="payer-info-modern">
+                <el-avatar :size="24" class="payer-avatar">
+                  {{ getUserName(row.paidBy).charAt(0) }}
+                </el-avatar>
+                <span class="payer-name">{{ getUserName(row.paidBy) }}</span>
+              </div>
             </template>
           </el-table-column>
 
-          <el-table-column prop="title" label="账单描述" width="200">
+          <el-table-column prop="title" label="账单描述" min-width="200">
             <template #default="{ row }">
-              <div class="expense-title" v-if="row.title && row.title.trim()">
-                <span class="title-text">{{ row.title }}</span>
-                <el-tag v-if="row.receipt" size="small" type="success">有票据</el-tag>
+              <div class="expense-title-modern">
+                <span class="title-text" v-if="row.title && row.title.trim()">{{ row.title }}</span>
+                <span v-else class="no-description">-</span>
+                <el-tag v-if="row.receipt" size="small" type="success" class="receipt-tag">
+                  <el-icon><Picture /></el-icon>
+                  票据
+                </el-tag>
               </div>
-              <div class="expense-title" v-else-if="row.receipt">
-                <el-tag size="small" type="success">有票据</el-tag>
-              </div>
-              <span v-else class="no-description">-</span>
             </template>
           </el-table-column>
           
-          <el-table-column prop="date" label="日期" width="120">
+          <el-table-column prop="date" label="日期" width="120" align="center">
             <template #default="{ row }">
-              {{ formatDate(row.date) }}
+              <span class="expense-date">{{ formatDate(row.date) }}</span>
             </template>
           </el-table-column>
           
-          <el-table-column label="操作" width="200" fixed="right" align="center">
+          <el-table-column label="操作" width="180" fixed="right" align="center">
             <template #default="{ row }">
-              <div class="action-buttons">
-                <el-button text @click="viewExpense(row)" size="small">
+              <div class="action-buttons-modern">
+                <el-button text @click="viewExpense(row)" size="small" class="action-btn-item">
                   <el-icon><View /></el-icon>
-                  查看
                 </el-button>
                 <template v-if="isCurrentUserExpense(row)">
-                  <el-button text @click="editExpense(row)" size="small">
+                  <el-button text @click="editExpense(row)" size="small" class="action-btn-item">
                     <el-icon><Edit /></el-icon>
-                    编辑
                   </el-button>
-                  <el-button text @click="deleteExpense(row)" type="danger" size="small">
+                  <el-button text @click="deleteExpense(row)" type="danger" size="small" class="action-btn-item">
                     <el-icon><Delete /></el-icon>
-                    删除
                   </el-button>
                 </template>
-                
               </div>
             </template>
           </el-table-column>
@@ -1161,41 +1202,272 @@ const handleEditExpense = async () => {
 
 <style scoped>
 .expense-list {
-  max-width: 1200px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-bottom: 24px;
-}
-
-.header-left h2 {
-  margin: 0 0 4px 0;
-  font-size: 24px;
-  color: #333;
-}
-
-.header-left p {
-  margin: 0;
-  color: #666;
-  font-size: 14px;
-}
-
+/* 统计卡片样式 */
 .stats-row {
-  margin-bottom: 24px;
+  margin-bottom: 32px;
 }
 
-.stat-card {
-  text-align: center;
+.stat-card-modern {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
-.filter-card {
-  margin-bottom: 24px;
+.stat-card-modern:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
-.expense-title {
+.stat-card-modern.total {
+  border-left: 4px solid #f5576c;
+}
+
+.stat-card-modern.my-expense {
+  border-left: 4px solid #667eea;
+}
+
+.stat-card-modern.total-count {
+  border-left: 4px solid #43e97b;
+}
+
+.stat-card-modern.my-count {
+  border-left: 4px solid #4facfe;
+}
+
+.stat-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.stat-card-modern.total .stat-icon {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.stat-card-modern.my-expense .stat-icon {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.stat-card-modern.total-count .stat-icon {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.stat-card-modern.my-count .stat-icon {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #8c8c8c;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1d29;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+}
+
+.stat-unit {
+  font-size: 16px;
+  font-weight: 500;
+  margin-left: 4px;
+  color: #8c8c8c;
+}
+
+/* 筛选器样式 */
+.filter-card-modern {
+  margin-bottom: 32px;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.02) 0%, rgba(118, 75, 162, 0.02) 100%);
+}
+
+.filter-card-modern :deep(.el-card__body) {
+  padding: 24px;
+}
+
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filter-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  letter-spacing: 0.3px;
+}
+
+.filter-select, .filter-input {
+  width: 100%;
+}
+
+.filter-select :deep(.el-input__wrapper),
+.filter-input :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s;
+}
+
+.filter-select :deep(.el-input__wrapper:hover),
+.filter-input :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-btn {
+  flex: 1;
+  height: 40px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.current-book-info-modern {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(102, 126, 234, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.book-icon {
+  font-size: 24px;
+  color: #667eea;
+}
+
+.book-info {
+  flex: 1;
+}
+
+.book-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1d29;
+  margin-bottom: 4px;
+}
+
+.book-trip {
+  font-size: 13px;
+  color: #8c8c8c;
+}
+
+.action-buttons-row {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.primary-action-btn {
+  height: 40px;
+  padding: 0 24px;
+  border-radius: 10px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s;
+}
+
+.primary-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.secondary-action-btn {
+  height: 40px;
+  padding: 0 24px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+/* 表格样式 */
+.expense-table-modern {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.expense-table-modern :deep(.el-table__header) {
+  background: #f8f9fa;
+}
+
+.expense-table-modern :deep(.el-table__header th) {
+  background: #f8f9fa;
+  color: #1a1d29;
+  font-weight: 600;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.06);
+}
+
+.expense-table-modern :deep(.el-table__row) {
+  transition: all 0.2s;
+}
+
+.expense-table-modern :deep(.el-table__row:hover) {
+  background: #f8f9fa;
+}
+
+.category-tag-modern {
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+.expense-amount-modern {
+  font-weight: 700;
+  font-size: 16px;
+  color: #f5576c;
+  letter-spacing: -0.3px;
+}
+
+.payer-info-modern {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+}
+
+.payer-avatar {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-weight: 600;
+}
+
+.payer-name {
+  font-size: 14px;
+  color: #1a1d29;
+  font-weight: 500;
+}
+
+.expense-title-modern {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1206,24 +1478,47 @@ const handleEditExpense = async () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 140px;
+  color: #1a1d29;
+  font-size: 14px;
 }
 
-.expense-amount {
-  font-weight: bold;
-  color: #f56c6c;
-}
-
-.payer-info {
+.receipt-tag {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+}
+
+.expense-date {
+  color: #666;
+  font-size: 14px;
+}
+
+.action-buttons-modern {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-btn-item {
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.action-btn-item:hover {
+  background: rgba(102, 126, 234, 0.1);
 }
 
 .pagination {
   display: flex;
   justify-content: center;
-  margin-top: 24px;
+  margin-top: 32px;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .receipt-uploader {

@@ -1,120 +1,147 @@
 <template>
   <Layout>
     <div class="trip-list">
-      <!-- 页面头部 -->
-      <div class="page-header">
-        <div class="header-left">
-          <h2>我的行程</h2>
-          <p>管理你的所有旅行计划</p>
-        </div>
-        <div class="header-right">
-          <el-button type="primary" @click="$router.push('/trips/create')">
-            <el-icon><Plus /></el-icon>
-            创建行程
-          </el-button>
-        </div>
-      </div>
-
       <!-- 筛选器 -->
-      <el-card class="filter-card">
+      <el-card class="filter-card-modern" shadow="hover">
         <el-row :gutter="16">
-          <el-col :span="6">
-            <el-select v-model="filters.status" placeholder="状态筛选" clearable>
-              <el-option label="全部" value="" />
-              <el-option label="计划中" value="planning" />
-              <el-option label="进行中" value="ongoing" />
-              <el-option label="已完成" value="completed" />
-            </el-select>
-          </el-col>
-          <el-col :span="8">
-            <el-input
-              v-model="filters.keyword"
-              placeholder="搜索行程标题或目的地"
-              clearable
-            >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
+          <el-col :span="5">
+            <div class="filter-item">
+              <label class="filter-label">状态</label>
+              <el-select v-model="filters.status" placeholder="全部状态" clearable class="filter-select">
+                <el-option label="全部" value="" />
+                <el-option label="计划中" value="planning" />
+                <el-option label="进行中" value="ongoing" />
+                <el-option label="已完成" value="completed" />
+              </el-select>
+            </div>
           </el-col>
           <el-col :span="4">
-            <el-button @click="handleSearch">搜索</el-button>
+            <div class="filter-item">
+              <label class="filter-label">创建者</label>
+              <el-select v-model="filters.isMyCreated" placeholder="全部" clearable class="filter-select">
+                <el-option label="全部" value="" />
+                <el-option label="我创建的" value="true" />
+                <el-option label="我参与的" value="false" />
+              </el-select>
+            </div>
+          </el-col>
+          <el-col :span="9">
+            <div class="filter-item">
+              <label class="filter-label">搜索</label>
+              <el-input
+                v-model="filters.keyword"
+                placeholder="搜索行程标题或目的地"
+                clearable
+                class="filter-input"
+                @keyup.enter="handleSearch"
+              >
+                <template #prefix>
+                  <el-icon><Search /></el-icon>
+                </template>
+              </el-input>
+            </div>
+          </el-col>
+          <el-col :span="6">
+            <div class="filter-item">
+              <label class="filter-label">&nbsp;</label>
+              <div class="filter-actions">
+                <el-button type="primary" @click="handleSearch" class="search-btn">
+                  <el-icon><Search /></el-icon>
+                  搜索
+                </el-button>
+                <el-button type="primary" @click="$router.push('/trips/create')" class="create-btn-filter">
+                  <el-icon><Plus /></el-icon>
+                  创建行程
+                </el-button>
+              </div>
+            </div>
           </el-col>
         </el-row>
       </el-card>
 
       <!-- 行程列表 -->
       <div class="trip-grid" v-loading="loading">
-        <el-empty v-if="!loading && trips.length === 0" description="暂无行程数据" />
+        <el-empty v-if="!loading && trips.length === 0" description="暂无行程数据" :image-size="120" />
         <el-row :gutter="24" v-else>
           <el-col :span="8" v-for="trip in trips" :key="trip.id">
-            <el-card class="trip-card" @click="$router.push(`/trips/${trip.id}`)">
-              <div class="trip-cover">
-                <img v-if="trip.coverImage" :src="formatImageUrl(trip.coverImage)" alt="行程封面" />
-                <div v-else class="default-cover">
+            <div class="trip-card-modern" @click="$router.push(`/trips/${trip.id}`)">
+              <div class="trip-cover-modern">
+                <img v-if="trip.coverImage" :src="formatImageUrl(trip.coverImage)" alt="行程封面" class="cover-image" />
+                <div v-else class="default-cover-modern">
                   <el-icon><Picture /></el-icon>
+                  <span>暂无封面</span>
                 </div>
-                <div class="trip-status">
-                  <el-tag :type="getTripStatusType(trip.status)" size="small">
-                    {{ getTripStatusText(trip.status) }}
-                  </el-tag>
+                <div class="trip-overlay">
+                  <div class="trip-status-modern">
+                    <el-tag :type="getTripStatusType(trip.status)" size="small" class="status-tag">
+                      {{ getTripStatusText(trip.status) }}
+                    </el-tag>
+                  </div>
                 </div>
+                <div class="trip-gradient"></div>
               </div>
               
-              <div class="trip-content">
-                <h3 class="trip-title">{{ trip.title }}</h3>
-                <p class="trip-destination">
-                  <el-icon><MapLocation /></el-icon>
-                  {{ trip.destination }}
-                </p>
-                <p class="trip-date">
-                  <el-icon><Calendar /></el-icon>
-                  {{ formatDateRange(trip.startDate, trip.endDate) }}
-                </p>
-                <div class="trip-members">
-                  <el-avatar-group :max="3" size="small">
+              <div class="trip-content-modern">
+                <h3 class="trip-title-modern">{{ trip.title }}</h3>
+                <div class="trip-info-row">
+                  <div class="info-item">
+                    <el-icon class="info-icon"><MapLocation /></el-icon>
+                    <span class="info-text">{{ trip.destination || '未设置目的地' }}</span>
+                  </div>
+                </div>
+                <div class="trip-info-row">
+                  <div class="info-item">
+                    <el-icon class="info-icon"><Calendar /></el-icon>
+                    <span class="info-text">{{ formatDateRange(trip.startDate, trip.endDate) || '未设置日期' }}</span>
+                  </div>
+                </div>
+                <div class="trip-members-modern">
+                  <el-avatar-group :max="4" :size="28">
                     <el-avatar 
                       v-for="member in trip.members" 
                       :key="member.userId"
                       :src="formatAvatarUrl(member.avatar)"
+                      class="member-avatar"
                     >
-                      {{ member.username.charAt(0) }}
+                      {{ member.username?.charAt(0) || 'U' }}
                     </el-avatar>
                   </el-avatar-group>
-                  <span class="member-count">{{ trip.members.length || 1 }} 人</span>
+                  <span class="member-count-modern">{{ trip.members.length || 1 }} 人参与</span>
                 </div>
               </div>
               
-              <div class="trip-actions">
-                <el-button text @click.stop="handleEdit(trip)" v-if="isOwner(trip)">
+              <div class="trip-actions-modern">
+                <el-button text size="small" @click.stop="handleEdit(trip)" v-if="isOwner(trip)" class="action-btn">
                   <el-icon><Edit /></el-icon>
                   编辑
                 </el-button>
-                <el-button text @click.stop="handleShare(trip)">
+                <el-button text size="small" @click.stop="handleShare(trip)" class="action-btn">
                   <el-icon><Share /></el-icon>
                   分享
                 </el-button>
-                <el-dropdown @click.stop v-if="isOwner(trip)">
-                  <el-button text>
+                <el-dropdown @click.stop trigger="click" v-if="isOwner(trip)">
+                  <el-button text size="small" class="action-btn">
                     <el-icon><More /></el-icon>
                   </el-button>
                   <template #dropdown>
                     <el-dropdown-menu>
                       <el-dropdown-item @click="handleDuplicate(trip)">
+                        <el-icon><CopyDocument /></el-icon>
                         复制行程
                       </el-dropdown-item>
                       <el-dropdown-item @click="handleDelete(trip)" divided>
+                        <el-icon><Delete /></el-icon>
                         删除行程
                       </el-dropdown-item>
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
-                <el-button text type="danger" @click.stop="handleLeaveTrip(trip)" v-if="isParticipant(trip)">
+                <el-button text size="small" type="danger" @click.stop="handleLeaveTrip(trip)" v-if="isParticipant(trip)" class="action-btn">
                   <el-icon><CircleClose /></el-icon>
-                  退出行程
+                  退出
                 </el-button>
               </div>
-            </el-card>
+            </div>
           </el-col>
         </el-row>
       </div>
@@ -156,7 +183,8 @@ const currentUser = ref<any>(null)
 // 筛选条件
 const filters = ref({
   status: '',
-  keyword: ''
+  keyword: '',
+  isMyCreated: '' // '' 全部, 'true' 我创建的, 'false' 我参与的
 })
 
 // 分页
@@ -242,6 +270,16 @@ const loadTrips = async () => {
           t.title.toLowerCase().includes(keyword) || 
           t.destination.toLowerCase().includes(keyword)
         )
+      }
+      
+      // 筛选是否是我创建的
+      if (filters.value.isMyCreated !== '' && currentUser.value) {
+        const isMyCreated = filters.value.isMyCreated === 'true'
+        const currentUserId = String(currentUser.value.userId || currentUser.value.id || '')
+        filteredTrips = filteredTrips.filter(t => {
+          const isOwner = t.createdBy === currentUserId
+          return isMyCreated ? isOwner : !isOwner
+        })
       }
       
       trips.value = filteredTrips
@@ -398,123 +436,303 @@ const handleLeaveTrip = async (trip: Trip) => {
 
 <style scoped>
 .trip-list {
-  max-width: 1200px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-.page-header {
+/* 筛选器操作按钮 */
+.filter-actions {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-bottom: 24px;
+  gap: 8px;
+  width: 100%;
 }
 
-.header-left h2 {
-  margin: 0 0 4px 0;
-  font-size: 24px;
-  color: #333;
+.search-btn {
+  flex: 1;
+  height: 40px;
+  border-radius: 10px;
+  font-weight: 500;
 }
 
-.header-left p {
-  margin: 0;
-  color: #666;
-  font-size: 14px;
-}
-
-.filter-card {
-  margin-bottom: 24px;
-}
-
-.trip-grid {
-  margin-bottom: 24px;
-}
-
-.trip-card {
-  cursor: pointer;
+.create-btn-filter {
+  flex: 1;
+  height: 40px;
+  border-radius: 10px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
   transition: all 0.3s;
-  height: 100%;
 }
 
-.trip-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+.create-btn-filter:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
-.trip-cover {
-  position: relative;
-  height: 160px;
-  background: #f5f5f5;
-  border-radius: 4px;
+/* 筛选器样式 */
+.filter-card-modern {
+  margin-bottom: 32px;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.02) 0%, rgba(118, 75, 162, 0.02) 100%);
+}
+
+.filter-card-modern :deep(.el-card__body) {
+  padding: 24px;
+}
+
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filter-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  letter-spacing: 0.3px;
+}
+
+.filter-select, .filter-input {
+  width: 100%;
+}
+
+.filter-select :deep(.el-input__wrapper),
+.filter-input :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s;
+}
+
+.filter-select :deep(.el-input__wrapper:hover),
+.filter-input :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.search-btn {
+  height: 40px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+/* 行程卡片样式 */
+.trip-grid {
+  margin-bottom: 32px;
+}
+
+.trip-card-modern {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
   overflow: hidden;
-  margin-bottom: 16px;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
-.trip-cover img {
+.trip-card-modern:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  border-color: rgba(102, 126, 234, 0.3);
+}
+
+.trip-cover-modern {
+  position: relative;
+  height: 200px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  overflow: hidden;
+}
+
+.cover-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.5s;
 }
 
-.default-cover {
+.trip-card-modern:hover .cover-image {
+  transform: scale(1.1);
+}
+
+.default-cover-modern {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #ccc;
+  color: rgba(255, 255, 255, 0.6);
   font-size: 48px;
+  gap: 12px;
 }
 
-.trip-status {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-}
-
-.trip-content {
-  margin-bottom: 16px;
-}
-
-.trip-title {
-  margin: 0 0 8px 0;
-  font-size: 16px;
-  font-weight: 500;
-  color: #333;
-}
-
-.trip-destination, .trip-date {
-  display: flex;
-  align-items: center;
-  margin: 4px 0;
+.default-cover-modern span {
   font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.trip-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.3) 100%);
+  pointer-events: none;
+}
+
+.trip-status-modern {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+}
+
+.status-tag {
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.trip-gradient {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.4) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.trip-content-modern {
+  padding: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.trip-title-modern {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1d29;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  letter-spacing: -0.2px;
+}
+
+.trip-info-row {
+  display: flex;
+  align-items: center;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: #666;
+  font-size: 14px;
 }
 
-.trip-destination .el-icon, .trip-date .el-icon {
-  margin-right: 4px;
+.info-icon {
+  font-size: 16px;
+  color: #8c8c8c;
 }
 
-.trip-members {
+.info-text {
+  color: #666;
+  line-height: 1.4;
+}
+
+.trip-members-modern {
   display: flex;
   align-items: center;
-  margin-top: 12px;
-}
-
-.member-count {
-  margin-left: 8px;
-  font-size: 12px;
-  color: #999;
-}
-
-.trip-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
   padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
+.member-avatar {
+  border: 2px solid #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.member-count-modern {
+  font-size: 13px;
+  color: #8c8c8c;
+  font-weight: 500;
+}
+
+.trip-actions-modern {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 20px;
+  background: #f8f9fa;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.action-btn {
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.action-btn:hover {
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+}
+
+/* 分页样式 */
 .pagination {
   display: flex;
   justify-content: center;
-  margin-top: 32px;
+  margin-top: 40px;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.pagination :deep(.el-pagination) {
+  justify-content: center;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .trip-card-modern {
+    margin-bottom: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-title {
+    font-size: 24px;
+  }
+  
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .create-btn {
+    width: 100%;
+  }
+  
+  .trip-cover-modern {
+    height: 160px;
+  }
 }
 </style>

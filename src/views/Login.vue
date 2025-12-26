@@ -4,7 +4,7 @@
       <template #header>
         <div class="login-header">
           <el-icon><Compass /></el-icon>
-          <span>协同旅行</span>
+          <span>多人协同旅行系统</span>
         </div>
       </template>
       

@@ -505,14 +505,36 @@
     </el-dialog>
 
     <!-- 编辑行程安排对话框 -->
-    <el-dialog v-model="showEditItinerary" title="编辑行程安排" width="500px">
-      <el-form :model="editItineraryForm" :rules="editItineraryRules" ref="editItineraryFormRef" label-width="80px">
+    <el-dialog 
+      v-model="showEditItinerary" 
+      title="编辑行程安排" 
+      width="600px"
+      class="edit-itinerary-dialog-modern"
+    >
+      <template #header>
+        <div class="dialog-header-modern">
+          <div class="header-icon-wrapper">
+            <el-icon class="header-icon"><EditPen /></el-icon>
+          </div>
+          <span class="header-title">编辑行程安排</span>
+        </div>
+      </template>
+      <el-form :model="editItineraryForm" :rules="editItineraryRules" ref="editItineraryFormRef" label-width="100px" class="itinerary-form-modern">
         <el-form-item label="地点名称">
-          <el-input :value="currentEditItem?.title" disabled />
+          <el-input :value="currentEditItem?.title" disabled class="form-input-modern">
+            <template #prefix>
+              <el-icon><Location /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
         
         <el-form-item label="选择天数" prop="day">
-          <el-select v-model="editItineraryForm.day" placeholder="请选择第几天" style="width: 100%">
+          <el-select 
+            v-model="editItineraryForm.day" 
+            placeholder="请选择第几天" 
+            style="width: 100%"
+            class="form-select-modern"
+          >
             <el-option label="未规划" :value="0" />
             <el-option
               v-for="day in availableDays" 
@@ -524,7 +546,12 @@
         </el-form-item>
         
         <el-form-item label="地点类型" prop="placeType">
-          <el-select v-model="editItineraryForm.placeType" placeholder="请选择地点类型" style="width: 100%">
+          <el-select 
+            v-model="editItineraryForm.placeType" 
+            placeholder="请选择地点类型" 
+            style="width: 100%"
+            class="form-select-modern"
+          >
             <el-option
               v-for="type in placeTypes"
               :key="type.id"
@@ -536,10 +563,13 @@
       </el-form>
       
       <template #footer>
-        <el-button @click="showEditItinerary = false">取消</el-button>
-        <el-button type="primary" @click="handleEditItinerary" :loading="editingItinerary">
-          保存修改
-        </el-button>
+        <div class="dialog-footer-modern">
+          <el-button @click="showEditItinerary = false" class="cancel-btn-modern">取消</el-button>
+          <el-button type="primary" @click="handleEditItinerary" :loading="editingItinerary" class="submit-btn-modern">
+            <el-icon><Check /></el-icon>
+            保存修改
+          </el-button>
+        </div>
       </template>
     </el-dialog>
 
@@ -674,7 +704,7 @@ import { tripApi, expenseApi, placeTypeApi, invitationApi, userApi, baiduRouteAp
 import type { Trip, ItineraryItem, Expense, TripMember } from '@/types'
 import { formatAvatarUrl } from '@/utils/image'
 import dayjs from 'dayjs'
-import { MapLocation, Calendar, Edit, Share, Delete, CircleClose, Plus, Upload, Location, ArrowRight, Van, Guide, Promotion, UserFilled, More, Money, Search, Check, InfoFilled, Loading } from '@element-plus/icons-vue'
+import { MapLocation, Calendar, Edit, EditPen, Share, Delete, CircleClose, Plus, Upload, Location, ArrowRight, Van, Guide, Promotion, UserFilled, More, Money, Search, Check, InfoFilled, Loading } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -2881,14 +2911,16 @@ const handleShowPlaceDetail = async (item: any) => {
 
 /* 添加行程安排对话框样式 */
 .add-itinerary-dialog-modern :deep(.el-dialog),
-.batch-import-dialog-modern :deep(.el-dialog) {
+.batch-import-dialog-modern :deep(.el-dialog),
+.edit-itinerary-dialog-modern :deep(.el-dialog) {
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
 }
 
 .add-itinerary-dialog-modern :deep(.el-dialog__header),
-.batch-import-dialog-modern :deep(.el-dialog__header) {
+.batch-import-dialog-modern :deep(.el-dialog__header),
+.edit-itinerary-dialog-modern :deep(.el-dialog__header) {
   padding: 24px 28px;
   background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
@@ -2896,12 +2928,14 @@ const handleShowPlaceDetail = async (item: any) => {
 }
 
 .add-itinerary-dialog-modern :deep(.el-dialog__body),
-.batch-import-dialog-modern :deep(.el-dialog__body) {
+.batch-import-dialog-modern :deep(.el-dialog__body),
+.edit-itinerary-dialog-modern :deep(.el-dialog__body) {
   padding: 28px;
 }
 
 .add-itinerary-dialog-modern :deep(.el-dialog__footer),
-.batch-import-dialog-modern :deep(.el-dialog__footer) {
+.batch-import-dialog-modern :deep(.el-dialog__footer),
+.edit-itinerary-dialog-modern :deep(.el-dialog__footer) {
   padding: 20px 28px;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
   background: #fafbfc;

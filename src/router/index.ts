@@ -64,7 +64,7 @@ const routes: RouteRecordRaw[] = [
     path: '/community/:id',
     name: 'CommunityDetail',
     component: () => import('@/views/community/CommunityDetail.vue'),
-    meta: { title: '行程分享详情', requiresAuth: false }
+    meta: { title: '帖子详细', requiresAuth: false }
   },
   {
     path: '/invitations',

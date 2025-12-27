@@ -302,6 +302,16 @@ export const communityApi = {
     return request.delete(`/community/post/${postId}/collect`)
   },
 
+  // 检查收藏状态
+  checkCollectStatus(postId: number) {
+    return request.get(`/community/post/${postId}/collect/status`)
+  },
+
+  // 获取帖子收藏数
+  getPostCollectCount(postId: number) {
+    return request.get(`/community/post/${postId}/collect/count`)
+  },
+
   // 举报帖子
   reportPost(postId: number, reason: string) {
     return request.post(`/community/post/${postId}/report`, { reason })

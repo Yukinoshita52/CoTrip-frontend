@@ -49,84 +49,77 @@
         </el-col>
       </el-row>
 
-      <!-- 账本选择和筛选器 -->
-      <el-card class="filter-card-modern" shadow="hover">
-        <el-row :gutter="16">
-          <el-col :span="8">
-            <div class="filter-item">
-              <label class="filter-label">选择账本</label>
-              <el-select 
-                v-model="selectedBookId" 
-                @change="handleBookChange" 
-                placeholder="请选择行程账本" 
-                class="filter-select"
-                clearable
-              >
-                <el-option
-                  v-for="book in accountBooks"
-                  :key="book.bookId || book.id"
-                  :label="`${getTripName(book.tripId)} - ${book.name}`"
-                  :value="book.bookId || book.id"
-                />
-              </el-select>
-            </div>
-          </el-col>
-          <el-col :span="10">
-            <div class="filter-item">
-              <label class="filter-label">搜索</label>
-              <el-input
-                v-model="filters.keyword"
-                placeholder="搜索账单描述或类别"
-                clearable
-                class="filter-input"
-                @keyup.enter="handleSearch"
-              >
-                <template #prefix>
-                  <el-icon><Search /></el-icon>
-                </template>
-              </el-input>
-            </div>
-          </el-col>
-          <el-col :span="6">
-            <div class="filter-item">
-              <label class="filter-label">&nbsp;</label>
-              <div class="filter-actions">
-                <el-button type="primary" @click="handleSearch" class="action-btn">
-                  <el-icon><Search /></el-icon>
-                  搜索
-                </el-button>
-                <el-button @click="resetFilters" class="action-btn">
-                  重置
-                </el-button>
-              </div>
-            </div>
-          </el-col>
-        </el-row>
-        <el-row :gutter="16" style="margin-top: 16px;" v-if="currentBook">
-          <el-col :span="24">
-            <div class="current-book-info-modern">
+      <!-- 账本选择区域 -->
+      <div class="books-selection-area" v-if="!loading && accountBooks.length > 0">
+        <h2 class="section-title">选择账本</h2>
+        <div class="books-grid">
+          <div 
+            v-for="book in accountBooks" 
+            :key="book.bookId || book.id"
+            class="book-card-modern"
+            :class="{ 'selected': selectedBookId === (book.bookId || book.id) }"
+            @click="handleBookSelect(book.bookId || book.id)"
+          >
+            <div class="book-card-header">
               <el-icon class="book-icon"><Notebook /></el-icon>
               <div class="book-info">
-                <div class="book-name">{{ currentBook.name }}</div>
-                <div class="book-trip">关联行程：{{ getTripName(currentBook.tripId) }}</div>
+                <div class="book-name">{{ book.name }}</div>
+                <div class="book-trip">{{ getTripName(book.tripId) }}</div>
               </div>
             </div>
-          </el-col>
-        </el-row>
-        <el-row :gutter="16" style="margin-top: 16px;">
-          <el-col :span="24">
-            <div class="action-buttons-row">
-              <el-button type="primary" @click="handleAddExpenseClick" class="primary-action-btn">
-                <el-icon><Plus /></el-icon>
-                添加账单
-              </el-button>
-              <el-button @click="handleSplitCalculation" class="secondary-action-btn">
-                <el-icon><Calculator /></el-icon>
-                分摊计算
-              </el-button>
+            <div class="book-stats" v-if="bookStats[book.bookId || book.id]">
+              <div class="stat-item">
+                <span class="stat-label">总支出</span>
+                <span class="stat-value">¥{{ bookStats[book.bookId || book.id].totalAmount.toFixed(2) }}</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">账单数</span>
+                <span class="stat-value">{{ bookStats[book.bookId || book.id].count }}笔</span>
+              </div>
             </div>
-          </el-col>
-        </el-row>
+          </div>
+        </div>
+      </div>
+
+      <!-- 操作和筛选区域 -->
+      <el-card class="actions-filter-card" v-if="selectedBookId">
+        <div class="actions-filter-content">
+          <!-- 左侧操作按钮 -->
+          <div class="action-buttons-section">
+            <el-button type="primary" @click="handleAddExpenseClick" class="primary-action-btn">
+              <el-icon><Plus /></el-icon>
+              添加账单
+            </el-button>
+            <el-button @click="handleSplitCalculation" class="secondary-action-btn">
+              <el-icon><Calculator /></el-icon>
+              分摊计算
+            </el-button>
+          </div>
+          
+          <!-- 右侧筛选和排序 -->
+          <div class="filter-sort-section">
+            <div class="filter-item">
+              <label class="filter-label">类别筛选</label>
+              <el-select v-model="filters.category" placeholder="全部类别" clearable @change="applyFilters">
+                <el-option label="全部类别" value="" />
+                <el-option label="交通" value="transport" />
+                <el-option label="住宿" value="accommodation" />
+                <el-option label="餐饮" value="food" />
+                <el-option label="活动" value="activity" />
+                <el-option label="购物" value="shopping" />
+                <el-option label="其他" value="other" />
+              </el-select>
+            </div>
+            
+            <div class="filter-item">
+              <label class="filter-label">排序方式</label>
+              <el-select v-model="sortBy" placeholder="选择排序" @change="applySorting">
+                <el-option label="按时间排列" value="date" />
+                <el-option label="按金额逆序" value="amount" />
+              </el-select>
+            </div>
+          </div>
+        </div>
       </el-card>
 
       <!-- 无账本提示 -->
@@ -143,26 +136,26 @@
       </el-card>
 
       <!-- 账单列表 -->
-      <el-card v-loading="loading">
-        <!-- 未选择账本提示 -->
-        <el-empty v-if="!selectedBookId && accountBooks.length > 0" description="请先选择账本">
-          <template #description>
-            <p>请在上方选择一个行程账本来查看和管理账单</p>
-          </template>
-        </el-empty>
-        
+      <el-card v-loading="loading" v-if="selectedBookId">
         <!-- 无账单数据 -->
-        <el-empty v-else-if="selectedBookId && !loading && expenses.length === 0" description="暂无账单数据">
+        <el-empty v-if="!loading && filteredExpenses.length === 0 && expenses.length === 0" description="暂无账单数据">
           <el-button type="primary" @click="showAddExpenseDialog = true">
             添加第一笔账单
           </el-button>
         </el-empty>
         
+        <!-- 筛选后无数据 -->
+        <el-empty v-else-if="!loading && filteredExpenses.length === 0 && expenses.length > 0" description="没有符合条件的账单">
+          <el-button @click="resetFilters">
+            清除筛选条件
+          </el-button>
+        </el-empty>
+        
         <!-- 账单表格 -->
         <el-table 
-          :data="expenses" 
+          :data="filteredExpenses" 
           style="width: 100%" 
-          v-else-if="selectedBookId && expenses.length > 0"
+          v-else-if="filteredExpenses.length > 0"
           class="expense-table-modern"
           stripe
         >
@@ -500,11 +493,6 @@ import { useUserStore } from '@/stores/user'
 import type { Expense, Trip } from '@/types'
 import dayjs from 'dayjs'
 
-// 筛选条件
-const filters = ref({
-  keyword: ''
-})
-
 // 分页
 const pagination = ref({
   page: 1,
@@ -518,8 +506,15 @@ const accountBooks = ref<any[]>([])
 const trips = ref<Trip[]>([])
 const expenses = ref<Expense[]>([])
 const selectedBookId = ref<number | null>(null)
+const bookStats = ref<Record<number, any>>({}) // 存储每个账本的统计信息
 const splitData = ref<any>(null) // 存储分摊计算结果
 const myExpenseStats = ref<any>(null) // 存储我的支出统计
+
+// 筛选和排序
+const filters = ref({
+  category: ''
+})
+const sortBy = ref('date') // 'date' | 'amount'
 
 // 添加账单对话框相关
 const showAddExpenseDialog = ref(false)
@@ -560,13 +555,64 @@ const loadAccountBooks = async () => {
       accountBooks.value = Array.isArray(res.data) ? res.data : []
       console.log('解析后的账本列表:', accountBooks.value)
       
-      // 不再自动选择第一个账本，让用户主动选择
+      // 加载每个账本的统计信息
+      await loadBookStats()
+      
       console.log('账本加载完成，等待用户选择')
     } else {
       console.log('账本API返回错误:', res.message)
     }
   } catch (error: any) {
     console.error('加载账本列表失败:', error)
+  }
+}
+
+// 加载所有账本的统计信息
+const loadBookStats = async () => {
+  try {
+    console.log('开始加载账本统计信息...')
+    const statsPromises = accountBooks.value.map(async (book) => {
+      const bookId = book.bookId || book.id
+      try {
+        // 获取账本的账单列表来计算统计信息
+        const res = await expenseApi.getRecords(bookId, 1, 1000) // 获取所有记录
+        if (res.code === 200 && res.data) {
+          const records = res.data.lists || res.data.items || res.data.list || []
+          const totalAmount = records.reduce((sum: number, record: any) => sum + (Number(record.amount) || 0), 0)
+          const count = records.length
+          
+          return {
+            bookId,
+            totalAmount,
+            count
+          }
+        }
+      } catch (error) {
+        console.error(`加载账本 ${bookId} 统计失败:`, error)
+        return {
+          bookId,
+          totalAmount: 0,
+          count: 0
+        }
+      }
+    })
+    
+    const statsResults = await Promise.all(statsPromises)
+    
+    // 将统计结果存储到 bookStats
+    bookStats.value = {}
+    statsResults.forEach(stat => {
+      if (stat) {
+        bookStats.value[stat.bookId] = {
+          totalAmount: stat.totalAmount,
+          count: stat.count
+        }
+      }
+    })
+    
+    console.log('账本统计信息加载完成:', bookStats.value)
+  } catch (error: any) {
+    console.error('加载账本统计信息失败:', error)
   }
 }
 
@@ -613,6 +659,27 @@ const stats = computed(() => {
     totalCount,
     myCount
   }
+})
+
+// 筛选和排序后的账单数据
+const filteredExpenses = computed(() => {
+  let result = [...expenses.value]
+  
+  // 按类别筛选
+  if (filters.value.category) {
+    result = result.filter(expense => expense.category === filters.value.category)
+  }
+  
+  // 排序
+  if (sortBy.value === 'amount') {
+    // 按金额逆序（从大到小）
+    result.sort((a, b) => Number(b.amount) - Number(a.amount))
+  } else if (sortBy.value === 'date') {
+    // 按时间排列（最新的在前）
+    result.sort((a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf())
+  }
+  
+  return result
 })
 
 onMounted(async () => {
@@ -766,18 +833,6 @@ const loadMyExpenseStats = async () => {
   }
 }
 
-const handleSearch = () => {
-  // 搜索逻辑
-  loadExpenses()
-}
-
-const resetFilters = () => {
-  filters.value = {
-    keyword: ''
-  }
-  loadExpenses()
-}
-
 const handleSizeChange = (size: number) => {
   pagination.value.pageSize = size
   pagination.value.page = 1
@@ -789,8 +844,24 @@ const handleCurrentChange = (page: number) => {
   loadExpenses()
 }
 
-// 账本选择变化
-const handleBookChange = (bookId: number) => {
+// 筛选和排序函数
+const applyFilters = () => {
+  // 筛选逻辑已在 computed 中处理，这里可以添加额外逻辑
+  console.log('应用筛选:', filters.value)
+}
+
+const applySorting = () => {
+  // 排序逻辑已在 computed 中处理，这里可以添加额外逻辑
+  console.log('应用排序:', sortBy.value)
+}
+
+const resetFilters = () => {
+  filters.value.category = ''
+  sortBy.value = 'date'
+}
+
+// 账本选择
+const handleBookSelect = (bookId: number) => {
   selectedBookId.value = bookId
   pagination.value.page = 1
   loadExpenses()
@@ -1204,6 +1275,196 @@ const handleEditExpense = async () => {
 .expense-list {
   max-width: 1400px;
   margin: 0 auto;
+}
+
+/* 账本选择区域样式 */
+.books-selection-area {
+  margin-bottom: 32px;
+}
+
+.section-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1d29;
+  margin-bottom: 20px;
+  padding-left: 4px;
+}
+
+.books-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.book-card-modern {
+  background: #ffffff;
+  border: 2px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.book-card-modern:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-color: rgba(102, 126, 234, 0.3);
+}
+
+.book-card-modern.selected {
+  border-color: #667eea;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.2);
+}
+
+.book-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.book-card-modern .book-icon {
+  font-size: 24px;
+  color: #667eea;
+  margin-top: 2px;
+}
+
+.book-card-modern .book-info {
+  flex: 1;
+}
+
+.book-card-modern .book-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1d29;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.book-card-modern .book-trip {
+  font-size: 13px;
+  color: #8c8c8c;
+  line-height: 1.3;
+}
+
+.book-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  padding: 12px;
+  background: rgba(102, 126, 234, 0.05);
+  border-radius: 8px;
+}
+
+.stat-item .stat-label {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.stat-item .stat-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1d29;
+}
+
+.actions-filter-card {
+  margin-bottom: 24px;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.actions-filter-card :deep(.el-card__body) {
+  padding: 24px;
+}
+
+.actions-filter-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.action-buttons-section {
+  display: flex;
+  gap: 12px;
+}
+
+.filter-sort-section {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 140px;
+}
+
+.filter-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  letter-spacing: 0.3px;
+}
+
+.filter-item .el-select {
+  width: 100%;
+}
+
+.filter-item .el-select :deep(.el-input__wrapper) {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s;
+}
+
+.filter-item .el-select :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .actions-filter-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  
+  .action-buttons-section {
+    justify-content: center;
+  }
+  
+  .filter-sort-section {
+    justify-content: space-between;
+  }
+  
+  .filter-item {
+    min-width: 120px;
+  }
+}
+
+.no-books-card {
+  text-align: center;
+  padding: 60px 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.no-books-card :deep(.el-card__body) {
+  padding: 40px;
 }
 
 /* 统计卡片样式 */

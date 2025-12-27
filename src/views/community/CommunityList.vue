@@ -70,7 +70,7 @@
                       {{ post.views }}
                     </span>
                     <span class="stat-item-modern">
-                      <el-icon><Heart /></el-icon>
+                      <el-icon><CircleCheck /></el-icon>
                       {{ post.likes }}
                     </span>
                   </div>
@@ -96,7 +96,7 @@
               
               <div class="post-footer-modern">
                 <div class="author-info-modern">
-                  <el-avatar :size="32" :src="formatAvatarUrl(post.author.avatarUrl || post.author.avatar)" class="author-avatar">
+                  <el-avatar :size="32" :src="formatAvatarUrl(post.author.avatar)" class="author-avatar">
                     {{ (post.author.username || post.author.nickname || 'U').charAt(0) }}
                   </el-avatar>
                   <div class="author-details">
@@ -107,18 +107,13 @@
               </div>
               
               <div class="post-actions-modern" @click.stop>
-                <el-button 
-                  text 
-                  @click="toggleLike(post)" 
-                  :class="{ 'liked-button-modern': isLiked(post) }"
-                  class="action-btn-modern"
-                >
-                  <el-icon :class="{ 'liked-icon': isLiked(post) }"><Heart /></el-icon>
-                  <span>喜欢</span>
+                <el-button text @click="toggleLike(post)" class="action-btn-modern" :class="{ 'liked-button-modern': isLiked(post) }">
+                  <el-icon :class="{ 'liked-icon': isLiked(post) }"><CircleCheck /></el-icon>
+                  <span>{{ isLiked(post) ? '已点赞' : '点赞' }}</span>
                 </el-button>
-                <el-button text @click="collectPost(post)" class="action-btn-modern">
-                  <el-icon><Star /></el-icon>
-                  <span>收藏</span>
+                <el-button text @click="collectPost(post)" class="action-btn-modern" :class="{ 'collected-button-modern': isCollected(post) }">
+                  <el-icon :class="{ 'collected-icon': isCollected(post) }"><Star /></el-icon>
+                  <span>{{ isCollected(post) ? '已收藏' : '收藏' }}</span>
                 </el-button>
                 <el-button text @click="sharePost(post)" class="action-btn-modern">
                   <el-icon><Share /></el-icon>
@@ -127,16 +122,6 @@
                 <el-button text @click="reportPost(post)" class="action-btn-modern report-btn">
                   <el-icon><Warning /></el-icon>
                   <span>举报</span>
-                </el-button>
-                <!-- 编辑按钮（仅作者可见） -->
-                <el-button 
-                  v-if="isPostAuthor(post)" 
-                  text 
-                  @click="editPost(post)" 
-                  class="action-btn-modern edit-btn"
-                >
-                  <el-icon><Edit /></el-icon>
-                  <span>编辑</span>
                 </el-button>
               </div>
             </div>
@@ -210,42 +195,23 @@
         </el-button>
       </template>
     </el-dialog>
-    <!-- 编辑帖子对话框 -->
-    <el-dialog v-model="showEditDialog" title="编辑帖子" width="600px">
-      <div class="edit-form">
-        <el-form :model="editForm" label-width="100px">
-          <el-form-item label="帖子标题">
-            <el-input v-model="editForm.title" placeholder="修改帖子标题" />
-          </el-form-item>
-          
-          <el-form-item label="帖子描述">
-            <el-input
-              v-model="editForm.description"
-              type="textarea"
-              :rows="4"
-              placeholder="修改帖子描述"
-            />
-          </el-form-item>
-        </el-form>
-      </div>
-      
-      <template #footer>
-        <el-button @click="showEditDialog = false">取消</el-button>
-        <el-button 
-          type="primary" 
-          @click="handleEditPost" 
-          :loading="editLoading"
-        >
-          保存修改
-        </el-button>
-      </template>
-    </el-dialog>
   </Layout>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { 
+  Search, 
+  Share, 
+  Picture, 
+  View, 
+  CircleCheck, 
+  Warning, 
+  Star, 
+  MapLocation, 
+  Calendar 
+} from '@element-plus/icons-vue'
 import Layout from '@/components/Layout.vue'
 import { communityApi, tripApi, userApi } from '@/api'
 import { useUserStore } from '@/stores/user'
@@ -274,16 +240,6 @@ const shareForm = reactive({
   title: '',
   description: ''
 })
-
-// 编辑帖子对话框
-const showEditDialog = ref(false)
-const editLoading = ref(false)
-const editForm = reactive({
-  postId: '',
-  title: '',
-  description: ''
-})
-const currentEditPost = ref<CommunityPost | null>(null)
 
 // 我的行程（用于分享）
 const myTrips = ref<Trip[]>([])
@@ -454,6 +410,7 @@ const getCurrentUserId = async () => {
 const posts = ref<CommunityPost[]>([])
 const loading = ref(false)
 const likedPosts = ref<Set<number>>(new Set())
+const collectedPosts = ref<Set<number>>(new Set())
 
 // 检查用户是否已登录
 const isLoggedIn = computed(() => !!localStorage.getItem('token'))
@@ -470,6 +427,11 @@ watch(showShareDialog, (newVal) => {
   }
 })
 
+// 监听排序方式变化，重新应用排序
+watch(() => filters.value.sortBy, () => {
+  applySorting()
+})
+
 const loadPosts = async () => {
   loading.value = true
   try {
@@ -483,6 +445,9 @@ const loadPosts = async () => {
         const author = item.author || {}
         const stats = item.stats || {}
         
+        // 调试：打印author数据结构
+        console.log('Community author data:', author)
+        
         return {
           id: String(item.postId || item.id || ''),
           title: item.tripName || item.title || '',
@@ -494,7 +459,7 @@ const loadPosts = async () => {
             username: author.username || author.nickname || '',
             email: author.email || '',
             nickname: author.nickname || author.username || '',
-            avatar: author.avatar || '',
+            avatar: author.avatarUrl || author.avatar || '',
             avatarUrl: author.avatarUrl || author.avatar || '',
             createdAt: author.createdAt || ''
           },
@@ -518,9 +483,13 @@ const loadPosts = async () => {
           tags: item.tags || [],
           isPublic: true,
           createdAt: item.createTime ? dayjs(item.createTime).format('YYYY-MM-DD') : '',
-          updatedAt: item.createTime ? dayjs(item.createTime).format('YYYY-MM-DD') : ''
+          updatedAt: item.createTime ? dayjs(item.createTime).format('YYYY-MM-DD') : '',
+          createTime: item.createTime // 保留原始创建时间用于排序
         }
       })
+      
+      // 应用排序
+      applySorting()
       
       pagination.value.total = feedData.total || list.length
       
@@ -532,6 +501,50 @@ const loadPosts = async () => {
     ElMessage.error(error.message || '加载社区动态失败')
   } finally {
     loading.value = false
+  }
+}
+
+// 应用排序逻辑
+const applySorting = () => {
+  if (!posts.value || posts.value.length === 0) return
+  
+  console.log(`应用排序: ${filters.value.sortBy}`)
+  
+  switch (filters.value.sortBy) {
+    case 'latest':
+      // 按最新发布排序（创建时间降序）
+      posts.value.sort((a, b) => {
+        const timeA = new Date((a as any).createTime || a.createdAt).getTime()
+        const timeB = new Date((b as any).createTime || b.createdAt).getTime()
+        return timeB - timeA // 降序，最新的在前
+      })
+      console.log('按最新发布排序完成')
+      break
+      
+    case 'likes':
+      // 按最多点赞排序（点赞数降序）
+      posts.value.sort((a, b) => {
+        return (b.likes || 0) - (a.likes || 0) // 降序，点赞多的在前
+      })
+      console.log('按最多点赞排序完成')
+      break
+      
+    case 'views':
+      // 按最多浏览排序（浏览数降序）
+      posts.value.sort((a, b) => {
+        return (b.views || 0) - (a.views || 0) // 降序，浏览多的在前
+      })
+      console.log('按最多浏览排序完成')
+      break
+      
+    default:
+      // 默认按最新发布排序
+      posts.value.sort((a, b) => {
+        const timeA = new Date((a as any).createTime || a.createdAt).getTime()
+        const timeB = new Date((b as any).createTime || b.createdAt).getTime()
+        return timeB - timeA
+      })
+      console.log('默认排序完成')
   }
 }
 
@@ -550,6 +563,12 @@ const loadLikeStatuses = async () => {
         const likeStatusRes = await communityApi.checkLikeStatus(Number(post.id))
         if (likeStatusRes.code === 200 && likeStatusRes.data) {
           likedPosts.value.add(Number(post.id))
+        }
+        
+        // 获取收藏状态
+        const collectStatusRes = await communityApi.checkCollectStatus(Number(post.id))
+        if (collectStatusRes.code === 200 && collectStatusRes.data) {
+          collectedPosts.value.add(Number(post.id))
         }
         
         // 获取最新的点赞数和浏览数（从Redis）
@@ -586,21 +605,41 @@ const handleSearch = async () => {
       if (res.code === 200 && res.data) {
         const searchData = res.data
         const list = searchData.list || searchData.items || []
-        posts.value = list.map((item: any) => ({
-          id: String(item.postId || item.id || ''),
-          title: item.tripName || item.title || '',
-          description: item.description || '',
-          tripId: String(item.tripId || ''),
-          authorId: String(item.authorId || ''),
-          author: item.author || {},
-          trip: item.trip || {},
-          likes: item.likes || 0,
-          views: item.views || 0,
-          tags: item.tags || [],
-          isPublic: true,
-          createdAt: item.createdAt || '',
-          updatedAt: item.updatedAt || ''
-        }))
+        posts.value = list.map((item: any) => {
+          const author = item.author || {}
+          const stats = item.stats || {}
+          
+          // 调试：打印搜索结果中的author数据结构
+          console.log('Search author data:', author)
+          
+          return {
+            id: String(item.postId || item.id || ''),
+            title: item.tripName || item.title || '',
+            description: item.description || '',
+            tripId: String(item.tripId || ''),
+            authorId: String(item.authorId || author.userId || ''),
+            author: {
+              id: String(author.userId || author.id || ''),
+              username: author.username || author.nickname || '',
+              email: author.email || '',
+              nickname: author.nickname || author.username || '',
+              avatar: author.avatarUrl || author.avatar || '',
+              avatarUrl: author.avatarUrl || author.avatar || '',
+              createdAt: author.createdAt || ''
+            },
+            trip: item.trip || {},
+            likes: stats.likeCount || item.likes || 0,
+            views: stats.viewCount || item.views || 0,
+            tags: item.tags || [],
+            isPublic: true,
+            createdAt: item.createdAt || item.createTime || '',
+            updatedAt: item.updatedAt || item.createTime || '',
+            createTime: item.createTime || item.createdAt // 保留原始创建时间用于排序
+          }
+        })
+        
+        // 对搜索结果应用排序
+        applySorting()
       }
     } catch (error: any) {
       console.error('搜索失败:', error)
@@ -642,6 +681,10 @@ const getTripDuration = (trip: Trip) => {
 
 const isLiked = (post: CommunityPost) => {
   return likedPosts.value.has(Number(post.id))
+}
+
+const isCollected = (post: CommunityPost) => {
+  return collectedPosts.value.has(Number(post.id))
 }
 
 const toggleLike = async (post: CommunityPost) => {
@@ -697,16 +740,30 @@ const collectPost = async (post: CommunityPost) => {
     return
   }
   
+  const postId = Number(post.id)
+  if (isNaN(postId)) return
+  
   try {
-    const res = await communityApi.collectPost(Number(post.id))
-    if (res.code === 200) {
-      ElMessage.success('已收藏到我的行程')
+    if (isCollected(post)) {
+      const res = await communityApi.uncollectPost(postId)
+      if (res.code === 200 && res.data) {
+        collectedPosts.value.delete(postId)
+        ElMessage.success('已取消收藏')
+      }
     } else {
-      ElMessage.error(res.message || '收藏失败')
+      const res = await communityApi.collectPost(postId)
+      if (res.code === 200 && res.data) {
+        collectedPosts.value.add(postId)
+        ElMessage.success('收藏成功')
+      }
     }
   } catch (error: any) {
-    console.error('收藏失败:', error)
-    ElMessage.error(error.message || '收藏失败')
+    console.error('收藏操作失败:', error)
+    if (error.response?.status === 401) {
+      ElMessage.warning('请先登录后再收藏')
+    } else {
+      ElMessage.error(error.message || '操作失败')
+    }
   }
 }
 
@@ -744,59 +801,6 @@ const reportPost = async (post: CommunityPost) => {
       console.error('举报失败:', error)
       ElMessage.error(error.message || '举报失败')
     }
-  }
-}
-
-// 检查是否为帖子作者
-const isPostAuthor = (post: CommunityPost) => {
-  const userStore = useUserStore()
-  const currentUserId = userStore.user?.id || userStore.user?.userId
-  return currentUserId && String(currentUserId) === String(post.authorId)
-}
-
-// 编辑帖子
-const editPost = (post: CommunityPost) => {
-  currentEditPost.value = post
-  editForm.postId = post.id
-  editForm.title = post.title
-  editForm.description = post.description
-  showEditDialog.value = true
-}
-
-// 处理编辑帖子
-const handleEditPost = async () => {
-  if (!editForm.title.trim()) {
-    ElMessage.warning('请填写帖子标题')
-    return
-  }
-  
-  editLoading.value = true
-  
-  try {
-    // 调用编辑帖子API
-    const res = await communityApi.updatePost(Number(editForm.postId), {
-      name: editForm.title,
-      description: editForm.description
-    })
-    
-    if (res.code === 200) {
-      ElMessage.success('帖子修改成功!')
-      showEditDialog.value = false
-      
-      // 更新本地数据
-      if (currentEditPost.value) {
-        currentEditPost.value.title = editForm.title
-        currentEditPost.value.description = editForm.description
-      }
-      
-      // 重新加载帖子列表
-      await loadPosts()
-    }
-  } catch (error: any) {
-    console.error('编辑帖子失败:', error)
-    ElMessage.error(error.message || '编辑帖子失败')
-  } finally {
-    editLoading.value = false
   }
 }
 
@@ -1148,11 +1152,29 @@ const handleShare = async () => {
 }
 
 .liked-icon {
-  color: #f5576c;
+  color: #409eff;
   animation: heartBeat 0.3s;
 }
 
+.collected-button-modern {
+  color: #f39c12 !important;
+}
+
+.collected-button-modern:hover {
+  background: rgba(243, 156, 18, 0.1) !important;
+}
+
+.collected-icon {
+  color: #f39c12;
+  animation: starBeat 0.3s;
+}
+
 @keyframes heartBeat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+@keyframes starBeat {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.2); }
 }

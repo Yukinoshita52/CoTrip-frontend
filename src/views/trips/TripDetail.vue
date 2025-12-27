@@ -375,46 +375,6 @@
             </div>
           </div>
         </el-tab-pane>
-
-        <!-- 相关账单 -->
-        <el-tab-pane label="相关账单" name="expenses">
-          <div class="expenses-section">
-            <div class="section-header">
-              <h3>相关账单</h3>
-              <el-button @click="$router.push('/expenses/create')">
-                <el-icon><Money /></el-icon>
-                添加账单
-              </el-button>
-            </div>
-            
-            <div class="expense-summary">
-              <el-row :gutter="16">
-                <el-col :span="8">
-                  <el-statistic title="总支出" :value="expenseSummary.total" prefix="¥" />
-                </el-col>
-                <el-col :span="8">
-                  <el-statistic title="人均支出" :value="expenseSummary.average" prefix="¥" />
-                </el-col>
-                <el-col :span="8">
-                  <el-statistic title="账单数量" :value="expenseSummary.count" suffix="笔" />
-                </el-col>
-              </el-row>
-            </div>
-            
-            <div class="expense-list">
-              <div v-for="expense in relatedExpenses" :key="expense.id" class="expense-item">
-                <div class="expense-info">
-                  <div class="expense-title">{{ expense.title }}</div>
-                  <div class="expense-meta">
-                    <el-tag size="small">{{ getCategoryText(expense.category) }}</el-tag>
-                    <span class="expense-date">{{ formatDate(expense.date) }}</span>
-                  </div>
-                </div>
-                <div class="expense-amount">¥{{ expense.amount }}</div>
-              </div>
-            </div>
-          </div>
-        </el-tab-pane>
       </el-tabs>
       </template>
     </div>
@@ -719,8 +679,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import Layout from '@/components/Layout.vue'
-import { tripApi, expenseApi, placeTypeApi, invitationApi, userApi, baiduRouteApi, transportInfoApi } from '@/api'
-import type { Trip, ItineraryItem, Expense, TripMember } from '@/types'
+import { tripApi, placeTypeApi, invitationApi, userApi, baiduRouteApi, transportInfoApi } from '@/api'
+import type { Trip, ItineraryItem, TripMember } from '@/types'
 import { formatAvatarUrl } from '@/utils/image'
 import dayjs from 'dayjs'
 import { MapLocation, Calendar, Edit, EditPen, Share, Delete, CircleClose, Plus, Upload, Location, ArrowRight, Van, Guide, Promotion, UserFilled, More, Money, Search, Check, InfoFilled, Loading } from '@element-plus/icons-vue'
@@ -770,7 +730,6 @@ const transportInfo = ref<Record<string, {
 
 const loading = ref(false)
 const trip = ref<Trip | null>(null)
-const relatedExpenses = ref<Expense[]>([])
 const pendingInvitations = ref<any[]>([])
 const currentUser = ref<any>(null)
 const placeDetail = ref<any>(null)
@@ -850,10 +809,9 @@ const loadTripDetail = async () => {
   
   loading.value = true
   try {
-    // 并行加载行程详情、相关账单和待接受邀请，提升加载速度
+    // 并行加载行程详情和待接受邀请，提升加载速度
     const [tripRes] = await Promise.allSettled([
       tripApi.getTripById(Number(tripId)),
-      loadRelatedExpenses(Number(tripId)).catch(() => {}), // 忽略错误，不影响主流程
       loadPendingInvitations(Number(tripId)).catch(() => {}) // 忽略错误，不影响主流程
     ])
     
@@ -945,59 +903,6 @@ const loadTripDetail = async () => {
     router.push('/trips')
   } finally {
     loading.value = false
-  }
-}
-
-// 加载相关账单
-const loadRelatedExpenses = async (tripId: number) => {
-  try {
-    const booksRes = await expenseApi.getAllAccountBooks()
-    if (booksRes.code === 200 && booksRes.data) {
-      const books = Array.isArray(booksRes.data) ? booksRes.data : []
-      const book = books.find((b: any) => b.tripId === tripId)
-      
-      if (book) {
-        const recordsRes = await expenseApi.getRecords(book.bookId || book.id, 1, 10)
-        if (recordsRes.code === 200 && recordsRes.data) {
-          const items = recordsRes.data.items || recordsRes.data.list || []
-          relatedExpenses.value = items
-            .filter((record: any) => record.type === 2) // 只处理支出类型
-            .map((record: any) => {
-              // 根据 categoryName 映射到前端类别
-              let category: 'transport' | 'accommodation' | 'food' | 'activity' | 'shopping' | 'other' = 'other'
-              const categoryName = (record.categoryName || '').toLowerCase()
-              if (categoryName.includes('交通') || categoryName.includes('transport')) {
-                category = 'transport'
-              } else if (categoryName.includes('住宿') || categoryName.includes('accommodation') || categoryName.includes('酒店')) {
-                category = 'accommodation'
-              } else if (categoryName.includes('餐饮') || categoryName.includes('food') || categoryName.includes('美食')) {
-                category = 'food'
-              } else if (categoryName.includes('活动') || categoryName.includes('activity')) {
-                category = 'activity'
-              } else if (categoryName.includes('购物') || categoryName.includes('shopping')) {
-                category = 'shopping'
-              }
-              
-              return {
-                id: String(record.recordId || record.id || ''),
-                tripId: String(tripId),
-                title: record.categoryName || record.note || '未命名',
-                amount: Number(record.amount || 0),
-                currency: 'CNY',
-                category: category,
-                paidBy: record.user?.userId ? String(record.user.userId) : '',
-                participants: [],
-                splitType: 'equal' as const,
-                splits: [],
-                date: record.recordTime ? dayjs(record.recordTime).format('YYYY-MM-DD') : '',
-                createdAt: record.recordTime ? dayjs(record.recordTime).format('YYYY-MM-DD') : ''
-              }
-            })
-        }
-      }
-    }
-  } catch (error: any) {
-    console.error('加载相关账单失败:', error)
   }
 }
 
@@ -1111,15 +1016,6 @@ const getCurrentDayPlaces = computed(() => {
       lng: item.lng,
       id: item.id
     }))
-})
-
-const expenseSummary = computed(() => {
-  const total = relatedExpenses.value.reduce((sum, expense) => sum + expense.amount, 0)
-  const count = relatedExpenses.value.length
-  const average = trip.value && trip.value.members.length > 0
-    ? Math.round(total / trip.value.members.length)
-    : 0
-  return { total, count, average }
 })
 
 // 判断用户在行程中的角色
@@ -1371,18 +1267,6 @@ const getRoleText = (role: string) => {
     member: '参与者'
   }
   return texts[role] || role
-}
-
-const getCategoryText = (category: string) => {
-  const texts: Record<string, string> = {
-    transport: '交通',
-    accommodation: '住宿',
-    food: '餐饮',
-    activity: '活动',
-    shopping: '购物',
-    other: '其他'
-  }
-  return texts[category] || category
 }
 
 // 事件处理
@@ -3135,97 +3019,6 @@ const handleShowPlaceDetail = async (item: any) => {
   font-size: 12px;
   color: #999;
   margin-top: 4px;
-}
-
-.expense-summary {
-  margin-bottom: 32px;
-  padding: 24px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-}
-
-.expense-summary :deep(.el-statistic) {
-  text-align: center;
-}
-
-.expense-summary :deep(.el-statistic__head) {
-  font-size: 14px;
-  color: #666;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-
-.expense-summary :deep(.el-statistic__number) {
-  font-size: 28px;
-  font-weight: 700;
-  color: #1a1d29;
-}
-
-.expense-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.expense-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 12px;
-  background: #ffffff;
-  transition: all 0.3s;
-}
-
-.expense-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transform: translateX(4px);
-  border-color: rgba(102, 126, 234, 0.3);
-}
-
-.expense-info {
-  flex: 1;
-}
-
-.expense-title {
-  font-weight: 600;
-  color: #1a1d29;
-  margin-bottom: 8px;
-  font-size: 15px;
-}
-
-.expense-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 4px;
-}
-
-.expense-meta .el-tag {
-  border-radius: 6px;
-  font-weight: 500;
-}
-
-.expense-date {
-  font-size: 12px;
-  color: #8c8c8c;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.expense-date::before {
-  content: '📅';
-  font-size: 12px;
-}
-
-.expense-amount {
-  font-weight: 700;
-  color: #f56c6c;
-  font-size: 20px;
-  padding-left: 16px;
 }
 
 /* 添加行程安排对话框样式 */

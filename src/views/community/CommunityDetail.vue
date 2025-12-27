@@ -17,54 +17,55 @@
         <div class="header-content-modern">
           <div class="post-info-modern">
             <h1 class="post-title-modern">{{ post.title }}</h1>
-            <div class="post-meta-modern">
-              <div class="author-info-modern">
-                <el-avatar :src="formatAvatarUrl(post.author.avatarUrl || post.author.avatar)" :size="48" class="author-avatar-modern">
-                  {{ (post.author.username || post.author.nickname || 'U').charAt(0) }}
-                </el-avatar>
-                <div class="author-details-modern">
-                  <div class="author-name-modern">{{ post.author.username }}</div>
-                  <div class="post-date-modern">
-                    <el-icon><Clock /></el-icon>
-                    {{ formatDate(post.createdAt) }} 发布
+            
+            <!-- 两列布局：作者信息+统计数据 | 操作按钮 -->
+            <div class="post-meta-row-modern">
+              <!-- 左列：作者信息 + 统计数据 -->
+              <div class="left-column-modern">
+                <div class="author-info-modern">
+                  <el-avatar :src="formatAvatarUrl(post.author.avatar)" :size="48" class="author-avatar-modern">
+                    {{ (post.author.username || post.author.nickname || 'U').charAt(0) }}
+                  </el-avatar>
+                  <div class="author-details-modern">
+                    <div class="author-name-modern">{{ post.author.username }}</div>
+                    <!-- 发布时间和统计数据在同一行 -->
+                    <div class="post-date-stats-row">
+                      <div class="post-date-modern">
+                        <el-icon><Clock /></el-icon>
+                        {{ formatDate(post.createdAt) }} 发布
+                      </div>
+                      <!-- 统计数据在发布时间右边 -->
+                      <div class="stats-compact-modern">
+                        <span class="stat-compact-item">
+                          <el-icon class="stat-compact-icon"><View /></el-icon>
+                          {{ post.views }} 浏览
+                        </span>
+                        <span class="stat-compact-item">
+                          <el-icon class="stat-compact-icon"><CircleCheck /></el-icon>
+                          {{ post.likes }} 点赞
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-              <div class="post-stats-modern">
-                <div class="stat-item-modern">
-                  <div class="stat-icon-wrapper">
-                    <el-icon class="stat-icon"><View /></el-icon>
-                  </div>
-                  <div class="stat-content">
-                    <div class="stat-value">{{ post.views }}</div>
-                    <div class="stat-label">浏览</div>
-                  </div>
-                </div>
-                <div class="stat-item-modern">
-                  <div class="stat-icon-wrapper">
-                    <el-icon class="stat-icon"><Heart /></el-icon>
-                  </div>
-                  <div class="stat-content">
-                    <div class="stat-value">{{ post.likes }}</div>
-                    <div class="stat-label">点赞</div>
-                  </div>
-                </div>
+              
+              <!-- 右列：操作按钮（横向排列） -->
+              <div class="actions-column-modern">
+                <el-button @click="toggleLike" :type="isLiked ? 'primary' : 'default'" :class="{ 'liked-button-modern': isLiked }" class="action-btn-horizontal-modern">
+                  <el-icon :class="{ 'liked': isLiked }"><CircleCheck /></el-icon>
+                  {{ isLiked ? '已点赞' : '点赞' }}
+                </el-button>
+                <el-button @click="handleCollect" class="action-btn-horizontal-modern">
+                  <el-icon><Star /></el-icon>
+                  收藏
+                </el-button>
+                <el-button @click="handleShare" class="action-btn-horizontal-modern">
+                  <el-icon><Share /></el-icon>
+                  分享
+                </el-button>
               </div>
             </div>
-          </div>
-          <div class="post-actions-modern">
-            <el-button @click="toggleLike" :type="isLiked ? 'primary' : 'default'" :class="{ 'liked-button-modern': isLiked }" class="action-btn-modern">
-              <el-icon :class="{ 'liked': isLiked }"><Heart /></el-icon>
-              {{ isLiked ? '已点赞' : '点赞' }}
-            </el-button>
-            <el-button @click="handleShare" class="action-btn-modern">
-              <el-icon><Share /></el-icon>
-              分享
-            </el-button>
-            <el-button @click="handleCollect" class="action-btn-modern">
-              <el-icon><Collection /></el-icon>
-              收藏
-            </el-button>
           </div>
         </div>
       </el-card>
@@ -79,50 +80,45 @@
             <span class="header-title">行程概览</span>
           </div>
         </template>
-        <div class="overview-content">
-          <div class="trip-basic-info">
-            <div class="info-item">
-              <label>行程时间：</label>
-              <span>{{ formatDateRange(post.trip.startDate, post.trip.endDate) }}</span>
-            </div>
-            <div class="info-item">
-              <label>行程天数：</label>
-              <span>{{ getTripDuration(post.trip) || '待确定' }} {{ getTripDuration(post.trip) > 0 ? '天' : '' }}</span>
-            </div>
-            <div class="info-item" v-if="tripDestinations">
-              <label>目的地：</label>
-              <span>{{ tripDestinations }}</span>
-            </div>
-          </div>
-          <div class="trip-description">
-            <h4>行程描述</h4>
-            <p>{{ getTripDescription() }}</p>
-          </div>
-        </div>
-      </el-card>
-
-      <!-- 行程图片展示 -->
-      <el-card class="trip-photos-modern" shadow="hover" v-if="post.trip.coverImage || (post.trip.images && post.trip.images.length > 0)">
-        <template #header>
-          <div class="card-header-modern">
-            <div class="header-icon-wrapper">
-              <el-icon class="header-icon"><Picture /></el-icon>
-            </div>
-            <span class="header-title">行程图片</span>
-          </div>
-        </template>
-        <div class="photo-gallery">
-          <div class="photo-grid">
-            <div 
-              v-for="(image, index) in allImages" 
-              :key="index" 
-              class="photo-item"
-              @click="previewImage(index)"
-            >
-              <img :src="formatImageUrl(image)" :alt="`行程图片${index + 1}`" />
-              <div class="photo-overlay">
-                <el-icon><ZoomIn /></el-icon>
+        <div class="overview-content-with-images">
+          <!-- 左列：行程图片 -->
+          <div class="overview-images-column" v-if="post.trip.coverImage || (post.trip.images && post.trip.images.length > 0)">
+            <div class="photo-gallery-compact">
+              <div class="photo-grid-compact">
+                <div 
+                  v-for="(image, index) in allImages" 
+                  :key="index" 
+                  class="photo-item-compact"
+                  @click="previewImage(index)"
+                >
+                  <img :src="formatImageUrl(image)" :alt="`行程图片${index + 1}`" />
+                  <div class="photo-overlay">
+                    <el-icon><ZoomIn /></el-icon>
+                  </div>
+                </div>
               </div>
+            </div>
+          </div>
+          
+          <!-- 右列：行程信息 -->
+          <div class="overview-info-column">
+            <div class="trip-basic-info">
+              <div class="info-item">
+                <label>行程时间：</label>
+                <span>{{ formatDateRange(post.trip.startDate, post.trip.endDate) }}</span>
+              </div>
+              <div class="info-item">
+                <label>行程天数：</label>
+                <span>{{ getTripDuration(post.trip) || '待确定' }} {{ getTripDuration(post.trip) > 0 ? '天' : '' }}</span>
+              </div>
+              <div class="info-item" v-if="tripDestinations">
+                <label>目的地：</label>
+                <span>{{ tripDestinations }}</span>
+              </div>
+            </div>
+            <div class="trip-description">
+              <h4>行程描述</h4>
+              <p>{{ getTripDescription() }}</p>
             </div>
           </div>
         </div>
@@ -139,43 +135,48 @@
           </div>
         </template>
         <div class="itinerary-timeline">
-          <div v-for="(dayItems, date) in groupedItinerary" :key="date" class="day-group">
-            <div class="day-header">
-              <h3>{{ formatDayTitle(date) }}</h3>
-              <span class="day-count">{{ dayItems.length }} 个地点</span>
-            </div>
-            
-            <div class="day-items">
-              <div v-for="(item, index) in dayItems" :key="item.id" class="itinerary-item-modern">
-                <div class="item-sequence">{{ index + 1 }}</div>
-                <div class="item-content">
-                  <div class="item-header">
-                    <span class="item-title">{{ item.title }}</span>
-                    <el-tag size="small" :type="getItemTypeColor(item.type)">
-                      {{ getItemTypeText(item.type) }}
-                    </el-tag>
-                  </div>
-                  <div class="item-location" v-if="item.location">
-                    <el-icon><Location /></el-icon>
-                    {{ item.location }}
-                  </div>
-                  <div v-if="item.description" class="item-description">
-                    {{ item.description }}
-                  </div>
-                  <div v-if="item.telephone" class="item-contact">
-                    <el-icon><Phone /></el-icon>
-                    {{ item.telephone }}
+          <el-collapse v-model="activeCollapseDays" class="itinerary-collapse">
+            <el-collapse-item v-for="(dayItems, date) in groupedItinerary" :key="date" :name="date" class="day-collapse-item">
+              <template #title>
+                <div class="day-header-collapse">
+                  <h3>{{ formatDayTitle(date) }}</h3>
+                  <span class="day-count">{{ dayItems.length }} 个地点</span>
+                </div>
+              </template>
+              
+              <div class="day-items">
+                <div v-for="(item, index) in dayItems" :key="item.id" class="itinerary-item-modern">
+                  <div class="item-sequence">{{ index + 1 }}</div>
+                  <div class="item-content">
+                    <div class="item-header">
+                      <span class="item-title">{{ item.title }}</span>
+                      <el-tag size="small" :type="getItemTypeColor(item.type)">
+                        {{ getItemTypeText(item.type) }}
+                      </el-tag>
+                    </div>
+                    <div class="item-location" v-if="item.location">
+                      <el-icon><Location /></el-icon>
+                      {{ item.location }}
+                    </div>
+                    <div v-if="item.description" class="item-description">
+                      {{ item.description }}
+                    </div>
+                    <div v-if="item.telephone" class="item-contact">
+                      <el-icon><Phone /></el-icon>
+                      {{ item.telephone }}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </el-collapse-item>
+          </el-collapse>
           
           <!-- 如果没有详细行程安排，显示提示信息 -->
           <div v-if="Object.keys(groupedItinerary).length === 0" class="no-itinerary">
             <el-empty description="暂无详细行程安排" :image-size="100">
               <template #description>
-                <p>该行程还没有添加具体的地点安排</p>
+                <p>该行程的详细安排暂时无法显示</p>
+                <p class="text-sm text-gray-500">可能是作者设置了隐私权限或还未添加具体安排</p>
               </template>
             </el-empty>
           </div>
@@ -437,6 +438,24 @@ import { ref, computed, onMounted } from 'vue'
 import { h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { 
+  CircleCheck, 
+  Share, 
+  Star, 
+  View, 
+  ArrowLeft, 
+  Clock,
+  Collection,
+  ZoomIn,
+  Location,
+  Phone,
+  ChatDotRound,
+  Delete,
+  ArrowDown,
+  ArrowUp,
+  DocumentCopy,
+  Edit
+} from '@element-plus/icons-vue'
 import Layout from '@/components/Layout.vue'
 import type { CommunityPost, ItineraryItem, Expense } from '@/types'
 import { formatAvatarUrl, formatImageUrl } from '@/utils/image'
@@ -454,6 +473,9 @@ const loading = ref(false)
 const post = ref<CommunityPost | null>(null)
 const relatedExpenses = ref<Expense[]>([])
 const comments = ref<any[]>([])
+
+// 折叠面板控制 - 默认所有天数都折叠
+const activeCollapseDays = ref<string[]>([])
 
 // 评论相关状态
 const showCommentDialog = ref(false)
@@ -545,7 +567,6 @@ const loadPostDetail = async () => {
           email: data.author?.email || '',
           nickname: data.author?.nickname || data.author?.username || '',
           avatar: data.author?.avatar || '',
-          avatarUrl: data.author?.avatarUrl || data.author?.avatar || '',
           createdAt: ''
         },
         trip: {
@@ -574,11 +595,22 @@ const loadPostDetail = async () => {
 
       // 加载行程详情以获取 itinerary (如果还没有日期信息，也会从这里获取)
       if (data.trip?.tripId || data.tripId) {
-        await loadTripDetail(data.trip?.tripId || data.tripId)
+        try {
+          await loadTripDetail(data.trip?.tripId || data.tripId)
+        } catch (error: any) {
+          // 如果无权访问行程详情，不影响帖子显示，只记录日志
+          console.warn('无法加载行程详情，可能是权限限制:', error.message)
+          // 帖子仍然可以正常显示，只是没有详细的行程安排信息
+        }
       }
 
       // 加载相关费用
-      await loadRelatedExpenses(data.trip?.tripId || data.tripId)
+      try {
+        await loadRelatedExpenses(data.trip?.tripId || data.tripId)
+      } catch (error: any) {
+        // 如果无法加载费用信息，也不影响帖子显示
+        console.warn('无法加载相关费用信息:', error.message)
+      }
       
       // 加载评论
       await loadComments(postId)
@@ -751,7 +783,16 @@ const loadTripDetail = async (tripId: number) => {
       }
     }
   } catch (error: any) {
-    console.error('加载行程详情失败:', error)
+    // 区分不同类型的错误
+    if (error.message && error.message.includes('无权查看')) {
+      console.warn('无权查看行程详情，跳过加载:', error.message)
+      // 抛出错误让上层处理
+      throw error
+    } else {
+      console.error('加载行程详情失败:', error)
+      // 其他错误也抛出，但不影响帖子显示
+      throw error
+    }
   }
 }
 
@@ -1393,9 +1434,8 @@ const handleDeletePost = async () => {
 
 .header-content-modern {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 24px;
+  flex-direction: column;
+  width: 100%;
 }
 
 .post-info-modern {
@@ -1413,6 +1453,65 @@ const handleDeletePost = async () => {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   line-height: 1.3;
+}
+
+.post-info-modern {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 两列布局 */
+.post-meta-row-modern {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 32px;
+  padding: 16px 0;
+}
+
+/* 左列：作者信息 + 统计数据 */
+.left-column-modern {
+  flex: 1;
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* 右列：操作按钮 */
+.actions-column-modern {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+/* 发布时间和统计数据同行 */
+.post-date-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* 紧凑的统计数据样式 */
+.stats-compact-modern {
+  display: flex;
+  gap: 16px;
+}
+
+.stat-compact-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #666;
+}
+
+.stat-compact-icon {
+  font-size: 14px;
+  color: #8c8c8c;
 }
 
 .post-meta-modern {
@@ -1459,7 +1558,8 @@ const handleDeletePost = async () => {
 
 .post-stats-modern {
   display: flex;
-  gap: 20px;
+  gap: 24px;
+  justify-content: center;
 }
 
 .stat-item-modern {
@@ -1520,20 +1620,20 @@ const handleDeletePost = async () => {
   color: #8c8c8c;
 }
 
-.post-actions-modern {
-  display: flex;
-  gap: 12px;
-  flex-direction: column;
-  flex-shrink: 0;
-}
-
-.action-btn-modern {
+/* 垂直排列的操作按钮 */
+/* 横向排列的操作按钮 */
+.action-btn-horizontal-modern {
   border-radius: 10px;
-  padding: 10px 20px;
+  padding: 8px 16px;
   font-weight: 500;
   transition: all 0.3s;
-  min-width: 120px;
-  width: 120px;
+  min-width: 80px;
+  font-size: 14px;
+}
+
+.action-btn-horizontal-modern:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .action-btn-modern:hover {
@@ -1593,6 +1693,22 @@ const handleDeletePost = async () => {
 }
 
 /* 行程概览 */
+.overview-content-with-images {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.overview-images-column {
+  flex: 0 0 400px;
+  min-width: 400px;
+}
+
+.overview-info-column {
+  flex: 1;
+  min-width: 0;
+}
+
 .overview-content {
   display: grid;
   grid-template-columns: 1fr 2fr;
@@ -1653,6 +1769,54 @@ const handleDeletePost = async () => {
 }
 
 /* 详细行程 */
+.itinerary-collapse {
+  border: none;
+}
+
+.day-collapse-item {
+  margin-bottom: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.day-collapse-item :deep(.el-collapse-item__header) {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+  border: none;
+  padding: 16px 20px;
+  font-weight: 600;
+  border-left: 4px solid #667eea;
+}
+
+.day-collapse-item :deep(.el-collapse-item__content) {
+  padding: 0;
+  border: none;
+}
+
+.day-header-collapse {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.day-header-collapse h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1d29;
+}
+
+.day-count {
+  font-size: 13px;
+  color: #8c8c8c;
+  padding: 4px 12px;
+  background: #ffffff;
+  border-radius: 12px;
+  font-weight: 500;
+  margin-left: auto;
+}
+
 .day-group {
   margin-bottom: 40px;
 }
@@ -1675,14 +1839,9 @@ const handleDeletePost = async () => {
   color: #1a1d29;
 }
 
-.day-count {
-  font-size: 13px;
-  color: #8c8c8c;
-  padding: 4px 12px;
-  background: #ffffff;
-  border-radius: 12px;
-  font-weight: 500;
-  margin-left: auto;
+.day-items {
+  padding: 20px;
+  background: #fafafa;
 }
 
 .itinerary-item-modern {
@@ -1924,22 +2083,60 @@ const handleDeletePost = async () => {
 }
 
 .liked {
-  color: #f56c6c;
+  color: #409eff;
 }
 
 .liked-button-modern {
-  color: #f56c6c !important;
-  border-color: #f56c6c !important;
+  color: #409eff !important;
+  border-color: #409eff !important;
 }
 
 .liked-button-modern:hover {
-  color: #f78989 !important;
-  border-color: #f78989 !important;
+  color: #66b1ff !important;
+  border-color: #66b1ff !important;
 }
 
 /* 行程图片样式 */
 .photo-gallery {
   width: 100%;
+}
+
+/* 紧凑版图片画廊（用于概览中） */
+.photo-gallery-compact {
+  width: 100%;
+}
+
+.photo-grid-compact {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.photo-item-compact {
+  position: relative;
+  aspect-ratio: 4/3;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.photo-item-compact:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.2);
+}
+
+.photo-item-compact img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+
+.photo-item-compact:hover img {
+  transform: scale(1.05);
 }
 
 .photo-grid {
@@ -2234,17 +2431,55 @@ const handleDeletePost = async () => {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .header-content-modern {
+  .post-meta-row-modern {
     flex-direction: column;
+    gap: 20px;
+    align-items: center;
   }
   
-  .post-actions-modern {
+  .left-column-modern {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .actions-column-modern {
     flex-direction: row;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .action-btn-horizontal-modern {
+    width: auto;
+    min-width: 70px;
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+  
+  .post-date-stats-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .stats-compact-modern {
+    justify-content: flex-start;
+  }
+  
+  .overview-content-with-images {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .overview-images-column {
+    flex: none;
+    min-width: auto;
     width: 100%;
   }
   
-  .action-btn-modern {
-    flex: 1;
+  .photo-grid-compact {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
   }
   
   .overview-content {

@@ -107,6 +107,7 @@ export interface CommunityPost {
   }
   createdAt: string
   updatedAt: string
+  createTime?: string // 原始创建时间，用于排序
 }
 
 // API 响应类型

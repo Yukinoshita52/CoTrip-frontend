@@ -1586,7 +1586,7 @@ const handleDrop = async (event: DragEvent, dropIndex: number) => {
 
 // 基于当前 trip 初始化草稿（按 day 分组并按 sequence 排序）
 const initItineraryDraft = () => {
-  const map = new Map<number, ItineraryItem[]>()
+  const map = new Map<number, ItineraryItem>()
   if (!trip.value?.itinerary) {
     itineraryDraftByDay.value = map
     return
@@ -2027,7 +2027,7 @@ const adjustMapViewport = (plan: any, places: any[]) => {
       allPoints.push(new (window as any).BMap.Point(place.lng, place.lat))
     })
 
-    // 尝试从路线规划结果中获取路线点来调整视野
+    // 尝试从路线规划结果中获取路线点来扩展视野
     try {
       const route = plan.getRoute(0)
       if (route && typeof route.getStartPoint === 'function' && typeof route.getEndPoint === 'function') {
@@ -2347,12 +2347,12 @@ const editItineraryItem = (item: any) => {
 
 const deleteItineraryItem = async (item: any) => {
   try {
-    await ElMessageBox.confirm('确定要删除这个行程安排吗？', '确认删除', {
+    await ElMessageBox.confirm('确定要删除这个地点吗？', '确认删除', {
       type: 'warning'
     })
 
     const tripId = Number(route.params.id)
-    const placeId = item.placeId
+    const placeId = item?.placeId ?? item?.id
 
     if (!placeId) {
       ElMessage.error('无法获取地点ID')
@@ -2362,17 +2362,21 @@ const deleteItineraryItem = async (item: any) => {
     const res = await tripApi.deletePlace(tripId, Number(placeId))
 
     if (res.code === 200) {
-      ElMessage.success('行程安排已删除')
-      // 更新本地行程数据
-      if (trip.value && Array.isArray(trip.value.itinerary)) {
-        trip.value.itinerary = trip.value.itinerary.filter(i => i.id !== item.id)
+      ElMessage.success('地点已删除')
+      // 重新拉取
+      await loadTripDetail()
+
+      if (shouldShowMap.value) {
+        await refreshRoute()
+      } else if (shouldShowUnplannedMap.value) {
+        await refreshUnplannedMap()
       }
     } else {
       ElMessage.error(res.message || '删除失败')
     }
   } catch (error: any) {
-    if (error !== 'cancel' && error.message !== 'cancel') {
-      console.error('删除行程安排失败:', error)
+    if (error !== 'cancel' && error !== 'close' && error?.message !== 'cancel' && error?.message !== 'close') {
+      console.error('删除地点失败:', error)
       ElMessage.error(error.message || '删除失败，请稍后再试')
     }
   }

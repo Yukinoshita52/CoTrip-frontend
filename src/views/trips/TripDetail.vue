@@ -171,7 +171,7 @@
                         </div>
                       </div>
                       <!-- 交通信息：只在具体日期下显示，总览模式不显示 -->
-                      <div v-if="selectedDay !== null && index < dayItems.length - 1 && item.lat && item.lng && dayItems[index + 1]?.lat && dayItems[index + 1]?.lng" 
+                      <div v-if="selectedDay !== null && selectedDay !== 0 && index < dayItems.length - 1 && item.lat && item.lng && dayItems[index + 1]?.lat && dayItems[index + 1]?.lng && !shouldSkipTransport(item, dayItems[index + 1])"
                            class="transport-info-item">
                         <div class="transport-info-content">
                           <el-icon class="transport-icon"><ArrowRight /></el-icon>
@@ -251,7 +251,7 @@
                         </div>
                       </div>
                       <!-- 交通信息：显示在两个地点之间 -->
-                      <div v-if="index < selectedDayItems.length - 1 && item.lat && item.lng && selectedDayItems[index + 1]?.lat && selectedDayItems[index + 1]?.lng" 
+                      <div v-if="selectedDay !== 0 && index < selectedDayItems.length - 1 && item.lat && item.lng && selectedDayItems[index + 1]?.lat && selectedDayItems[index + 1]?.lng && !shouldSkipTransport(item, selectedDayItems[index + 1])"
                            class="transport-info-item">
                         <div class="transport-info-content">
                           <el-icon class="transport-icon"><ArrowRight /></el-icon>
@@ -674,6 +674,7 @@ import { tripApi, expenseApi, placeTypeApi, invitationApi, userApi, baiduRouteAp
 import type { Trip, ItineraryItem, Expense, TripMember } from '@/types'
 import { formatAvatarUrl } from '@/utils/image'
 import dayjs from 'dayjs'
+import { MapLocation, Calendar, Edit, Share, Delete, CircleClose, Plus, Upload, Location, ArrowRight, Van, Guide, Promotion, UserFilled, More, Money, Search, Check, InfoFilled, Loading } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -699,8 +700,8 @@ const routeLoading = ref(false)
 // key格式: "itemId1-itemId2", value: { driving, transit, walking }
 const transportInfo = ref<Record<string, {
   driving?: { distance: number; duration: number; loading: boolean },
-  transit?: { distance: number; duration: number; loading: boolean },
-  walking?: { distance: number; duration: number; loading: boolean }
+  transit?: { distance: number; duration: number, loading: boolean },
+  walking?: { distance: number; duration: number, loading: boolean }
 }>>({})
 
 const loading = ref(false)
@@ -1118,6 +1119,50 @@ watch(selectedDay, async (day) => {
   }
 }, { immediate: false })
 
+// 计算两点间的直线距离（米），用于判断是否需要交通
+const computeDistanceMeters = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+  const toRad = (v: number) => (v * Math.PI) / 180
+  const R = 6371000 // 地球半径（米）
+  const dLat = toRad(lat2 - lat1)
+  const dLng = toRad(lng2 - lng1)
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLng / 2) * Math.sin(dLng / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
+
+// 判断两个地点之间是否无需交通：未规划页面或两点很近
+const shouldSkipTransport = (item1: any, item2: any, nearThresholdMeters: number = 200) => {
+  if (selectedDay.value === 0) return true
+  if (!item1?.lat || !item1?.lng || !item2?.lat || !item2?.lng) return true
+  const distance = computeDistanceMeters(item1.lat, item1.lng, item2.lat, item2.lng)
+  return distance < nearThresholdMeters
+}
+
+// 加载某一天所有地点之间的交通信息
+const loadTransportInfoForDay = async (items: any[]) => {
+  if (items.length < 2) return
+
+  for (let i = 0; i < items.length - 1; i++) {
+    const item1 = items[i]
+    const item2 = items[i + 1]
+
+    // 跳过不需要交通的情况
+    if (shouldSkipTransport(item1, item2)) {
+      continue
+    }
+
+    if (item1.lat && item1.lng && item2.lat && item2.lng) {
+      await Promise.all([
+        fetchRouteBetweenPlaces(item1, item2, 'driving'),
+        fetchRouteBetweenPlaces(item1, item2, 'transit'),
+        fetchRouteBetweenPlaces(item1, item2, 'walking')
+      ])
+    }
+  }
+}
+
 // 工具函数
 // 判断值是否有效（非空、非null、非undefined）
 const hasValue = (value: any): boolean => {
@@ -1130,11 +1175,6 @@ const formatDate = (date: string | Date) => {
   return d.isValid() ? d.format('MM月DD日') : ''
 }
 
-const formatTime = (time: string | Date) => {
-  if (!time) return ''
-  const t = dayjs(time)
-  return t.isValid() ? t.format('HH:mm') : ''
-}
 
 const formatDateRange = (startDate: string | Date, endDate: string | Date) => {
   if (!startDate || !endDate) return ''
@@ -1884,23 +1924,6 @@ const fetchRouteBetweenPlaces = async (item1: any, item2: any, transportType: 'd
   }
 }
 
-// 加载某一天所有地点之间的交通信息
-const loadTransportInfoForDay = async (items: any[]) => {
-  if (items.length < 2) return
-
-  for (let i = 0; i < items.length - 1; i++) {
-    const item1 = items[i]
-    const item2 = items[i + 1]
-
-    if (item1.lat && item1.lng && item2.lat && item2.lng) {
-      await Promise.all([
-        fetchRouteBetweenPlaces(item1, item2, 'driving'),
-        fetchRouteBetweenPlaces(item1, item2, 'transit'),
-        fetchRouteBetweenPlaces(item1, item2, 'walking')
-      ])
-    }
-  }
-}
 
 // 获取地点建议
 const fetchPlaceSuggestions = async (queryString: string, cb: (suggestions: any[]) => void) => {

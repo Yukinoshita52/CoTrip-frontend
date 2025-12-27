@@ -41,6 +41,7 @@ export interface ItineraryItem {
   placeId?: number // 真实的地点ID
   day?: number // 天数
   dayDate?: string // 具体日期
+  sequence?: number // 地点顺序
   tripId: string
   title: string
   description?: string

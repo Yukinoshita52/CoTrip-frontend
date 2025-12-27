@@ -1,17 +1,11 @@
 import { request } from '@/utils/api'
 import type {
-  ApiResponse,
   UserVO,
   AuthLoginVO,
   AuthRegisterVO,
   ImageUrlVO,
   InvitationVO,
-  LoginRequest,
-  RegisterRequest,
-  UpdatePasswordRequest,
-  UpdateNicknameRequest,
-  UpdatePhoneRequest,
-  DeleteAccountRequest
+  RegisterRequest
 } from '@/types/api'
 
 // 认证相关API
@@ -83,8 +77,8 @@ export const tripApi = {
   },
 
   // 更新地点顺序
-  updatePlaceOrder(tripId: number, placeIds: number[]) {
-    return request.put(`/trips/${tripId}/places/order`, placeIds)
+  updatePlaceOrder(tripId: number, data: { day: number; placeIds: number[] }) {
+    return request.put(`/trips/${tripId}/places/order`, data)
   },
 
   // 获取地点建议

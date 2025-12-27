@@ -60,6 +60,13 @@
                   <el-icon><Upload /></el-icon>
                   批量导入
                 </el-button>
+                <el-button type="success" plain @click="handleAutoPlan" :loading="autoPlanning" class="action-btn-modern">
+                  一键规划
+                </el-button>
+                <el-button type="warning" plain @click="toggleEditRoute" class="action-btn-modern" v-if="selectedDay !== null && selectedDay !== 0">
+                  <el-icon><EditPen /></el-icon>
+                  {{ isEditingRoute ? '完成编辑' : '编辑路线' }}
+                </el-button>
               </div>
             </div>
             
@@ -219,7 +226,19 @@
                   
                   <div class="day-items">
                     <template v-for="(item, index) in selectedDayItems" :key="item.id">
-                      <div class="itinerary-item">
+                      <div
+                        class="itinerary-item"
+                        :class="{
+                          'dragging': isEditingRoute && draggedIndex === index,
+                          'drag-over': isEditingRoute && dragOverIndex === index && draggedIndex !== index,
+                          'draggable-item': isEditingRoute
+                        }"
+                        :draggable="isEditingRoute"
+                        @dragstart="handleDragStart($event, index)"
+                        @dragover="handleDragOver($event, index)"
+                        @dragleave="handleDragLeave"
+                        @drop="handleDrop($event, index)"
+                      >
                         <div class="item-type-icon">
                           <img :src="getPlaceTypeImage(item.type, item.typeId)" :alt="getItemTypeText(item.type)" class="type-image" />
                         </div>
@@ -714,6 +733,21 @@ const showEditItinerary = ref(false)
 const showInviteMember = ref(false)
 const showBatchImport = ref(false)
 const showPlaceDetail = ref(false)
+const autoPlanning = ref(false)
+
+// 编辑路线相关状态
+const isEditingRoute = ref(false)
+const draggedIndex = ref<number | null>(null)
+const dragOverIndex = ref<number | null>(null)
+
+// 跨 Day 拖拽：记录被拖拽项来自哪一天（编辑模式下使用）
+const draggedDay = ref<number | null>(null)
+
+// 编辑模式下的草稿（key=day, value=该天的地点列表，保持顺序）
+const itineraryDraftByDay = ref(new Map<number, ItineraryItem[]>())
+
+// 保存中状态
+const savingRoute = ref(false)
 
 // 选择的天数（null表示总览，显示所有天数）
 const selectedDay = ref<number | null>(null)
@@ -833,18 +867,25 @@ const loadTripDetail = async () => {
       places.forEach((dayPlaces: any) => {
         const day = dayPlaces.day !== null && dayPlaces.day !== undefined ? dayPlaces.day : 1
         const placesList = dayPlaces.places || []
+        // 按照sequence字段排序
+        placesList.sort((a: any, b: any) => {
+          const seqA = a.sequence !== null && a.sequence !== undefined ? a.sequence : Number.MAX_SAFE_INTEGER
+          const seqB = b.sequence !== null && b.sequence !== undefined ? b.sequence : Number.MAX_SAFE_INTEGER
+          return seqA - seqB
+        })
         // 根据天数计算正确的日期（day=0 时使用起始日期）
         const itemDate = day > 0 ? startDate.add(day - 1, 'day').format('YYYY-MM-DD') : startDate.format('YYYY-MM-DD')
         placesList.forEach((place: any, index: number) => {
           const placeId = place.placeId || place.id
           // 调试：打印地点数据
           if (import.meta.env.DEV) {
-            console.log('地点数据:', { name: place.name, type: place.type, typeId: place.typeId })
+            console.log('地点数据:', { name: place.name, type: place.type, typeId: place.typeId, sequence: place.sequence })
           }
           itinerary.push({
             id: String(placeId || `${day}-${index}`),
             placeId: placeId, // 添加真实的placeId
             day: day, // 添加天数信息
+            sequence: place.sequence, // 添加顺序字段
             tripId: String(data.tripId || tripId),
             title: place.name || '',
             description: place.address || '',
@@ -985,6 +1026,12 @@ const loadPendingInvitations = async (tripId: number) => {
   }
 }
 
+// 安全读取 sequence（部分数据源可能没有该字段）
+const getSequenceSafe = (item: any) => {
+  const seq = item?.sequence
+  return typeof seq === 'number' ? seq : Number.MAX_SAFE_INTEGER
+}
+
 // 计算属性
 const availableDays = computed(() => {
   if (!trip.value?.startDate || !trip.value?.endDate) return [1]
@@ -1006,6 +1053,11 @@ const groupedItineraryByDay = computed(() => {
     }
     groups[day].push(item)
   })
+  // 对每一天的地点按sequence排序
+  Object.keys(groups).forEach(dayStr => {
+    const day = Number(dayStr)
+    groups[day].sort((a: any, b: any) => getSequenceSafe(a) - getSequenceSafe(b))
+  })
   // 按天数排序，但day=0（未规划）放在最后
   // 使用Map来保持插入顺序
   const sortedGroups = new Map<number, ItineraryItem[]>()
@@ -1026,7 +1078,16 @@ const groupedItineraryByDay = computed(() => {
 // 根据选择的天数筛选行程项
 const selectedDayItems = computed(() => {
   if (selectedDay.value === null || !trip.value) return []
-  return trip.value.itinerary.filter(item => item.day === selectedDay.value)
+
+  // 编辑中优先展示草稿
+  if (isEditingRoute.value) {
+    const draft = itineraryDraftByDay.value.get(selectedDay.value)
+    return draft ? [...draft] : []
+  }
+
+  const items = trip.value.itinerary.filter(item => item.day === selectedDay.value)
+  // 按sequence字段排序
+  return items.sort((a: any, b: any) => getSequenceSafe(a) - getSequenceSafe(b))
 })
 
 // 是否显示路线规划地图（只在选择具体天数时显示，且至少2个地点，day=0不显示）
@@ -1392,6 +1453,235 @@ const handleDeleteTrip = async () => {
   }
 }
 
+const handleAutoPlan = async () => {
+  const tripId = Number(route.params.id)
+  if (!tripId) {
+    ElMessage.error('行程ID无效')
+    return
+  }
+  try {
+    autoPlanning.value = true
+    const res = await tripApi.autoPlanRoute(tripId)
+    if (res.code === 200) {
+      ElMessage.success(res.data || '一键规划成功')
+
+      // 清空交通缓存状态，避免旧 key/旧 loading 状态影响展示
+      transportInfo.value = {}
+
+      // 重新加载行程详情
+      await loadTripDetail()
+      await nextTick()
+
+      // 主动触发交通加载与地图路线刷新
+      const day = selectedDay.value
+      if (day !== null && day !== 0) {
+        const items = selectedDayItems.value
+        if (items.length >= 2) {
+          const sortedItems = [...items].sort((a: any, b: any) => {
+            const timeA = dayjs(a.startTime).valueOf()
+            const timeB = dayjs(b.startTime).valueOf()
+            return timeA - timeB
+          })
+          await loadTransportInfoForDay(sortedItems)
+          refreshRoute()
+        }
+      }
+    } else {
+      ElMessage.error(res.message || '一键规划失败')
+    }
+  } catch (error: any) {
+    console.error('一键规划失败:', error)
+    ElMessage.error(error.message || '一键规划失败，请稍后再试')
+  } finally {
+    autoPlanning.value = false
+  }
+}
+
+// 切换编辑路线模式
+const toggleEditRoute = async () => {
+  // 进入编辑：初始化草稿
+  if (!isEditingRoute.value) {
+    initItineraryDraft()
+    isEditingRoute.value = true
+    return
+  }
+
+  // 点击保存
+  await saveRouteDraft()
+}
+
+// 拖拽开始（编辑模式下：仅支持单日内排序）
+const handleDragStart = (event: DragEvent, index: number) => {
+  if (!isEditingRoute.value || selectedDay.value === null) return
+  draggedIndex.value = index
+  draggedDay.value = null
+  event.dataTransfer!.effectAllowed = 'move'
+  event.dataTransfer!.setData('application/json', JSON.stringify({
+    index
+  }))
+}
+
+// 拖拽经过
+const handleDragOver = (event: DragEvent, index: number) => {
+  if (!isEditingRoute.value || draggedIndex.value === null) return
+  event.preventDefault()
+  dragOverIndex.value = index
+}
+
+// 拖拽离开
+const handleDragLeave = () => {
+  dragOverIndex.value = null
+}
+
+// 放置：在 drop 的当前 selectedDay 里插入
+const handleDrop = async (event: DragEvent, dropIndex: number) => {
+  if (!isEditingRoute.value || selectedDay.value === null) return
+  event.preventDefault()
+
+  let srcIndex: number | null = draggedIndex.value
+  try {
+    const raw = event.dataTransfer?.getData('application/json')
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (typeof parsed?.index === 'number') srcIndex = parsed.index
+    }
+  } catch {
+    // ignore
+  }
+
+  if (srcIndex === null) return
+
+  const day = selectedDay.value
+  if (day === null || day === 0) return
+
+  if (!itineraryDraftByDay.value.has(day)) itineraryDraftByDay.value.set(day, [])
+  const items = [...(itineraryDraftByDay.value.get(day) || [])]
+
+  if (srcIndex < 0 || srcIndex >= items.length) return
+
+  // 同一位置不处理
+  if (srcIndex === dropIndex) {
+    draggedIndex.value = null
+    dragOverIndex.value = null
+    draggedDay.value = null
+    return
+  }
+
+  const [moved] = items.splice(srcIndex, 1)
+  const safeDropIndex = Math.min(Math.max(dropIndex, 0), items.length)
+  items.splice(safeDropIndex, 0, moved)
+  itineraryDraftByDay.value.set(day, items)
+
+  // drop 后清理拖拽态
+  draggedIndex.value = null
+  dragOverIndex.value = null
+  draggedDay.value = null
+
+  // 1) 更新交通信息
+  await refreshTransportForDay(day)
+
+  // 2) 更新地图的路线显示（如果当前天正在展示地图）
+  refreshRoute()
+}
+
+// 基于当前 trip 初始化草稿（按 day 分组并按 sequence 排序）
+const initItineraryDraft = () => {
+  const map = new Map<number, ItineraryItem[]>()
+  if (!trip.value?.itinerary) {
+    itineraryDraftByDay.value = map
+    return
+  }
+
+  for (const item of trip.value.itinerary) {
+    const day = item.day !== null && item.day !== undefined ? item.day : 0
+    if (!map.has(day)) map.set(day, [])
+    map.get(day)!.push(item)
+  }
+
+  for (const [day, items] of map.entries()) {
+    items.sort((a: any, b: any) => getSequenceSafe(a) - getSequenceSafe(b))
+    map.set(day, items)
+  }
+
+  itineraryDraftByDay.value = map
+}
+
+// 编辑模式下：重算某一天相邻地点的交通信息（只算“相邻对”）
+const refreshTransportForDay = async (day: number) => {
+  if (day === 0) return // 未规划不展示交通
+  const items = itineraryDraftByDay.value.get(day) || []
+  if (items.length < 2) return
+
+  // 只请求相邻点的三种方式，避免全量请求
+  const tasks: Promise<any>[] = []
+  for (let i = 0; i < items.length - 1; i++) {
+    const a: any = items[i]
+    const b: any = items[i + 1]
+    if (!a?.lat || !a?.lng || !b?.lat || !b?.lng) continue
+    if (shouldSkipTransport(a, b)) continue
+
+    // drop 后希望立刻更新，所以先清掉旧 key，避免被“已有数据不加载”短路
+    const key = `${a.id}-${b.id}`
+    if (transportInfo.value[key]) {
+      delete transportInfo.value[key]
+    }
+
+    tasks.push(fetchRouteBetweenPlaces(a, b, 'driving'))
+    tasks.push(fetchRouteBetweenPlaces(a, b, 'transit'))
+    tasks.push(fetchRouteBetweenPlaces(a, b, 'walking'))
+  }
+
+  // 并发执行，但不 await 也行；这里 await 让 UI 更快出现结果
+  await Promise.all(tasks)
+}
+
+// 保存草稿到后端（按 day 分组分别调用 updatePlaceOrder）
+const saveRouteDraft = async () => {
+  if (!trip.value) return
+  const tripId = Number(route.params.id)
+  if (!tripId) {
+    ElMessage.error('行程ID无效')
+    return
+  }
+
+  // 只保存已规划 day（1..n），day=0 不支持顺序接口/也不展示交通
+  const daysToSave = Array.from(itineraryDraftByDay.value.keys())
+    .filter(d => d !== 0)
+    .sort((a, b) => a - b)
+
+  savingRoute.value = true
+  try {
+    for (const day of daysToSave) {
+      const items = itineraryDraftByDay.value.get(day) || []
+      const placeIds = items
+        .map((it: any) => Number(it.placeId))
+        .filter((id: number) => !Number.isNaN(id))
+
+      const res = await tripApi.updatePlaceOrder(tripId, {
+        day,
+        placeIds
+      })
+      if (res.code !== 200) {
+        throw new Error(res.message || '保存失败')
+      }
+    }
+
+    ElMessage.success('路线已保存')
+
+    // 退出编辑模式并刷新服务端数据，确保 sequence/day 等字段一致
+    isEditingRoute.value = false
+    draggedIndex.value = null
+    dragOverIndex.value = null
+    draggedDay.value = null
+    await loadTripDetail()
+  } catch (error: any) {
+    console.error('保存路线失败:', error)
+    ElMessage.error(error?.message || '保存失败，请稍后再试')
+  } finally {
+    savingRoute.value = false
+  }
+}
+
 // 格式化天数对应的日期
 const formatDayDate = (day: number) => {
   if (!trip.value?.startDate) return ''
@@ -1491,24 +1781,24 @@ const getRoute = async () => {
 
     // 1. 先检查缓存
     const cacheRes = await baiduRouteApi.checkRouteCache(cacheCheckPlaces)
-    
+
     if (cacheRes.code === 200 && cacheRes.data) {
       // 缓存命中，直接使用缓存结果
       const cachedRoute = cacheRes.data
-      
+
       // 清除之前的覆盖物
       mapInstance.value.clearOverlays()
-      
+
       // 添加地点标记
       addPlaceMarkers(places)
-      
+
       // 使用缓存的路线信息
       routeInfo.value = {
         distance: cachedRoute.distance || 0,
         duration: cachedRoute.duration || 0,
         toll: cachedRoute.toll || 0
       }
-      
+
       // 如果缓存中有路线绘制数据，直接绘制
       // 兼容新旧字段名：routePolyline (新) 或 routePoints (旧)
       const polylineData = cachedRoute.routePolyline || cachedRoute.routePoints
@@ -1518,7 +1808,7 @@ const getRoute = async () => {
         // 如果缓存中没有绘制数据，调用API绘制并更新缓存
         callBaiduAPIForDrawing(places, true) // 改为 true，重新缓存完整数据
       }
-      
+
       routeLoading.value = false
       return
     }
@@ -1681,7 +1971,7 @@ const drawCachedRoute = (routePolyline: Array<{lng: number, lat: number}>, place
     }
 
     // 将路径点转换为百度地图Point对象
-    const points = routePolyline.map(point => 
+    const points = routePolyline.map(point =>
       new (window as any).BMap.Point(point.lng, point.lat)
     )
 
@@ -1700,7 +1990,7 @@ const drawCachedRoute = (routePolyline: Array<{lng: number, lat: number}>, place
     try {
       // 收集所有需要显示的点（路线点 + 地点标记）
       const allPoints = [...points]
-      
+
       // 添加地点标记的坐标
       places.forEach(place => {
         allPoints.push(new (window as any).BMap.Point(place.lng, place.lat))
@@ -1712,13 +2002,8 @@ const drawCachedRoute = (routePolyline: Array<{lng: number, lat: number}>, place
       })
     } catch (viewportError) {
       console.warn('调整地图视野失败，使用默认视野:', viewportError)
-      // 如果调整视野失败，至少确保能看到起点和终点
-      if (places.length >= 2) {
-        const bounds = new (window as any).BMap.Bounds()
-        bounds.extend(new (window as any).BMap.Point(places[0].lng, places[0].lat))
-        bounds.extend(new (window as any).BMap.Point(places[places.length - 1].lng, places[places.length - 1].lat))
-        mapInstance.value.setViewport(bounds)
-      }
+      // 如果调整视野失败，回退到调用百度地图API
+      callBaiduAPIForDrawing(places, false)
     }
   } catch (error) {
     console.error('绘制缓存路线失败:', error)
@@ -1873,11 +2158,11 @@ const getTransportInfo = (itemId1: string, itemId2: string) => {
   const key = `${itemId1}-${itemId2}`
   const info = transportInfo.value[key]
   if (!info) return null
-  
+
   const hasLoadedData = (info.driving && !info.driving.loading && info.driving.distance > 0) ||
                         (info.transit && !info.transit.loading && info.transit.distance > 0) ||
                         (info.walking && !info.walking.loading && info.walking.distance > 0)
-  
+
   return hasLoadedData ? info : null
 }
 
@@ -1886,7 +2171,7 @@ const isTransportInfoLoading = (itemId1: string, itemId2: string) => {
   const key = `${itemId1}-${itemId2}`
   const info = transportInfo.value[key]
   if (!info) return true // 如果没有信息，认为正在加载
-  
+
   // 检查是否至少有一种方式正在加载
   return (info.driving && info.driving.loading) ||
          (info.transit && info.transit.loading) ||
@@ -1900,7 +2185,7 @@ const fetchRouteBetweenPlaces = async (item1: any, item2: any, transportType: 'd
   }
 
   const key = `${item1.id}-${item2.id}`
-  
+
   // 初始化交通信息对象
   if (!transportInfo.value[key]) {
     transportInfo.value[key] = {}
@@ -1923,7 +2208,7 @@ const fetchRouteBetweenPlaces = async (item1: any, item2: any, transportType: 'd
     const res = await transportInfoApi.queryTransportInfo(
       item1.lng, item1.lat, item2.lng, item2.lat, transportType
     )
-    
+
     if (res.code === 200 && res.data) {
       // 更新交通信息
       transportInfo.value[key] = {
@@ -2078,8 +2363,10 @@ const deleteItineraryItem = async (item: any) => {
 
     if (res.code === 200) {
       ElMessage.success('行程安排已删除')
-      // 重新加载行程详情
-      await loadTripDetail()
+      // 更新本地行程数据
+      if (trip.value && Array.isArray(trip.value.itinerary)) {
+        trip.value.itinerary = trip.value.itinerary.filter(i => i.id !== item.id)
+      }
     } else {
       ElMessage.error(res.message || '删除失败')
     }
@@ -2098,15 +2385,15 @@ const changeRole = async (member: TripMember) => {
       { label: '参与者', value: 'member', backendValue: 2 },
       { label: '管理员', value: 'admin', backendValue: 1 }
     ]
-    
+
     // 过滤掉当前角色
     const availableRoles = roleOptions.filter(opt => opt.value !== currentRole)
-    
+
     if (availableRoles.length === 0) {
       ElMessage.warning('没有可更改的角色')
       return
     }
-    
+
     // 如果只有一个选项，直接确认
     if (availableRoles.length === 1) {
       const selectedRoleOption = availableRoles[0]
@@ -2119,13 +2406,13 @@ const changeRole = async (member: TripMember) => {
           type: 'warning'
         }
       )
-      
+
       const tripId = Number(route.params.id)
       const res = await tripApi.updateMemberRole(tripId, {
         userId: Number(member.userId),
         role: selectedRoleOption.backendValue
       })
-      
+
       if (res.code === 200) {
         ElMessage.success('角色已更新')
         await loadTripDetail()
@@ -2134,11 +2421,11 @@ const changeRole = async (member: TripMember) => {
       }
       return
     }
-    
+
     // 多个选项时，使用 prompt 让用户输入选项编号
     const optionsText = availableRoles.map((opt, index) => `${index + 1}. ${opt.label}`).join('\n')
     const promptMessage = `请选择新角色：\n\n${optionsText}\n\n请输入选项编号（1-${availableRoles.length}）：`
-    
+
     const { value } = await ElMessageBox.prompt(
       promptMessage,
       '更改角色',
@@ -2149,23 +2436,23 @@ const changeRole = async (member: TripMember) => {
         inputErrorMessage: `请输入 1 到 ${availableRoles.length} 之间的数字`
       }
     )
-    
+
     if (!value) return
-    
+
     const selectedIndex = parseInt(value) - 1
     if (selectedIndex < 0 || selectedIndex >= availableRoles.length) {
       ElMessage.error('无效的选项')
       return
     }
-    
+
     const selectedRoleOption = availableRoles[selectedIndex]
-    
+
     const tripId = Number(route.params.id)
     const res = await tripApi.updateMemberRole(tripId, {
       userId: Number(member.userId),
       role: selectedRoleOption.backendValue
     })
-    
+
     if (res.code === 200) {
       ElMessage.success('角色已更新')
       await loadTripDetail()
@@ -2189,7 +2476,7 @@ const removeMember = async (member: TripMember) => {
         type: 'warning'
       }
     )
-    
+
     // 注意：这里需要后端提供移除成员的接口
     // 目前只能通过退出行程的方式，但那是用户自己操作
     // 暂时提示功能未实现
@@ -2641,6 +2928,34 @@ const handleShowPlaceDetail = async (item: any) => {
 }
 
 .itinerary-item:hover::before {
+  opacity: 1;
+}
+
+/* 拖拽相关样式 */
+.draggable-item {
+  cursor: grab;
+}
+
+.draggable-item:active {
+  cursor: grabbing;
+}
+
+.dragging {
+  opacity: 0.5;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
+  border-color: #667eea;
+  z-index: 1000;
+}
+
+.drag-over {
+  border-color: #67c23a;
+  background: rgba(103, 194, 58, 0.05);
+  transform: translateY(-1px);
+}
+
+.drag-over::before {
+  background: #67c23a;
   opacity: 1;
 }
 
@@ -3372,3 +3687,4 @@ const handleShowPlaceDetail = async (item: any) => {
   color: #667eea;
 }
 </style>
+

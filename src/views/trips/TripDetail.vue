@@ -178,7 +178,7 @@
                         </div>
                       </div>
                       <!-- 交通信息：只在具体日期下显示，总览模式不显示 -->
-                      <div v-if="selectedDay !== null && selectedDay !== 0 && index < dayItems.length - 1 && item.lat && item.lng && dayItems[index + 1]?.lat && dayItems[index + 1]?.lng && !shouldSkipTransport(item, dayItems[index + 1])"
+                      <div v-if="false"
                            class="transport-info-item">
                         <div class="transport-info-content">
                           <el-icon class="transport-icon"><ArrowRight /></el-icon>
@@ -683,7 +683,7 @@ import { tripApi, placeTypeApi, invitationApi, userApi, baiduRouteApi, transport
 import type { Trip, ItineraryItem, TripMember } from '@/types'
 import { formatAvatarUrl } from '@/utils/image'
 import dayjs from 'dayjs'
-import { MapLocation, Calendar, Edit, EditPen, Share, Delete, CircleClose, Plus, Upload, Location, ArrowRight, Van, Guide, Promotion, UserFilled, More, Money, Search, Check, InfoFilled, Loading } from '@element-plus/icons-vue'
+import { MapLocation, Calendar, Edit, EditPen, Share, Delete, CircleClose, Plus, Upload, Location, ArrowRight, Van, Guide, Promotion, UserFilled, More, Search, Check, InfoFilled, Loading } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -1470,7 +1470,7 @@ const handleDrop = async (event: DragEvent, dropIndex: number) => {
 
 // 基于当前 trip 初始化草稿（按 day 分组并按 sequence 排序）
 const initItineraryDraft = () => {
-  const map = new Map<number, ItineraryItem>()
+  const map: Map<number, ItineraryItem[]> = new Map<number, ItineraryItem[]>()
   if (!trip.value?.itinerary) {
     itineraryDraftByDay.value = map
     return
@@ -1478,7 +1478,7 @@ const initItineraryDraft = () => {
 
   for (const item of trip.value.itinerary) {
     const day = item.day !== null && item.day !== undefined ? item.day : 0
-    if (!map.has(day)) map.set(day, [])
+    if (!map.has(day)) map.set(day, [] as ItineraryItem[])
     map.get(day)!.push(item)
   }
 
@@ -1546,7 +1546,8 @@ const saveRouteDraft = async () => {
         placeIds
       })
       if (res.code !== 200) {
-        throw new Error(res.message || '保存失败')
+        ElMessage.error(res.message || '保存失败')
+        return
       }
     }
 
@@ -1723,13 +1724,13 @@ const callBaiduAPIForDrawing = (places: any[], shouldCache: boolean) => {
   }))
 
   // 使用百度地图JS API的路线规划（让百度地图自动绘制路线）
-  const driving = new (window as any).BMap.DrivingRoute(mapInstance.value, {
+  const driveOptions: any = {
     renderOptions: {
       map: mapInstance.value, // 自动绘制到地图
       autoViewport: true, // 自动调整视野
       panel: null // 不显示路线面板
     },
-    onSearchComplete: async (result: any) => {
+    onSearchComplete: (result: any) => {
       routeLoading.value = false
       const status = driving.getStatus()
 
@@ -1775,12 +1776,14 @@ const callBaiduAPIForDrawing = (places: any[], shouldCache: boolean) => {
 
           // 3. 保存到缓存（如果需要）
           if (shouldCache) {
-            try {
-              await baiduRouteApi.saveRouteCache(cacheCheckPlaces, routeData)
-            } catch (cacheError) {
-              console.error('保存路线规划缓存失败:', cacheError)
-              // 缓存失败不影响主要功能
-            }
+            void (async () => {
+              try {
+                await baiduRouteApi.saveRouteCache(cacheCheckPlaces, routeData)
+              } catch (cacheError) {
+                console.error('保存路线规划缓存失败:', cacheError)
+                // 缓存失败不影响主要功能
+              }
+            })()
           }
 
           // 百度地图会自动绘制路线，我们只需要调整视野
@@ -1803,7 +1806,9 @@ const callBaiduAPIForDrawing = (places: any[], shouldCache: boolean) => {
         ElMessage.error(errorMsg)
       }
     }
-  })
+  }
+
+  const driving = new (window as any).BMap.DrivingRoute(mapInstance.value, driveOptions)
 
   // 设置起点和终点
   const startPoint = new (window as any).BMap.Point(places[0].lng, places[0].lat)
@@ -3213,6 +3218,20 @@ const handleShowPlaceDetail = async (item: any) => {
 /* 文本域样式 */
 .textarea-wrapper-modern {
   position: relative;
+  width: 100%;
+}
+
+.form-textarea-modern {
+  width: 100%;
+}
+
+.batch-import-form-modern :deep(.el-form-item__content) {
+  flex: 1;
+  min-width: 0;
+}
+
+.form-textarea-modern :deep(.el-textarea) {
+  width: 100%;
 }
 
 .form-textarea-modern :deep(.el-textarea__inner) {
@@ -3225,14 +3244,6 @@ const handleShowPlaceDetail = async (item: any) => {
   font-family: inherit;
 }
 
-.form-textarea-modern :deep(.el-textarea__inner):hover {
-  border-color: rgba(102, 126, 234, 0.3);
-}
-
-.form-textarea-modern :deep(.el-textarea__inner):focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
-}
 
 .form-tip-modern {
   display: flex;
@@ -3245,12 +3256,8 @@ const handleShowPlaceDetail = async (item: any) => {
   border-left: 3px solid #667eea;
   font-size: 13px;
   color: #666;
-}
-
-.tip-icon {
-  color: #667eea;
-  font-size: 16px;
-  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* 对话框底部按钮 */

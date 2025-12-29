@@ -51,7 +51,13 @@
 
       <!-- 账本选择区域 -->
       <div class="books-selection-area" v-if="!loading && accountBooks.length > 0">
-        <h2 class="section-title">选择账本</h2>
+        <div class="section-header">
+          <h2 class="section-title">选择账本</h2>
+          <div class="section-hint" v-if="accountBooks.length > 3">
+            <el-icon><ArrowRight /></el-icon>
+            <span>可左右滑动查看更多</span>
+          </div>
+        </div>
         <div class="books-grid">
           <div 
             v-for="book in accountBooks" 
@@ -176,7 +182,7 @@
           <el-table-column prop="paidBy" label="付款人" width="140" align="center">
             <template #default="{ row }">
               <div class="payer-info-modern">
-                <el-avatar :size="24" class="payer-avatar">
+                <el-avatar :size="24" :src="getUserAvatar(row.paidBy)" class="payer-avatar">
                   {{ getUserName(row.paidBy).charAt(0) }}
                 </el-avatar>
                 <span class="payer-name">{{ getUserName(row.paidBy) }}</span>
@@ -325,7 +331,14 @@
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="支出日期">{{ currentExpense.date }}</el-descriptions-item>
-          <el-descriptions-item label="付款人">{{ getUserName(currentExpense.paidBy) }}</el-descriptions-item>
+          <el-descriptions-item label="付款人">
+            <div class="payer-info-dialog">
+              <el-avatar :size="32" :src="getUserAvatar(currentExpense.paidBy)" class="payer-avatar-dialog">
+                {{ getUserName(currentExpense.paidBy).charAt(0) }}
+              </el-avatar>
+              <span class="payer-name-dialog">{{ getUserName(currentExpense.paidBy) }}</span>
+            </div>
+          </el-descriptions-item>
           <el-descriptions-item label="创建时间">{{ currentExpense.createdAt }}</el-descriptions-item>
           <el-descriptions-item label="票据" :span="2" v-if="currentExpense.receipt">
             <img :src="currentExpense.receipt" class="receipt-preview" />
@@ -491,6 +504,7 @@ import Layout from '@/components/Layout.vue'
 import { expenseApi, tripApi, imageApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import type { Expense, Trip } from '@/types'
+import { formatAvatarUrl } from '@/utils/image'
 import dayjs from 'dayjs'
 
 // 分页
@@ -746,8 +760,20 @@ const loadExpenses = async () => {
           date: record.recordTime ? dayjs(record.recordTime).format('YYYY-MM-DD') : '',
           createdAt: record.recordTime ? dayjs(record.recordTime).format('YYYY-MM-DD') : ''
         }
-        // 添加额外的用户名信息（不在Expense类型中，但用于显示）
-        ;(mappedRecord as any).paidByName = record.user?.nickname || '未知用户'
+        // 添加用户信息，参考TripList.vue的做法
+        ;(mappedRecord as any).user = {
+          userId: String(record.user?.userId || ''),
+          username: record.user?.nickname || record.user?.username || '未知用户',
+          avatar: record.user?.avatar || ''  // 使用avatar字段，与其他地方保持一致
+        }
+        
+        // 调试：打印用户数据
+        console.log('Expense user data:', {
+          originalUser: record.user,
+          avatar: record.user?.avatar,
+          mappedUser: (mappedRecord as any).user
+        })
+        
         console.log('转换后的记录:', mappedRecord)
         return mappedRecord
       })
@@ -1009,25 +1035,49 @@ const getCategoryText = (category: string) => {
 const getUserName = (userId: string | number) => {
   const userIdStr = String(userId)
   
-  // 首先尝试从账单数据中获取用户名（最准确）
+  // 首先尝试从账单数据中获取用户名
   const expense = expenses.value.find(e => String(e.paidBy) === userIdStr)
-  if (expense && (expense as any).paidByName) {
-    return (expense as any).paidByName
+  if (expense && (expense as any).user && (expense as any).user.username) {
+    return (expense as any).user.username
   }
   
-  // 从当前账本关联的行程中查找用户名
+  // 如果账单数据中没有用户名，尝试从行程成员数据中获取
   if (currentBook.value && currentBook.value.tripId) {
     const selectedTrip = trips.value.find(trip => Number(trip.id) === currentBook.value.tripId)
     if (selectedTrip) {
       const member = selectedTrip.members.find(m => String(m.userId) === userIdStr)
-      if (member) {
-        return member.username || '未知用户'
+      if (member && member.username) {
+        return member.username
       }
     }
   }
   
-  // 如果找不到，返回默认名称
   return '未知用户'
+}
+
+// 获取用户头像
+const getUserAvatar = (userId: string | number) => {
+  const userIdStr = String(userId)
+  
+  // 从账单数据中获取用户头像
+  const expense = expenses.value.find(e => String(e.paidBy) === userIdStr)
+  
+  console.log('getUserAvatar - 查找用户头像:', {
+    userId: userIdStr,
+    expense: expense,
+    user: expense ? (expense as any).user : null,
+    avatar: expense && (expense as any).user ? (expense as any).user.avatar : null
+  })
+  
+  if (expense && (expense as any).user && (expense as any).user.avatar) {
+    const avatarUrl = formatAvatarUrl((expense as any).user.avatar)
+    console.log('getUserAvatar - 返回头像URL:', avatarUrl)
+    return avatarUrl
+  }
+  
+  // 如果找不到头像，返回空字符串让el-avatar显示默认头像
+  console.log('getUserAvatar - 未找到头像，返回空字符串')
+  return ''
 }
 
 // 判断是否是当前用户的账单
@@ -1280,6 +1330,19 @@ const handleEditExpense = async () => {
 /* 账本选择区域样式 */
 .books-selection-area {
   margin-bottom: 32px;
+  position: relative;
+}
+
+.books-selection-area::after {
+  content: '';
+  position: absolute;
+  top: 60px;
+  right: 0;
+  width: 30px;
+  height: calc(100% - 60px);
+  background: linear-gradient(to left, rgba(255, 255, 255, 0.8) 0%, transparent 100%);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .section-title {
@@ -1290,11 +1353,51 @@ const handleEditExpense = async () => {
   padding-left: 4px;
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.section-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #8c8c8c;
+  font-weight: 500;
+}
+
+.section-hint .el-icon {
+  font-size: 14px;
+}
+
 .books-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  display: flex;
   gap: 20px;
   margin-bottom: 24px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scroll-behavior: smooth;
+}
+
+.books-grid::-webkit-scrollbar {
+  height: 6px;
+}
+
+.books-grid::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.books-grid::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.books-grid::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 
 .book-card-modern {
@@ -1305,6 +1408,8 @@ const handleEditExpense = async () => {
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  min-width: 300px;
+  flex-shrink: 0;
 }
 
 .book-card-modern:hover {
@@ -1453,6 +1558,18 @@ const handleEditExpense = async () => {
   
   .filter-item {
     min-width: 120px;
+  }
+  
+  .book-card-modern {
+    min-width: 280px;
+  }
+  
+  .books-grid {
+    gap: 16px;
+  }
+  
+  .section-hint span {
+    display: none;
   }
 }
 
@@ -1724,6 +1841,24 @@ const handleEditExpense = async () => {
 
 .payer-name {
   font-size: 14px;
+  color: #1a1d29;
+  font-weight: 500;
+}
+
+.payer-info-dialog {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.payer-avatar-dialog {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-weight: 600;
+}
+
+.payer-name-dialog {
+  font-size: 16px;
   color: #1a1d29;
   font-weight: 500;
 }

@@ -8,11 +8,11 @@
             <div class="filter-item">
               <label class="filter-label">状态</label>
               <el-select v-model="filters.status" placeholder="全部状态" clearable class="filter-select">
-                <el-option label="全部" value="" />
-                <el-option label="计划中" value="planning" />
-                <el-option label="进行中" value="ongoing" />
-                <el-option label="已完成" value="completed" />
-              </el-select>
+              <el-option label="全部" value="" />
+              <el-option label="计划中" value="planning" />
+              <el-option label="进行中" value="ongoing" />
+              <el-option label="已完成" value="completed" />
+            </el-select>
             </div>
           </el-col>
           <el-col :span="4">
@@ -28,17 +28,17 @@
           <el-col :span="9">
             <div class="filter-item">
               <label class="filter-label">搜索</label>
-              <el-input
-                v-model="filters.keyword"
-                placeholder="搜索行程标题或目的地"
-                clearable
+            <el-input
+              v-model="filters.keyword"
+              placeholder="搜索行程标题或目的地"
+              clearable
                 class="filter-input"
                 @keyup.enter="handleSearch"
-              >
-                <template #prefix>
-                  <el-icon><Search /></el-icon>
-                </template>
-              </el-input>
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
             </div>
           </el-col>
           <el-col :span="6">
@@ -74,8 +74,8 @@
                 <div class="trip-overlay">
                   <div class="trip-status-modern">
                     <el-tag :type="getTripStatusType(trip.status)" size="small" class="status-tag">
-                      {{ getTripStatusText(trip.status) }}
-                    </el-tag>
+                    {{ getTripStatusText(trip.status) }}
+                  </el-tag>
                   </div>
                 </div>
                 <div class="trip-gradient"></div>

@@ -244,26 +244,64 @@
     </div>
 
     <!-- 添加账单对话框 -->
-    <el-dialog v-model="showAddExpenseDialog" title="添加账单" width="600px" @close="resetExpenseForm">
+    <el-dialog 
+      v-model="showAddExpenseDialog" 
+      title="添加账单" 
+      width="600px" 
+      class="expense-dialog"
+      :close-on-click-modal="false"
+      @close="resetExpenseForm"
+    >
+      <template #header="{ titleId, titleClass }">
+        <div class="expense-dialog-header">
+          <div class="expense-dialog-icon-wrapper">
+            <el-icon class="expense-dialog-icon"><Money /></el-icon>
+          </div>
+          <span :id="titleId" :class="titleClass">添加账单</span>
+        </div>
+      </template>
+      
       <el-form
         ref="expenseFormRef"
         :model="expenseForm"
         :rules="expenseRules"
-        label-width="100px"
+        label-position="top"
+        class="expense-form"
       >
-        <el-form-item label="支出金额" prop="amount">
-          <el-input-number
-            v-model="expenseForm.amount"
-            :min="0"
-            :precision="2"
-            placeholder="0.00"
-            style="width: 200px"
-          />
-          <span style="margin-left: 8px;">元</span>
+        <el-form-item prop="amount" class="expense-form-item">
+          <template #label>
+            <div class="expense-form-label">
+              <el-icon><Money /></el-icon>
+              <span class="label-text"><span class="required-mark">*</span>支出金额</span>
+            </div>
+          </template>
+          <div class="amount-input-wrapper">
+            <el-input-number
+              v-model="expenseForm.amount"
+              :min="0"
+              :precision="2"
+              placeholder="0.00"
+              size="large"
+              class="expense-amount-input"
+              controls-position="right"
+            />
+            <span class="amount-unit">元</span>
+          </div>
         </el-form-item>
         
-        <el-form-item label="支出类别" prop="category">
-          <el-select v-model="expenseForm.category" placeholder="选择类别" style="width: 100%">
+        <el-form-item prop="category" class="expense-form-item">
+          <template #label>
+            <div class="expense-form-label">
+              <el-icon><List /></el-icon>
+              <span class="label-text"><span class="required-mark">*</span>支出类别</span>
+            </div>
+          </template>
+          <el-select 
+            v-model="expenseForm.category" 
+            placeholder="请选择支出类别" 
+            size="large"
+            class="expense-select"
+          >
             <el-option label="交通" value="transport" />
             <el-option label="住宿" value="accommodation" />
             <el-option label="餐饮" value="food" />
@@ -273,49 +311,89 @@
           </el-select>
         </el-form-item>
         
-        <el-form-item label="支出日期" prop="date">
+        <el-form-item prop="date" class="expense-form-item">
+          <template #label>
+            <div class="expense-form-label">
+              <el-icon><Calendar /></el-icon>
+              <span class="label-text"><span class="required-mark">*</span>支出日期</span>
+            </div>
+          </template>
           <el-date-picker
             v-model="expenseForm.date"
             type="date"
-            placeholder="选择日期"
+            placeholder="请选择支出日期"
             format="YYYY-MM-DD"
             value-format="YYYY-MM-DD"
+            size="large"
+            class="expense-date-picker"
             style="width: 100%"
           />
         </el-form-item>
         
-        <el-form-item label="账单描述">
+        <el-form-item label="账单描述" class="expense-form-item">
+          <template #label>
+            <div class="expense-form-label">
+              <el-icon><Document /></el-icon>
+              <span class="label-text">账单描述</span>
+            </div>
+          </template>
           <el-input
             v-model="expenseForm.description"
             type="textarea"
-            :rows="3"
-            placeholder="详细描述这笔支出"
-            maxlength="100"
+            :rows="4"
+            placeholder="详细描述这笔支出（选填）"
+            maxlength="200"
             show-word-limit
+            class="expense-textarea"
           />
         </el-form-item>
         
-        <el-form-item label="票据上传">
+        <el-form-item label="票据上传" class="expense-form-item">
+          <template #label>
+            <div class="expense-form-label">
+              <el-icon><Picture /></el-icon>
+              <span class="label-text">票据上传</span>
+            </div>
+          </template>
           <el-upload
-            class="receipt-uploader"
+            class="receipt-uploader-modern"
             :show-file-list="false"
             :before-upload="beforeUpload"
             :auto-upload="false"
           >
-            <img v-if="expenseForm.receipt" :src="expenseForm.receipt" class="receipt-image" />
-            <div v-else class="upload-placeholder">
-              <el-icon><Plus /></el-icon>
-              <div class="upload-text">上传票据</div>
+            <img v-if="expenseForm.receipt" :src="expenseForm.receipt" class="receipt-image-modern" />
+            <div v-else class="upload-placeholder-modern">
+              <el-icon class="upload-icon"><Plus /></el-icon>
+              <div class="upload-text-modern">点击上传票据</div>
+              <div class="upload-hint">支持 JPG、PNG 格式，大小不超过 2MB</div>
             </div>
           </el-upload>
         </el-form-item>
       </el-form>
       
       <template #footer>
-        <el-button @click="showAddExpenseDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleAddExpense" :loading="addingExpense">
-          保存账单
-        </el-button>
+        <div class="expense-dialog-footer">
+          <el-button 
+            @click="showAddExpenseDialog = false" 
+            size="large"
+            class="expense-cancel-button"
+          >
+            取消
+          </el-button>
+          <el-button 
+            type="primary" 
+            @click="handleAddExpense" 
+            :loading="addingExpense"
+            size="large"
+            class="expense-submit-button"
+          >
+            <span v-if="!addingExpense">
+              <el-icon><Check /></el-icon>
+              保存账单
+            </span>
+            <span v-else>保存中...</span>
+          </el-button>
+        </div>
       </template>
     </el-dialog>
 
@@ -352,26 +430,64 @@
     </el-dialog>
 
     <!-- 编辑账单对话框 -->
-    <el-dialog v-model="showEditExpenseDialog" title="编辑账单" width="600px" @close="resetEditForm">
+    <el-dialog 
+      v-model="showEditExpenseDialog" 
+      title="编辑账单" 
+      width="600px" 
+      class="expense-dialog"
+      :close-on-click-modal="false"
+      @close="resetEditForm"
+    >
+      <template #header="{ titleId, titleClass }">
+        <div class="expense-dialog-header">
+          <div class="expense-dialog-icon-wrapper">
+            <el-icon class="expense-dialog-icon"><Edit /></el-icon>
+          </div>
+          <span :id="titleId" :class="titleClass">编辑账单</span>
+        </div>
+      </template>
+      
       <el-form
         ref="editFormRef"
         :model="editForm"
         :rules="editRules"
-        label-width="100px"
+        label-position="top"
+        class="expense-form"
       >
-        <el-form-item label="支出金额" prop="amount">
-          <el-input-number
-            v-model="editForm.amount"
-            :min="0"
-            :precision="2"
-            placeholder="0.00"
-            style="width: 200px"
-          />
-          <span style="margin-left: 8px;">元</span>
+        <el-form-item prop="amount" class="expense-form-item">
+          <template #label>
+            <div class="expense-form-label">
+              <el-icon><Money /></el-icon>
+              <span class="label-text"><span class="required-mark">*</span>支出金额</span>
+            </div>
+          </template>
+          <div class="amount-input-wrapper">
+            <el-input-number
+              v-model="editForm.amount"
+              :min="0"
+              :precision="2"
+              placeholder="0.00"
+              size="large"
+              class="expense-amount-input"
+              controls-position="right"
+            />
+            <span class="amount-unit">元</span>
+          </div>
         </el-form-item>
         
-        <el-form-item label="支出类别" prop="category">
-          <el-select v-model="editForm.category" placeholder="选择类别" style="width: 100%">
+        <el-form-item prop="category" class="expense-form-item">
+          <template #label>
+            <div class="expense-form-label">
+              <el-icon><List /></el-icon>
+              <span class="label-text"><span class="required-mark">*</span>支出类别</span>
+            </div>
+          </template>
+          <el-select 
+            v-model="editForm.category" 
+            placeholder="请选择支出类别" 
+            size="large"
+            class="expense-select"
+          >
             <el-option label="交通" value="transport" />
             <el-option label="住宿" value="accommodation" />
             <el-option label="餐饮" value="food" />
@@ -381,49 +497,89 @@
           </el-select>
         </el-form-item>
         
-        <el-form-item label="支出日期" prop="date">
+        <el-form-item prop="date" class="expense-form-item">
+          <template #label>
+            <div class="expense-form-label">
+              <el-icon><Calendar /></el-icon>
+              <span class="label-text"><span class="required-mark">*</span>支出日期</span>
+            </div>
+          </template>
           <el-date-picker
             v-model="editForm.date"
             type="date"
-            placeholder="选择日期"
+            placeholder="请选择支出日期"
             format="YYYY-MM-DD"
             value-format="YYYY-MM-DD"
+            size="large"
+            class="expense-date-picker"
             style="width: 100%"
           />
         </el-form-item>
         
-        <el-form-item label="账单描述">
+        <el-form-item label="账单描述" class="expense-form-item">
+          <template #label>
+            <div class="expense-form-label">
+              <el-icon><Document /></el-icon>
+              <span class="label-text">账单描述</span>
+            </div>
+          </template>
           <el-input
             v-model="editForm.description"
             type="textarea"
-            :rows="3"
-            placeholder="详细描述这笔支出"
+            :rows="4"
+            placeholder="详细描述这笔支出（选填）"
             maxlength="200"
             show-word-limit
+            class="expense-textarea"
           />
         </el-form-item>
         
-        <el-form-item label="票据上传">
+        <el-form-item label="票据上传" class="expense-form-item">
+          <template #label>
+            <div class="expense-form-label">
+              <el-icon><Picture /></el-icon>
+              <span class="label-text">票据上传</span>
+            </div>
+          </template>
           <el-upload
-            class="receipt-uploader"
+            class="receipt-uploader-modern"
             :show-file-list="false"
             :before-upload="beforeEditUpload"
             :auto-upload="false"
           >
-            <img v-if="editForm.receipt" :src="editForm.receipt" class="receipt-image" />
-            <div v-else class="upload-placeholder">
-              <el-icon><Plus /></el-icon>
-              <div class="upload-text">上传票据</div>
+            <img v-if="editForm.receipt" :src="editForm.receipt" class="receipt-image-modern" />
+            <div v-else class="upload-placeholder-modern">
+              <el-icon class="upload-icon"><Plus /></el-icon>
+              <div class="upload-text-modern">点击上传票据</div>
+              <div class="upload-hint">支持 JPG、PNG 格式，大小不超过 2MB</div>
             </div>
           </el-upload>
         </el-form-item>
       </el-form>
       
       <template #footer>
-        <el-button @click="showEditExpenseDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleEditExpense" :loading="editingExpense">
-          保存修改
-        </el-button>
+        <div class="expense-dialog-footer">
+          <el-button 
+            @click="showEditExpenseDialog = false" 
+            size="large"
+            class="expense-cancel-button"
+          >
+            取消
+          </el-button>
+          <el-button 
+            type="primary" 
+            @click="handleEditExpense" 
+            :loading="editingExpense"
+            size="large"
+            class="expense-submit-button"
+          >
+            <span v-if="!editingExpense">
+              <el-icon><Check /></el-icon>
+              保存修改
+            </span>
+            <span v-else>保存中...</span>
+          </el-button>
+        </div>
       </template>
     </el-dialog>
 
@@ -498,7 +654,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowRight, ArrowLeft, Minus } from '@element-plus/icons-vue'
+import { ArrowRight, ArrowLeft, Minus, Money, List, Calendar, Document, Picture, Edit, Check } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import { expenseApi, tripApi, imageApi } from '@/api'
@@ -2070,5 +2226,312 @@ const handleEditExpense = async () => {
 .no-description {
   color: #c0c4cc;
   font-style: italic;
+}
+
+/* 账单对话框样式 */
+:deep(.expense-dialog .el-dialog) {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+:deep(.expense-dialog .el-dialog__header) {
+  padding: 0;
+  margin: 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.expense-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 28px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+}
+
+.expense-dialog-icon-wrapper {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.expense-dialog-icon {
+  font-size: 20px;
+  color: white;
+}
+
+:deep(.expense-dialog .el-dialog__title) {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1d29;
+  letter-spacing: 0.3px;
+}
+
+:deep(.expense-dialog .el-dialog__headerbtn) {
+  top: 24px;
+  right: 24px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+:deep(.expense-dialog .el-dialog__headerbtn:hover) {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+:deep(.expense-dialog .el-dialog__body) {
+  padding: 28px;
+}
+
+/* 账单表单样式 */
+.expense-form {
+  margin-top: 8px;
+}
+
+.expense-form-item {
+  margin-bottom: 24px;
+}
+
+.expense-form-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
+}
+
+.expense-form-label .el-icon {
+  color: #667eea;
+  font-size: 16px;
+}
+
+.label-text {
+  display: inline-flex;
+  align-items: center;
+}
+
+.required-mark {
+  color: #f56c6c;
+  margin-right: 4px;
+  font-weight: 600;
+}
+
+/* 隐藏 Element Plus 默认的必填标记 */
+:deep(.expense-form-item.is-required .el-form-item__label::before) {
+  display: none;
+}
+
+/* 金额输入框 */
+.amount-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+:deep(.expense-amount-input .el-input__wrapper) {
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1) inset;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 12px 16px;
+}
+
+:deep(.expense-amount-input .el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px rgba(102, 126, 234, 0.3) inset;
+  background: rgba(255, 255, 255, 1);
+}
+
+:deep(.expense-amount-input .el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2) inset, 0 4px 12px rgba(102, 126, 234, 0.15);
+  background: rgba(255, 255, 255, 1);
+}
+
+.amount-unit {
+  font-size: 15px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* 选择器样式 */
+:deep(.expense-select .el-input__wrapper) {
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1) inset;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 12px 16px;
+}
+
+:deep(.expense-select .el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px rgba(102, 126, 234, 0.3) inset;
+  background: rgba(255, 255, 255, 1);
+}
+
+:deep(.expense-select .el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2) inset, 0 4px 12px rgba(102, 126, 234, 0.15);
+  background: rgba(255, 255, 255, 1);
+}
+
+/* 日期选择器样式 */
+:deep(.expense-date-picker .el-input__wrapper) {
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1) inset;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 12px 16px;
+}
+
+:deep(.expense-date-picker .el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px rgba(102, 126, 234, 0.3) inset;
+  background: rgba(255, 255, 255, 1);
+}
+
+:deep(.expense-date-picker .el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2) inset, 0 4px 12px rgba(102, 126, 234, 0.15);
+  background: rgba(255, 255, 255, 1);
+}
+
+/* 文本域样式 */
+:deep(.expense-textarea .el-textarea__inner) {
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  transition: all 0.3s ease;
+}
+
+:deep(.expense-textarea .el-textarea__inner:hover) {
+  border-color: rgba(102, 126, 234, 0.3);
+}
+
+:deep(.expense-textarea .el-textarea__inner:focus) {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+/* 票据上传样式 */
+.receipt-uploader-modern {
+  display: inline-block;
+}
+
+.receipt-image-modern {
+  width: 200px;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.receipt-image-modern:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: scale(1.02);
+}
+
+.upload-placeholder-modern {
+  width: 200px;
+  height: 150px;
+  border: 2px dashed rgba(102, 126, 234, 0.3);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: rgba(102, 126, 234, 0.02);
+}
+
+.upload-placeholder-modern:hover {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.05);
+  transform: translateY(-2px);
+}
+
+.upload-icon {
+  font-size: 32px;
+  color: #667eea;
+  margin-bottom: 8px;
+}
+
+.upload-text-modern {
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.upload-hint {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* 对话框底部 */
+.expense-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 28px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background: #fafbfc;
+}
+
+.expense-cancel-button {
+  border-radius: 10px;
+  padding: 10px 24px;
+  font-weight: 500;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: white;
+  color: #374151;
+  transition: all 0.2s ease;
+}
+
+.expense-cancel-button:hover {
+  background: #f9fafb;
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+.expense-submit-button {
+  border-radius: 10px;
+  padding: 10px 24px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.expense-submit-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.expense-submit-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* 表单验证错误样式 */
+:deep(.expense-form-item.is-error .el-input__wrapper),
+:deep(.expense-form-item.is-error .el-textarea__inner),
+:deep(.expense-form-item.is-error .el-input-number__wrapper) {
+  box-shadow: 0 0 0 1px #f56c6c inset;
+}
+
+:deep(.expense-form-item__error) {
+  color: #f56c6c;
+  font-size: 12px;
+  margin-top: 8px;
+  padding-left: 4px;
 }
 </style>

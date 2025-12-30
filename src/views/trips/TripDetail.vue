@@ -553,22 +553,75 @@
     </el-dialog>
 
     <!-- 邀请成员对话框 -->
-    <el-dialog v-model="showInviteMember" title="邀请成员" width="400px">
-      <el-form :model="inviteForm" :rules="inviteRules" ref="inviteFormRef" label-width="100px">
-        <el-form-item label="被邀请人" prop="invitee">
+    <el-dialog 
+      v-model="showInviteMember" 
+      title="邀请成员" 
+      width="500px"
+      class="invite-member-dialog"
+      :close-on-click-modal="false"
+    >
+      <template #header="{ titleId, titleClass }">
+        <div class="invite-dialog-header">
+          <div class="invite-dialog-icon-wrapper">
+            <el-icon class="invite-dialog-icon"><UserFilled /></el-icon>
+          </div>
+          <span :id="titleId" :class="titleClass">邀请成员</span>
+        </div>
+      </template>
+      
+      <el-form 
+        :model="inviteForm" 
+        :rules="inviteRules" 
+        ref="inviteFormRef" 
+        label-position="top"
+        class="invite-form"
+      >
+        <el-form-item prop="invitee" class="invite-form-item">
+          <template #label>
+            <div class="invite-form-label">
+              <el-icon><UserFilled /></el-icon>
+              <span class="label-text"><span class="required-mark">*</span>被邀请人手机号</span>
+            </div>
+          </template>
           <el-input 
             v-model="inviteForm.invitee" 
-            placeholder="请输入被邀请人的手机号"
+            placeholder="请输入被邀请人的手机号码（11位）"
             :maxlength="11"
+            size="large"
+            class="invite-input"
+            :prefix-icon="UserFilled"
+            clearable
           />
-          <div class="form-tip">请输入被邀请人的手机号码</div>
+          <div class="invite-form-tip">
+            <el-icon class="tip-icon"><InfoFilled /></el-icon>
+            <span>请输入11位手机号码，系统将自动查找并邀请该用户</span>
+          </div>
         </el-form-item>
       </el-form>
+      
       <template #footer>
-        <el-button @click="showInviteMember = false">取消</el-button>
-        <el-button type="primary" @click="handleInviteMember" :loading="inviteLoading">
-          发送邀请
-        </el-button>
+        <div class="invite-dialog-footer">
+          <el-button 
+            @click="handleCancelInvite" 
+            size="large"
+            class="invite-cancel-button"
+          >
+            取消
+          </el-button>
+          <el-button 
+            type="primary" 
+            @click="handleInviteMember" 
+            :loading="inviteLoading"
+            size="large"
+            class="invite-submit-button"
+          >
+            <span v-if="!inviteLoading">
+              <el-icon><Check /></el-icon>
+              发送邀请
+            </span>
+            <span v-else>发送中...</span>
+          </el-button>
+        </div>
       </template>
     </el-dialog>
 
@@ -2450,6 +2503,7 @@ const handleInviteMember = async () => {
       showInviteMember.value = false
       // 重置表单
       inviteForm.value.invitee = ''
+      inviteFormRef.value?.clearValidate()
       // 刷新行程详情以更新成员列表
       await loadTripDetail()
       // 重新加载待接受邀请
@@ -2464,6 +2518,13 @@ const handleInviteMember = async () => {
   } finally {
     inviteLoading.value = false
   }
+}
+
+// 取消邀请对话框
+const handleCancelInvite = () => {
+  showInviteMember.value = false
+  inviteForm.value.invitee = ''
+  inviteFormRef.value?.clearValidate()
 }
 
 // 撤销邀请
@@ -3489,6 +3550,208 @@ const handleShowPlaceDetail = async (item: any) => {
 .transport-loading .el-icon {
   font-size: 18px;
   color: #667eea;
+}
+
+/* 邀请成员对话框样式 */
+:deep(.invite-member-dialog .el-dialog) {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+:deep(.invite-member-dialog .el-dialog__header) {
+  padding: 0;
+  margin: 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.invite-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 28px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+}
+
+.invite-dialog-icon-wrapper {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.invite-dialog-icon {
+  font-size: 20px;
+  color: white;
+}
+
+:deep(.invite-member-dialog .el-dialog__title) {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1d29;
+  letter-spacing: 0.3px;
+}
+
+:deep(.invite-member-dialog .el-dialog__headerbtn) {
+  top: 24px;
+  right: 24px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+:deep(.invite-member-dialog .el-dialog__headerbtn:hover) {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+:deep(.invite-member-dialog .el-dialog__body) {
+  padding: 28px;
+}
+
+/* 邀请表单样式 */
+.invite-form {
+  margin-top: 8px;
+}
+
+.invite-form-item {
+  margin-bottom: 0;
+}
+
+.invite-form-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
+}
+
+.invite-form-label .el-icon {
+  color: #667eea;
+  font-size: 16px;
+}
+
+.label-text {
+  display: inline-flex;
+  align-items: center;
+}
+
+.required-mark {
+  color: #f56c6c;
+  margin-right: 4px;
+  font-weight: 600;
+}
+
+/* 隐藏 Element Plus 默认的必填标记 */
+:deep(.invite-form-item.is-required .el-form-item__label::before) {
+  display: none;
+}
+
+:deep(.invite-input .el-input__wrapper) {
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1) inset;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 12px 16px;
+}
+
+:deep(.invite-input .el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px rgba(102, 126, 234, 0.3) inset;
+  background: rgba(255, 255, 255, 1);
+}
+
+:deep(.invite-input .el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2) inset, 0 4px 12px rgba(102, 126, 234, 0.15);
+  background: rgba(255, 255, 255, 1);
+}
+
+:deep(.invite-input .el-input__inner) {
+  font-size: 15px;
+}
+
+.invite-form-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: rgba(102, 126, 234, 0.05);
+  border-radius: 10px;
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.tip-icon {
+  font-size: 16px;
+  color: #667eea;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* 对话框底部 */
+.invite-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 28px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background: #fafbfc;
+}
+
+.invite-cancel-button {
+  border-radius: 10px;
+  padding: 10px 24px;
+  font-weight: 500;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: white;
+  color: #374151;
+  transition: all 0.2s ease;
+}
+
+.invite-cancel-button:hover {
+  background: #f9fafb;
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+.invite-submit-button {
+  border-radius: 10px;
+  padding: 10px 24px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.invite-submit-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.invite-submit-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* 表单验证错误样式 */
+:deep(.invite-form-item.is-error .el-input__wrapper) {
+  box-shadow: 0 0 0 1px #f56c6c inset;
+}
+
+:deep(.invite-form-item__error) {
+  color: #f56c6c;
+  font-size: 12px;
+  margin-top: 8px;
+  padding-left: 4px;
 }
 </style>
 

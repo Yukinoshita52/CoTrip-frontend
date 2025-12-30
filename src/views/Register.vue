@@ -1,5 +1,5 @@
 <template>
-  <div class="login-container">
+  <div class="register-container">
     <!-- 背景装饰元素 -->
     <div class="background-decoration">
       <div class="gradient-orb orb-1"></div>
@@ -7,23 +7,28 @@
       <div class="gradient-orb orb-3"></div>
     </div>
 
-    <!-- 主登录卡片 -->
-    <div class="login-card">
+    <!-- 主注册卡片 -->
+    <div class="register-card">
+      <!-- 返回按钮 -->
+      <div class="back-button" @click="goToLogin">
+        <el-icon><ArrowLeft /></el-icon>
+      </div>
+
       <!-- Logo和标题区域 -->
-      <div class="login-header">
+      <div class="register-header">
         <div class="logo-wrapper">
           <img src="/logo.png" alt="Logo" class="logo-image" />
         </div>
-        <h1 class="login-title">欢迎回来</h1>
-        <p class="login-subtitle">登录您的账号，继续精彩的旅行之旅</p>
+        <h1 class="register-title">创建账号</h1>
+        <p class="register-subtitle">加入我们，开启精彩的旅行之旅</p>
       </div>
 
-      <!-- 登录表单 -->
+      <!-- 注册表单 -->
       <el-form 
-        :model="loginForm" 
-        :rules="rules" 
-        ref="loginFormRef" 
-        class="login-form"
+        :model="registerForm" 
+        :rules="registerRules" 
+        ref="registerFormRef" 
+        class="register-form"
         label-position="top"
       >
         <el-form-item prop="username" class="form-item">
@@ -34,7 +39,7 @@
             </div>
           </template>
           <el-input
-            v-model="loginForm.username"
+            v-model="registerForm.username"
             placeholder="请输入用户名"
             size="large"
             class="custom-input"
@@ -51,36 +56,75 @@
             </div>
           </template>
           <el-input
-            v-model="loginForm.password"
+            v-model="registerForm.password"
             type="password"
-            placeholder="请输入密码"
+            placeholder="请输入密码（至少6位）"
             size="large"
             class="custom-input"
             :prefix-icon="Lock"
             show-password
             clearable
-            @keyup.enter="handleLogin"
           />
         </el-form-item>
+
+        <el-form-item prop="confirmPassword" class="form-item">
+          <template #label>
+            <div class="form-label">
+              <el-icon><Lock /></el-icon>
+              <span class="label-text"><span class="required-mark">*</span>确认密码</span>
+            </div>
+          </template>
+          <el-input
+            v-model="registerForm.confirmPassword"
+            type="password"
+            placeholder="请再次输入密码"
+            size="large"
+            class="custom-input"
+            :prefix-icon="Lock"
+            show-password
+            clearable
+            @keyup.enter="handleRegister"
+          />
+        </el-form-item>
+
+        <!-- 密码强度指示器 -->
+        <div class="password-strength" v-if="registerForm.password">
+          <div class="strength-label">密码强度：</div>
+          <div class="strength-bars">
+            <div 
+              class="strength-bar" 
+              :class="getPasswordStrengthClass(0)"
+            ></div>
+            <div 
+              class="strength-bar" 
+              :class="getPasswordStrengthClass(1)"
+            ></div>
+            <div 
+              class="strength-bar" 
+              :class="getPasswordStrengthClass(2)"
+            ></div>
+          </div>
+          <span class="strength-text">{{ getPasswordStrengthText() }}</span>
+        </div>
 
         <el-form-item class="submit-item">
           <el-button
             type="primary"
             size="large"
-            :loading="loading"
-            @click="handleLogin"
-            class="login-button"
+            :loading="registerLoading"
+            @click="handleRegister"
+            class="register-button"
           >
-            <span v-if="!loading">立即登录</span>
-            <span v-else>登录中...</span>
+            <span v-if="!registerLoading">立即注册</span>
+            <span v-else>注册中...</span>
           </el-button>
         </el-form-item>
 
-        <!-- 注册链接 -->
-        <div class="register-link">
-          <span>还没有账号？</span>
-          <el-link type="primary" @click="goToRegister" class="link-text">
-            立即注册
+        <!-- 登录链接 -->
+        <div class="login-link">
+          <span>已有账号？</span>
+          <el-link type="primary" @click="goToLogin" class="link-text">
+            立即登录
           </el-link>
         </div>
       </el-form>
@@ -89,76 +133,124 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { User, Lock } from '@element-plus/icons-vue'
+import { User, Lock, ArrowLeft } from '@element-plus/icons-vue'
 import { authApi } from '@/api'
-import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
-const userStore = useUserStore()
 
-const loginFormRef = ref<FormInstance>()
-const loading = ref(false)
+const registerFormRef = ref<FormInstance>()
+const registerLoading = ref(false)
 
-const loginForm = reactive({
+const registerForm = reactive({
   username: '',
-  password: ''
+  password: '',
+  confirmPassword: ''
 })
 
-const rules: FormRules = {
+const validateConfirmPassword = (_rule: any, value: any, callback: any) => {
+  if (!value) {
+    callback(new Error('请确认密码'))
+  } else if (value !== registerForm.password) {
+    callback(new Error('两次输入的密码不一致'))
+  } else {
+    callback()
+  }
+}
+
+const registerRules: FormRules = {
   username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' }
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 3, max: 20, message: '用户名长度在 3 到 20 个字符', trigger: 'blur' },
+    { pattern: /^[a-zA-Z0-9_]+$/, message: '用户名只能包含字母、数字和下划线', trigger: 'blur' }
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码长度至少6位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请确认密码', trigger: 'blur' },
+    { validator: validateConfirmPassword, trigger: 'blur' }
   ]
 }
 
-const handleLogin = async () => {
-  if (!loginFormRef.value) return
+// 计算密码强度
+const getPasswordStrength = computed(() => {
+  const password = registerForm.password
+  if (!password) return 0
+  
+  let strength = 0
+  if (password.length >= 6) strength++
+  if (password.length >= 8) strength++
+  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++
+  if (/\d/.test(password)) strength++
+  if (/[^a-zA-Z0-9]/.test(password)) strength++
+  
+  if (strength <= 2) return 1
+  if (strength <= 4) return 2
+  return 3
+})
+
+const getPasswordStrengthClass = (index: number) => {
+  const strength = getPasswordStrength.value
+  if (index < strength) {
+    if (strength === 1) return 'weak'
+    if (strength === 2) return 'medium'
+    return 'strong'
+  }
+  return ''
+}
+
+const getPasswordStrengthText = () => {
+  const strength = getPasswordStrength.value
+  if (strength === 1) return '弱'
+  if (strength === 2) return '中'
+  if (strength === 3) return '强'
+  return ''
+}
+
+const handleRegister = async () => {
+  if (!registerFormRef.value) return
   
   try {
-    await loginFormRef.value.validate()
+    await registerFormRef.value.validate()
   } catch (error) {
     console.log('表单验证失败:', error)
     return
   }
   
-  loading.value = true
+  registerLoading.value = true
   try {
-    const res = await authApi.login(loginForm.username, loginForm.password)
+    const res = await authApi.register({
+      username: registerForm.username,
+      password: registerForm.password,
+      confirmPassword: registerForm.confirmPassword
+    })
     
     if (res.code === 200 && res.data) {
-      localStorage.setItem('token', res.data.token)
-      
-      if (res.data.userId) {
-        await userStore.fetchCurrentUser()
-      }
-      
-      ElMessage.success('登录成功')
-      router.push('/dashboard')
+      ElMessage.success('注册成功，请登录')
+      router.push('/login')
     } else {
-      ElMessage.error(res.message || '登录失败')
+      ElMessage.error(res.message || '注册失败')
     }
   } catch (error: any) {
-    console.error('登录错误:', error)
-    const errorMessage = error?.response?.data?.message || error?.message || '登录失败，请稍后再试'
+    console.error('注册错误:', error)
+    const errorMessage = error?.response?.data?.message || error?.message || '注册失败，请稍后再试'
     ElMessage.error(errorMessage)
   } finally {
-    loading.value = false
+    registerLoading.value = false
   }
 }
 
-const goToRegister = () => {
-  router.push('/register')
+const goToLogin = () => {
+  router.push('/login')
 }
 </script>
 
 <style scoped>
-.login-container {
+.register-container {
   position: relative;
   display: flex;
   justify-content: center;
@@ -241,8 +333,8 @@ const goToRegister = () => {
   }
 }
 
-/* 登录卡片 */
-.login-card {
+/* 注册卡片 */
+.register-card {
   position: relative;
   width: 100%;
   max-width: 480px;
@@ -268,8 +360,31 @@ const goToRegister = () => {
   }
 }
 
+/* 返回按钮 */
+.back-button {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 10;
+}
+
+.back-button:hover {
+  background: rgba(102, 126, 234, 0.2);
+  transform: translateX(-2px);
+}
+
 /* 头部区域 */
-.login-header {
+.register-header {
   text-align: center;
   margin-bottom: 40px;
 }
@@ -307,7 +422,7 @@ const goToRegister = () => {
   border-radius: 8px;
 }
 
-.login-title {
+.register-title {
   font-size: 32px;
   font-weight: 700;
   color: #1a1d29;
@@ -315,7 +430,7 @@ const goToRegister = () => {
   letter-spacing: -0.5px;
 }
 
-.login-subtitle {
+.register-subtitle {
   font-size: 15px;
   color: #6b7280;
   margin: 0;
@@ -323,7 +438,7 @@ const goToRegister = () => {
 }
 
 /* 表单样式 */
-.login-form {
+.register-form {
   margin-top: 8px;
 }
 
@@ -384,13 +499,75 @@ const goToRegister = () => {
   font-size: 15px;
 }
 
+/* 密码强度指示器 */
+.password-strength {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 12px 16px;
+  background: rgba(102, 126, 234, 0.05);
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.strength-label {
+  color: #6b7280;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.strength-bars {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.strength-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: #e5e7eb;
+  transition: all 0.3s ease;
+}
+
+.strength-bar.weak {
+  background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
+.strength-bar.medium {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.strength-bar.strong {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.strength-text {
+  font-weight: 600;
+  min-width: 24px;
+  text-align: right;
+}
+
+.strength-bar.weak ~ .strength-text {
+  color: #ef4444;
+}
+
+.strength-bar.medium ~ .strength-text {
+  color: #f59e0b;
+}
+
+.strength-bar.strong ~ .strength-text {
+  color: #10b981;
+}
+
 /* 提交按钮 */
 .submit-item {
   margin-bottom: 24px;
   margin-top: 32px;
 }
 
-.login-button {
+.register-button {
   width: 100%;
   height: 52px;
   font-size: 16px;
@@ -402,17 +579,17 @@ const goToRegister = () => {
   transition: all 0.3s ease;
 }
 
-.login-button:hover:not(:disabled) {
+.register-button:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(102, 126, 234, 0.5);
 }
 
-.login-button:active:not(:disabled) {
+.register-button:active:not(:disabled) {
   transform: translateY(0);
 }
 
-/* 注册链接 */
-.register-link {
+/* 登录链接 */
+.login-link {
   text-align: center;
   font-size: 14px;
   color: #6b7280;
@@ -430,12 +607,12 @@ const goToRegister = () => {
 
 /* 响应式设计 */
 @media (max-width: 640px) {
-  .login-card {
+  .register-card {
     padding: 36px 24px;
     border-radius: 20px;
   }
 
-  .login-title {
+  .register-title {
     font-size: 28px;
   }
 

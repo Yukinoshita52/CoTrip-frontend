@@ -2,9 +2,18 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ElMessage } from 'element-plus'
 import type { ApiResponse } from '@/types'
 
+// 获取API基础URL
+const getBaseURL = () => {
+  // 生产环境使用环境变量，开发环境使用代理
+  if (import.meta.env.PROD) {
+    return import.meta.env.VITE_API_BASE_URL || 'http://139.199.15.121:52416/api'
+  }
+  return '/api' // 开发环境使用代理
+}
+
 // 创建axios实例
 const api: AxiosInstance = axios.create({
-  baseURL: '/api', // 使用代理，会被vite转发到后端
+  baseURL: getBaseURL(),
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'

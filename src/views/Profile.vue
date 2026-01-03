@@ -23,15 +23,11 @@
             <h1 class="user-name-modern">{{ userInfo.nickname || userInfo.username }}</h1>
             <p class="username-modern">@{{ userInfo.username }}</p>
             <div class="user-contact-modern">
-              <div class="contact-item" v-if="userInfo.email">
-                <el-icon class="contact-icon"><Message /></el-icon>
-                <span>{{ userInfo.email }}</span>
-              </div>
               <div class="contact-item" v-if="userInfo.phone">
                 <el-icon class="contact-icon"><Phone /></el-icon>
                 <span>{{ userInfo.phone }}</span>
               </div>
-              <div class="contact-item no-contact" v-if="!userInfo.email && !userInfo.phone">
+              <div class="contact-item no-contact" v-if="!userInfo.phone">
                 <el-icon class="contact-icon"><InfoFilled /></el-icon>
                 <span>未设置联系方式</span>
               </div>
@@ -68,10 +64,6 @@
 
                   <el-form-item label="昵称">
                     <el-input v-model="settingsForm.nickname" placeholder="请输入昵称" class="form-input-modern" />
-                  </el-form-item>
-
-                  <el-form-item label="邮箱">
-                    <el-input v-model="settingsForm.email" placeholder="请输入邮箱" class="form-input-modern" />
                   </el-form-item>
 
                   <el-form-item label="手机号">
@@ -121,10 +113,10 @@
                     </div>
                   </el-form-item>
 
-                  <el-form-item label="邮件通知">
+                  <el-form-item label="短信通知">
                     <div class="switch-item-modern">
-                      <el-switch v-model="privacySettings.emailNotification" />
-                      <span class="switch-desc">接收行程更新和邀请邮件</span>
+                      <el-switch v-model="privacySettings.smsNotification" />
+                      <span class="switch-desc">接收行程更新和邀请短信</span>
                     </div>
                   </el-form-item>
 
@@ -231,7 +223,6 @@ const userInfo = ref({
   id: '',
   username: '',
   nickname: '',
-  email: '',
   phone: '',
   avatarUrl: '',
   bio: '',
@@ -242,14 +233,13 @@ const userInfo = ref({
 const settingsForm = reactive({
   username: '',
   nickname: '',
-  email: '',
   phone: '',
   bio: ''
 })
 
 const privacySettings = reactive({
   allowInvite: true,
-  emailNotification: true
+  smsNotification: true
 })
 
 const passwordForm = reactive({
@@ -394,7 +384,6 @@ const loadUserInfo = async () => {
       id: String(userStore.user.id || userStore.user.userId || ''),
       username: userStore.user.username || '',
       nickname: userStore.user.nickname || userStore.user.username || '',
-      email: userStore.user.email || '',
       phone: userStore.user.phone || '',
       avatarUrl: avatarUrl,
       bio: '',
@@ -408,7 +397,6 @@ const loadUserInfo = async () => {
         id: String(user.id || user.userId || ''),
         username: user.username || '',
         nickname: user.nickname || user.username || '',
-        email: user.email || '',
         phone: user.phone || '',
         avatarUrl: user.avatarUrl || '',
         bio: '',
@@ -420,7 +408,6 @@ const loadUserInfo = async () => {
   // 同步表单数据
   settingsForm.username = userInfo.value.username
   settingsForm.nickname = userInfo.value.nickname
-  settingsForm.email = userInfo.value.email
   settingsForm.phone = userInfo.value.phone
   settingsForm.bio = userInfo.value.bio
 }

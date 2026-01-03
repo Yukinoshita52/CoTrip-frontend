@@ -8,7 +8,6 @@ export interface User {
   userId?: number
   username: string
   nickname?: string
-  email?: string
   phone?: string
   avatarUrl?: string
   role?: number // 用户角色：0-普通用户，1-管理员

@@ -2,9 +2,10 @@
 export interface User {
   id: string
   username: string
-  email: string
   avatar?: string
   nickname: string
+  phone?: string
+  avatarUrl?: string
   createdAt: string
 }
 

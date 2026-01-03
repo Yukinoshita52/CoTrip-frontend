@@ -120,20 +120,14 @@
           </template>
           
           <div class="member-section-modern">
-            <div class="add-member-modern">
-              <el-input
-                v-model="newMemberEmail"
-                placeholder="输入邮箱邀请成员"
-                class="member-input-modern"
-              >
-                <template #prefix>
-                  <el-icon><Message /></el-icon>
-                </template>
-              </el-input>
-              <el-button @click="addMember" type="primary" class="invite-btn-modern">
-                <el-icon><Plus /></el-icon>
-                邀请成员
-              </el-button>
+            <div class="member-hint-modern">
+              <el-alert
+                title="成员邀请"
+                description="行程创建后，可以在行程详情页面通过用户名邀请成员加入"
+                type="info"
+                :closable="false"
+                show-icon
+              />
             </div>
             
             <div class="member-list-modern" v-if="form.members.length > 0">
@@ -191,7 +185,6 @@ import type { TripMember } from '@/types'
 const router = useRouter()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
-const newMemberEmail = ref('')
 
 // 表单数据
 const form = reactive({
@@ -277,16 +270,7 @@ const removeCover = () => {
   ElMessage.success('封面已移除')
 }
 
-const addMember = () => {
-  if (!newMemberEmail.value) {
-    ElMessage.warning('请输入邮箱地址')
-    return
-  }
-  
-  // 实际应该调用邀请API，这里暂时提示功能待实现
-  ElMessage.info('邀请功能待实现，请在行程创建后通过行程详情页面邀请成员')
-  newMemberEmail.value = ''
-}
+// 删除了邮箱邀请功能，行程创建后可在详情页面邀请成员
 
 const removeMember = (userId: string) => {
   const index = form.members.findIndex(m => m.userId === userId)
@@ -542,6 +526,16 @@ const handleSubmit = async () => {
 /* 成员管理样式 */
 .member-section-modern {
   margin-top: 8px;
+}
+
+.member-hint-modern {
+  margin-bottom: 16px;
+}
+
+.member-hint-modern :deep(.el-alert) {
+  border-radius: 8px;
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  background: rgba(102, 126, 234, 0.05);
 }
 
 .add-member-modern {

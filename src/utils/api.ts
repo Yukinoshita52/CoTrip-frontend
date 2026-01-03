@@ -10,7 +10,7 @@ const getBaseURL = () => {
   }
   return '/api' // 开发环境使用代理
 }
-
+//asdgads
 // 创建axios实例
 const api: AxiosInstance = axios.create({
   baseURL: getBaseURL(),

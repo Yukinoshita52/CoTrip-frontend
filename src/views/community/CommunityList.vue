@@ -457,7 +457,6 @@ const loadPosts = async () => {
           author: {
             id: String(author.userId || author.id || ''),
             username: author.username || author.nickname || '',
-            email: author.email || '',
             nickname: author.nickname || author.username || '',
             avatar: author.avatarUrl || author.avatar || '',
             avatarUrl: author.avatarUrl || author.avatar || '',
@@ -621,7 +620,6 @@ const handleSearch = async () => {
             author: {
               id: String(author.userId || author.id || ''),
               username: author.username || author.nickname || '',
-              email: author.email || '',
               nickname: author.nickname || author.username || '',
               avatar: author.avatarUrl || author.avatar || '',
               avatarUrl: author.avatarUrl || author.avatar || '',

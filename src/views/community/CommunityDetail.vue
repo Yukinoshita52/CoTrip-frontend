@@ -564,7 +564,6 @@ const loadPostDetail = async () => {
         author: {
           id: String(data.author?.userId || data.authorId || ''),
           username: data.author?.username || '',
-          email: data.author?.email || '',
           nickname: data.author?.nickname || data.author?.username || '',
           avatar: data.author?.avatar || '',
           createdAt: ''

@@ -506,6 +506,28 @@ export const adminApi = {
   // 获取系统统计数据
   getStatistics() {
     return request.get<{ totalUsers: number; totalTrips: number; totalPosts: number }>('/admin/statistics')
+  },
+
+  // 搜索用户（通过用户名或手机号）
+  searchUsers(keyword: string) {
+    return request.get<UserVO[]>('/admin/users/search', {
+      params: { keyword }
+    })
+  },
+
+  // 提升用户为管理员
+  promoteToAdmin(identifier: string) {
+    return request.post<void>('/admin/promote', { identifier })
+  },
+
+  // 取消用户的管理员权限
+  demoteFromAdmin(identifier: string) {
+    return request.post<void>('/admin/demote', { identifier })
+  },
+
+  // 获取所有管理员列表
+  getAllAdmins() {
+    return request.get<UserVO[]>('/admin/admins')
   }
 }
 

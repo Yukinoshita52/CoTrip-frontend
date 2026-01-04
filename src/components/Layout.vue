@@ -51,6 +51,10 @@
             <el-icon><Document /></el-icon>
             <span>公告管理</span>
           </el-menu-item>
+          <el-menu-item index="/admin/settings">
+            <el-icon><Setting /></el-icon>
+            <span>管理员设置</span>
+          </el-menu-item>
         </template>
         
         <el-menu-item index="/profile">
@@ -117,7 +121,8 @@ import {
   User,
   UserFilled,
   SwitchButton,
-  ArrowDown
+  ArrowDown,
+  Setting
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { formatAvatarUrl } from '@/utils/image'
